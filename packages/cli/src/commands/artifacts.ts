@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, basename } from "node:path";
-import type { ArtifactKind } from "@open-artifacts/shared";
+import type { ArtifactKind } from "../scopes.js";
 import { requireCredentials } from "../config.js";
 import { makeClient, CliApiError } from "../client.js";
 

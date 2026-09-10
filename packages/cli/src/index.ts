@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { isValidScope, API_KEY_SCOPES } from "@open-artifacts/shared";
+import { isValidScope, API_KEY_SCOPES } from "./scopes.js";
 import { login } from "./commands/login.js";
 import { listCommand, pushCommand, getCommand, rmCommand } from "./commands/artifacts.js";
 import { shareCommand, unshareCommand, whoamiCommand } from "./commands/share.js";
