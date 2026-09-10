@@ -1,0 +1,20 @@
+{
+  "name": "open-artifacts",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter=./packages/* --filter=./apps/* run build",
+    "dev:api": "pnpm --filter @open-artifacts/api dev",
+    "dev:web": "pnpm --filter @open-artifacts/web dev",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "db:generate": "pnpm --filter @open-artifacts/api db:generate",
+    "db:migrate": "pnpm --filter @open-artifacts/api db:migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
