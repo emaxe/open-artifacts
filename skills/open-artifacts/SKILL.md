@@ -10,22 +10,48 @@ Markdown, Mermaid, or SVG content to it and get back a URL a human can open in a
 renders in a sandboxed iframe (no access to the host page, no network access out), so it's safe to
 publish agent-generated content without a security review.
 
-## Setup (once per machine)
+## Setup
 
+Do this check at the start of every session before running any other `oa` command — don't assume
+it's installed just because it was there last time.
+
+**1. Check whether the CLI is already installed:**
 ```bash
-npm install -g @emaxe/oa   # installs the `oa` CLI
+command -v oa >/dev/null 2>&1 && oa --version
+```
+If that prints a version, skip to step 3. If it prints nothing / "command not found", install it:
+```bash
+npm install -g @emaxe/oa
+```
+(No npm on this machine? See the "no CLI available" note at the bottom of this file instead of
+trying to install Node — use the raw HTTP reference.)
+
+**2. Re-check after installing:**
+```bash
+command -v oa >/dev/null 2>&1 && oa --version
+```
+If this still fails, npm's global bin directory likely isn't on `PATH` — check `npm config get
+prefix` and add `<prefix>/bin` to `PATH`, or fall back to the raw HTTP reference.
+
+**3. Check whether you're already authenticated** (don't make the human re-approve a device flow
+they already completed):
+```bash
+oa whoami
+```
+If this succeeds ("Token is valid."), you're done — skip straight to the recipes below. If it
+fails (`Not logged in...` or `key_expired`), authenticate:
+```bash
 oa login --server https://artifacts.your-company.com
 ```
-
 `oa login` starts a device-flow authorization: it prints a code and a URL, a human opens the URL
 in their browser, logs in, picks an organization, and approves. The CLI then saves credentials to
-`~/.config/open-artifacts/credentials.json` (mode 600) and you're done — no need to repeat this
-per session. If a URL isn't reachable interactively, ask the human to run `oa login` for you once
-and confirm it succeeded before continuing.
+`~/.config/open-artifacts/credentials.json` (mode 600) — no need to repeat this per session. If a
+URL isn't reachable interactively, ask the human to run `oa login` for you once and confirm it
+succeeded before continuing.
 
-Alternative: if a `OA_TOKEN` (and optionally `OA_SERVER`) environment variable is already set, the
-CLI uses it directly and skips the device flow entirely — check for that first if you're running
-in an environment where env vars are the normal way secrets are injected.
+Alternative: if `OA_TOKEN` (and optionally `OA_SERVER`) is already set in the environment, the CLI
+uses it directly and skips both the install-check's login step and the device flow entirely —
+check for that first if you're running somewhere env vars are the normal way secrets are injected.
 
 ## Recipes
 
