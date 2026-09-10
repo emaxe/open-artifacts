@@ -1,5 +1,8 @@
 # Open Artifacts
 
+[![GitHub](https://img.shields.io/badge/GitHub-emaxe%2Fopen--artifacts-blue?logo=github)](https://github.com/emaxe/open-artifacts)
+[![Stars](https://img.shields.io/github/stars/emaxe/open-artifacts?style=social)](https://github.com/emaxe/open-artifacts/stargazers)
+
 Self-hosted artifact hosting for AI agents — an open alternative to Claude Artifacts. Any agent
 (not just Claude) authenticates with a token, publishes HTML/Markdown/Mermaid/SVG content, and
 gets back a link a human can open in a browser. Runs as one Docker Compose stack.
