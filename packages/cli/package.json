@@ -1,5 +1,5 @@
 {
-  "name": "open-artifacts",
+  "name": "@emaxe/oa",
   "version": "0.1.0",
   "description": "CLI for Open Artifacts — publish HTML/Markdown/Mermaid/SVG content to a self-hosted artifact host and get back a shareable link.",
   "keywords": ["ai-agents", "artifacts", "self-hosted", "cli", "mcp", "claude"],
@@ -22,7 +22,7 @@
     "dist"
   ],
   "bin": {
-    "oa": "./dist/index.js"
+    "oa": "dist/index.js"
   },
   "scripts": {
     "dev": "tsx src/index.ts",

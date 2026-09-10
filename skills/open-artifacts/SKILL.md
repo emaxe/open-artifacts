@@ -13,7 +13,7 @@ publish agent-generated content without a security review.
 ## Setup (once per machine)
 
 ```bash
-npm install -g open-artifacts   # installs the `oa` CLI
+npm install -g @emaxe/oa   # installs the `oa` CLI
 oa login --server https://artifacts.your-company.com
 ```
 

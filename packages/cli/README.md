@@ -5,7 +5,7 @@ alternative to Claude Artifacts. Publish HTML, Markdown, Mermaid, or SVG content
 instance and get back a shareable link, from any AI agent or script.
 
 ```bash
-npm install -g open-artifacts
+npm install -g @emaxe/oa
 ```
 
 ## Usage
