@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { getArtifact, getVersionByNumber, resolveAccessForIdentity } from "../services/artifacts.js";
 import { createShare, listSharesForArtifact, revokeShare } from "../services/shares.js";
 import { recordAudit } from "../services/audit.js";
+import { requiresScope } from "../services/scopes.js";
 import { shares } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 
@@ -34,6 +35,8 @@ shareRoutes.get("/artifacts/:id/shares", requireAuth, async (c) => {
 
 shareRoutes.post("/artifacts/:id/shares", requireAuth, async (c) => {
   const identity = c.get("identity")!;
+  if (!requiresScope(identity, "shares:write")) return c.json({ error: { code: "forbidden", message: "Missing scope shares:write" } }, 403);
+
   const db = c.get("db");
   const artifact = await getArtifact(db, c.req.param("id"));
   if (!artifact) return c.json({ error: { code: "not_found" } }, 404);
@@ -70,6 +73,8 @@ shareRoutes.post("/artifacts/:id/shares", requireAuth, async (c) => {
 
 shareRoutes.delete("/shares/:id", requireAuth, async (c) => {
   const identity = c.get("identity")!;
+  if (!requiresScope(identity, "shares:write")) return c.json({ error: { code: "forbidden", message: "Missing scope shares:write" } }, 403);
+
   const db = c.get("db");
   const share = await db.query.shares.findFirst({ where: eq(shares.id, c.req.param("id")) });
   if (!share) return c.json({ error: { code: "not_found" } }, 404);

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { buildEmbedCsp, hasScope, createArtifactSchema, updateArtifactSchema } from "@open-artifacts/shared";
-import type { AppBindings, Identity } from "../types.js";
+import { buildEmbedCsp, createArtifactSchema, updateArtifactSchema } from "@open-artifacts/shared";
+import type { AppBindings } from "../types.js";
 import { requireAuth } from "../middleware/auth.js";
 import {
   ArtifactTooLargeError,
@@ -20,13 +20,10 @@ import {
 import { renderArtifactHtml } from "../services/render.js";
 import { recordAudit } from "../services/audit.js";
 import { getOrgRole } from "../services/users.js";
+import { requiresScope } from "../services/scopes.js";
 import { defaultInstanceSettings, getInstanceSettings } from "../services/settings.js";
 
 export const artifactRoutes = new Hono<AppBindings>();
-
-function requiresScope(identity: Identity, scope: Parameters<typeof hasScope>[1]): boolean {
-  return identity.kind === "user" || hasScope(identity.scopes, scope);
-}
 
 artifactRoutes.get("/artifacts", requireAuth, async (c) => {
   const identity = c.get("identity")!;

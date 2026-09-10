@@ -29,6 +29,7 @@ apps/web/       React SPA (Vite) — the admin/user web UI
 packages/shared/  Zod schemas + pure logic shared by api/web/cli (access rules, CSP, TTL parsing...)
 packages/cli/   `oa` CLI for agents (published as npm package `@emaxe/oa`)
 skills/open-artifacts/  SKILL.md for AI agents to use the CLI/API
+apps/api/src/routes/mcp.ts  MCP server, mounted at /mcp on the same API
 docker/         Dockerfile (multi-stage) used by docker-compose.yml
 ```
 
@@ -75,6 +76,27 @@ npx skills add emaxe/open-artifacts
 This drops the skill into whichever supported agent it detects (Claude Code, Cursor, Codex,
 OpenCode, and more) so the agent knows how to install the `oa` CLI, log in, and publish/share
 artifacts. See `skills/open-artifacts/SKILL.md` for what it teaches the agent.
+
+## MCP server
+
+Every instance exposes an MCP server at `<APP_ORIGIN>/mcp` (Streamable HTTP) — no separate process
+or package to install. Point any MCP client's remote-server config at it with an agent API key
+(the same kind `oa login` or the web UI's Agents page issues) as a Bearer token:
+
+```json
+{
+  "mcpServers": {
+    "open-artifacts": {
+      "url": "http://localhost:3000/mcp",
+      "headers": { "Authorization": "Bearer oa_live_..." }
+    }
+  }
+}
+```
+
+Tools: `whoami`, `list_artifacts`, `get_artifact`, `create_artifact`, `update_artifact`,
+`delete_artifact`, `create_share`, `list_shares`, `revoke_share` — each enforces the calling key's
+scopes exactly like the REST API (see `apps/api/src/routes/mcp.ts`).
 
 ## Configuration
 

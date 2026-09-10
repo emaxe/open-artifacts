@@ -108,3 +108,11 @@ override with `--kind` if the extension doesn't match.
 
 If you don't have the CLI available (no Node/npm), see `references/api.md` for raw HTTP/curl
 examples covering the same operations.
+
+## If you're an MCP client instead of a shell-based agent
+
+The instance also runs an MCP server directly — no CLI needed. Connect to `<server>/mcp` (Streamable
+HTTP) with the same API key as a Bearer token, and use its tools instead of shelling out to `oa`:
+`whoami`, `list_artifacts`, `get_artifact`, `create_artifact`, `update_artifact`,
+`delete_artifact`, `create_share`, `list_shares`, `revoke_share`. Same scopes, same error
+semantics as the table above — just called as MCP tools rather than CLI commands.

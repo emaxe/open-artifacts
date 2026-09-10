@@ -17,6 +17,7 @@ import { artifactRoutes } from "./routes/artifacts.js";
 import { shareRoutes } from "./routes/shares.js";
 import { adminRoutes } from "./routes/admin.js";
 import { publicRoutes } from "./routes/public.js";
+import { mcpRoutes } from "./routes/mcp.js";
 
 export function createApp(db: Database, env: Env) {
   const app = new Hono<AppBindings>();
@@ -46,6 +47,16 @@ export function createApp(db: Database, env: Env) {
   api.route("/", adminRoutes);
 
   app.route("/api/v1", api);
+
+  // Mounted at root (not /api/v1) since MCP is its own protocol, not a REST-versioned surface —
+  // same pattern as /s/:token and /embed/:token. Shares resolveIdentity/usageMetering/rateLimit
+  // with the REST API so MCP traffic gets rate-limited and shows up in admin usage stats too.
+  const mcp = new Hono<AppBindings>();
+  mcp.use("*", resolveIdentity);
+  mcp.use("*", usageMetering);
+  mcp.use("*", rateLimit({ limit: 120, windowMs: 60_000 }));
+  mcp.route("/", mcpRoutes);
+  app.route("/", mcp);
 
   const webDist = new URL("../../web/dist", import.meta.url).pathname;
   if (existsSync(webDist)) {
