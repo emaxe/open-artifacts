@@ -12,7 +12,7 @@ interface ArtifactSummary {
   updatedAt: string;
 }
 
-function inferKind(filePath: string): ArtifactKind {
+export function inferKind(filePath: string): ArtifactKind {
   const ext = extname(filePath).toLowerCase();
   if (ext === ".md" || ext === ".markdown") return "markdown";
   if (ext === ".svg") return "svg";

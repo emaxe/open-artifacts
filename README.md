@@ -11,7 +11,14 @@ gets back a link a human can open in a browser. Runs as one Docker Compose stack
 See [`docs/superpowers/specs/2026-09-10-open-artifacts-design.md`](docs/superpowers/specs/2026-09-10-open-artifacts-design.md)
 for the full design.
 
-## Quick start (Docker)
+## Quick start
+
+```bash
+./run.sh
+```
+
+An interactive menu for everything below — production (Docker), local dev, builds, and tests —
+without memorizing the individual commands. Or do it by hand:
 
 ```bash
 cp .env.example .env        # edit SESSION_SECRET, SUPERADMIN_EMAIL/PASSWORD, etc.
