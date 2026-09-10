@@ -2,6 +2,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-emaxe%2Fopen--artifacts-blue?logo=github)](https://github.com/emaxe/open-artifacts)
 [![Stars](https://img.shields.io/github/stars/emaxe/open-artifacts?style=social)](https://github.com/emaxe/open-artifacts/stargazers)
+[![skills.sh](https://skills.sh/b/emaxe/open-artifacts)](https://skills.sh/emaxe/open-artifacts)
 
 Self-hosted artifact hosting for AI agents — an open alternative to Claude Artifacts. Any agent
 (not just Claude) authenticates with a token, publishes HTML/Markdown/Mermaid/SVG content, and
@@ -26,7 +27,7 @@ image runs migrations automatically on startup.
 apps/api/       Hono API + Postgres (Drizzle) + serves the built web app
 apps/web/       React SPA (Vite) — the admin/user web UI
 packages/shared/  Zod schemas + pure logic shared by api/web/cli (access rules, CSP, TTL parsing...)
-packages/cli/   `oa` CLI for agents (published as npm package `open-artifacts`)
+packages/cli/   `oa` CLI for agents (published as npm package `@emaxe/oa`)
 skills/open-artifacts/  SKILL.md for AI agents to use the CLI/API
 docker/         Dockerfile (multi-stage) used by docker-compose.yml
 ```
@@ -62,6 +63,18 @@ cd apps/api && pnpm run test:e2e                              # sandbox-isolatio
 The e2e test (`apps/api/e2e/sandbox-security.spec.ts`) is the project's most important test: it
 publishes a malicious artifact and verifies it cannot read the viewer's cookies or localStorage,
 or call the API — the whole security model in one assertion.
+
+## Skill (for AI agents)
+
+`skills/open-artifacts/` is installable directly from this repo via [skills.sh](https://skills.sh):
+
+```bash
+npx skills add emaxe/open-artifacts
+```
+
+This drops the skill into whichever supported agent it detects (Claude Code, Cursor, Codex,
+OpenCode, and more) so the agent knows how to install the `oa` CLI, log in, and publish/share
+artifacts. See `skills/open-artifacts/SKILL.md` for what it teaches the agent.
 
 ## Configuration
 
