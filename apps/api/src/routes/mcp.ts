@@ -17,6 +17,7 @@ import {
   ArtifactTooLargeError,
   QuotaExceededError,
   VersionConflictError,
+  LifetimeExceedsMaxError,
   createArtifact,
   getArtifact,
   getCurrentVersion,
@@ -27,6 +28,7 @@ import {
   updateArtifact,
 } from "../services/artifacts.js";
 import { createShare, listSharesForArtifact, revokeShare } from "../services/shares.js";
+import { resolveLifetimeLimitForRequest } from "../services/lifetime.js";
 
 export const mcpRoutes = new Hono<AppBindings>();
 
@@ -129,7 +131,14 @@ function createMcpServer(
       for (const artifact of all) {
         const access = await resolveAccessForIdentity(db, identity, artifact);
         if (access.read) {
-          visible.push({ id: artifact.id, title: artifact.title, kind: artifact.kind, visibility: artifact.visibility, updatedAt: artifact.updatedAt });
+          visible.push({
+            id: artifact.id,
+            title: artifact.title,
+            kind: artifact.kind,
+            visibility: artifact.visibility,
+            updatedAt: artifact.updatedAt,
+            expiresAt: artifact.expiresAt,
+          });
         }
       }
       return ok({ artifacts: visible });
@@ -159,9 +168,18 @@ function createMcpServer(
         versionNo: version?.versionNo,
         contentHash: version?.contentHash,
         content: version?.content,
+        expiresAt: artifact.expiresAt,
       });
     },
   );
+
+  const lifetimeSchema = z
+    .union([z.string(), z.number()])
+    .nullable()
+    .optional()
+    .describe(
+      "How long before the artifact is permanently deleted: a number of minutes, a duration like '30m'/'12h'/'7d', or null for never. Omit to use the team's default (its maximum). Exceeding the team/instance maximum is rejected — see the returned error for the allowed limit.",
+    );
 
   server.registerTool(
     "create_artifact",
@@ -174,20 +192,35 @@ function createMcpServer(
         description: z.string().max(2000).optional(),
         visibility: visibilitySchema.default("private").describe("'org' makes it readable by everyone in your org"),
         orgId: z.string().uuid().optional().describe("Team id to publish into — omit to use the connection's default team, or when you belong to only one"),
+        lifetime: lifetimeSchema,
       },
     },
-    async ({ title, kind, content, description, visibility, orgId }): Promise<CallToolResult> => {
+    async ({ title, kind, content, description, visibility, orgId, lifetime }): Promise<CallToolResult> => {
       if (!requiresScope(identity, "artifacts:write")) return toolError("Missing scope: artifacts:write");
       const resolved = await resolveOrgForTool(db, identity, orgId, defaultOrgId);
       if (!resolved.ok) return resolved.result;
       onOrgResolved(resolved.orgId);
 
       try {
-        const { artifact, version } = await createArtifact(db, { orgId: resolved.orgId, identity, title, kind, content, description, visibility });
+        const maxLifetimeMinutes = await resolveLifetimeLimitForRequest(db, env, resolved.orgId);
+        const { artifact, version } = await createArtifact(db, {
+          orgId: resolved.orgId,
+          identity,
+          title,
+          kind,
+          content,
+          description,
+          visibility,
+          lifetime,
+          maxLifetimeMinutes,
+        });
         await recordAudit(db, { orgId: resolved.orgId, identity, action: "artifact.create", targetType: "artifact", targetId: artifact.id });
-        return ok({ id: artifact.id, versionNo: version.versionNo });
+        return ok({ id: artifact.id, versionNo: version.versionNo, expiresAt: artifact.expiresAt });
       } catch (err) {
         if (err instanceof ArtifactTooLargeError || err instanceof QuotaExceededError) return toolError(err.message);
+        if (err instanceof LifetimeExceedsMaxError) {
+          return toolError(JSON.stringify({ code: "lifetime_exceeds_max", message: err.message, maxLifetimeMinutes: err.maxMinutes }));
+        }
         throw err;
       }
     },
@@ -205,9 +238,10 @@ function createMcpServer(
         visibility: visibilitySchema.optional(),
         message: z.string().max(500).optional().describe("Short version note, e.g. 'fixed the Q3 numbers'"),
         ifMatchContentHash: z.string().optional().describe("Pass the contentHash from get_artifact to fail instead of clobbering a concurrent edit"),
+        lifetime: lifetimeSchema,
       },
     },
-    async ({ id, content, title, description, visibility, message, ifMatchContentHash }): Promise<CallToolResult> => {
+    async ({ id, content, title, description, visibility, message, ifMatchContentHash, lifetime }): Promise<CallToolResult> => {
       if (!requiresScope(identity, "artifacts:write")) return toolError("Missing scope: artifacts:write");
       const artifact = await getArtifact(db, id);
       if (!artifact) return toolError("Artifact not found");
@@ -215,12 +249,17 @@ function createMcpServer(
       if (!access.write) return toolError("Forbidden: no write access to this artifact");
 
       try {
-        const result = await updateArtifact(db, id, { content, title, description, visibility, message, identity, ifMatchContentHash });
+        const lifetimePatch =
+          lifetime !== undefined ? { requested: lifetime, maxMinutes: await resolveLifetimeLimitForRequest(db, env, artifact.orgId) } : undefined;
+        const result = await updateArtifact(db, id, { content, title, description, visibility, message, identity, ifMatchContentHash, lifetime: lifetimePatch });
         await recordAudit(db, { orgId: artifact.orgId, identity, action: "artifact.update", targetType: "artifact", targetId: id });
-        return ok({ id, newVersionNo: result.version?.versionNo });
+        return ok({ id, newVersionNo: result.version?.versionNo, expiresAt: result.artifact.expiresAt });
       } catch (err) {
         if (err instanceof VersionConflictError) return toolError(`Version conflict: ${err.message}. Call get_artifact again to see the latest content.`);
         if (err instanceof ArtifactTooLargeError || err instanceof QuotaExceededError) return toolError(err.message);
+        if (err instanceof LifetimeExceedsMaxError) {
+          return toolError(JSON.stringify({ code: "lifetime_exceeds_max", message: err.message, maxLifetimeMinutes: err.maxMinutes }));
+        }
         throw err;
       }
     },

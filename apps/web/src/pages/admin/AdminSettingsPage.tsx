@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../../lib/api";
-import { REGISTRATION_MODE_LABELS } from "../../lib/labels";
+import { REGISTRATION_MODE_LABELS, formatLifetime } from "../../lib/labels";
 import { Card, CardHeader } from "../../components/ui/Card";
 import { Field } from "../../components/ui/Field";
 import { Select, Input } from "../../components/ui/Input";
@@ -8,6 +8,8 @@ import { Button, IconButton } from "../../components/ui/Button";
 import { Spinner } from "../../components/ui/Spinner";
 import { XIcon, PlusIcon } from "../../components/ui/icons";
 import { useToast } from "../../components/ui/Toast";
+import { LifetimeSelect } from "../../components/ui/LifetimeSelect";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 
 interface InstanceSettings {
   registrationMode: "open" | "invite_only" | "closed";
@@ -16,6 +18,8 @@ interface InstanceSettings {
   viewRetentionDays: number;
   maxArtifactSizeBytes: number;
   inviteTtlDays: number;
+  /** Minutes; 0 = unlimited. Also the default lifetime for newly created artifacts. */
+  maxArtifactLifetimeMinutes: number;
 }
 
 export function AdminSettingsPage() {
@@ -23,6 +27,7 @@ export function AdminSettingsPage() {
   const [settings, setSettings] = useState<InstanceSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [newCdnUrl, setNewCdnUrl] = useState("");
+  const [pendingMaxLifetime, setPendingMaxLifetime] = useState<number | null>(null);
 
   useEffect(() => {
     api.get<{ settings: InstanceSettings }>("/admin/settings").then((r) => setSettings(r.settings));
@@ -41,13 +46,31 @@ export function AdminSettingsPage() {
     }
   }
 
+  async function saveMaxLifetime(minutes: number) {
+    setSaving(true);
+    try {
+      const res = await api.patch<{ settings: InstanceSettings; shortenedArtifacts?: number }>("/admin/settings", {
+        maxArtifactLifetimeMinutes: minutes,
+      });
+      setSettings(res.settings);
+      toast.show(
+        res.shortenedArtifacts ? `Настройки сохранены. Срок сокращён у ${res.shortenedArtifacts} артефактов.` : "Настройки сохранены",
+        "success",
+      );
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось сохранить настройки", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (!settings) return <Spinner />;
 
   return (
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader title="Регистрация и приглашения" />
-        <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
           <Field label="Режим регистрации" className="max-w-xs">
             <Select
               value={settings.registrationMode}
@@ -79,6 +102,27 @@ export function AdminSettingsPage() {
           <NumberField
             value={Math.round(settings.maxArtifactSizeBytes / 1024 / 1024)}
             onSave={(n) => save({ maxArtifactSizeBytes: Math.round(n * 1024 * 1024) })}
+          />
+        </Field>
+
+        <Field
+          label="Максимальное время жизни артефакта"
+          hint="Также действует как срок по умолчанию для новых артефактов. Команды могут задать своё, но не больше этого значения. Уменьшение необратимо укорачивает срок уже созданных артефактов, отсчитывая от даты их создания — просроченные будут удалены безвозвратно."
+          className="mt-4 max-w-md"
+        >
+          <LifetimeSelect
+            value={settings.maxArtifactLifetimeMinutes === 0 ? null : settings.maxArtifactLifetimeMinutes}
+            maxMinutes={null}
+            disabled={saving}
+            onChange={(minutes) => {
+              const next = minutes ?? 0;
+              const isLowering = next !== 0 && (settings.maxArtifactLifetimeMinutes === 0 || next < settings.maxArtifactLifetimeMinutes);
+              if (isLowering) {
+                setPendingMaxLifetime(next);
+              } else {
+                saveMaxLifetime(next);
+              }
+            }}
           />
         </Field>
 
@@ -132,6 +176,23 @@ export function AdminSettingsPage() {
       </Card>
 
       {saving && <p className="text-xs text-muted">Сохранение…</p>}
+
+      <ConfirmDialog
+        open={pendingMaxLifetime !== null}
+        onClose={() => setPendingMaxLifetime(null)}
+        onConfirm={() => {
+          const minutes = pendingMaxLifetime!;
+          setPendingMaxLifetime(null);
+          saveMaxLifetime(minutes);
+        }}
+        title="Уменьшить максимальный срок жизни артефактов?"
+        description={
+          pendingMaxLifetime !== null
+            ? `Новый лимит — ${formatLifetime(pendingMaxLifetime)}. Артефакты старше этого срока (считая от даты создания) будут удалены безвозвратно.`
+            : undefined
+        }
+        confirmLabel="Уменьшить"
+      />
     </div>
   );
 }

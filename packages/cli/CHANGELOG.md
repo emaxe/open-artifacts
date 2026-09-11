@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-09-11
+
+### Added
+- **`--lifetime` flag** on `oa push`: set an artifact to expire after `30m`, `12h`, `7d`, etc. (or `0` for never), on both create and update. Omit it to use the team's default. `oa list` now shows each artifact's expiry (or "never expires").
+- A push that requests a lifetime past what the instance/team allows now fails with a clear `lifetime_exceeds_max` message naming the actual maximum, instead of a raw API error.
+
 ## [0.3.0] - 2026-09-11
 
 ### Added

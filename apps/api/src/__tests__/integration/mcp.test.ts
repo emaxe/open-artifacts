@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { serve, type ServerType } from "@hono/node-server";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { buildTestApp, registerAndLogin, resetDb } from "./helpers.js";
+import { artifacts, users } from "../../db/schema.js";
+import { buildTestApp, getTestDb, registerAndLogin, resetDb } from "./helpers.js";
 
 beforeEach(resetDb);
 
@@ -183,5 +185,60 @@ describe("MCP server", () => {
     expect(res.status).toBe(401);
     const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe("unauthorized");
+  });
+
+  it("create_artifact accepts a lifetime within the team's maximum and rejects one over it", async () => {
+    const app = buildTestApp();
+    const { orgId, sessionCookie, userId } = await registerAndLogin(app);
+    await getTestDb().update(users).set({ isSuperadmin: true }).where(eq(users.id, userId));
+    await app.request("/api/v1/admin/settings", {
+      method: "PATCH",
+      headers: authedHeaders(sessionCookie),
+      body: JSON.stringify({ maxArtifactLifetimeMinutes: 60 }),
+    });
+    const apiKey = await issueKey(app, orgId, sessionCookie, ["artifacts:read", "artifacts:write"]);
+
+    const port = await startServer();
+    const client = await connectClient(port, apiKey);
+
+    const created = toolJson(
+      await client.callTool({ name: "create_artifact", arguments: { title: "short-lived", kind: "html", content: "<p>x</p>", lifetime: "30m" } }),
+    );
+    expect(created.expiresAt).toEqual(expect.any(String));
+    const deltaMs = new Date(created.expiresAt).getTime() - Date.now();
+    expect(deltaMs).toBeGreaterThan(25 * 60_000);
+    expect(deltaMs).toBeLessThan(31 * 60_000);
+
+    const tooLong = await client.callTool({ name: "create_artifact", arguments: { title: "too long", kind: "html", content: "<p>x</p>", lifetime: "7d" } });
+    expect(tooLong.isError).toBe(true);
+    const errorText = (tooLong.content as Array<{ text: string }>)[0]!.text;
+    expect(errorText).toContain("lifetime_exceeds_max");
+
+    await client.close();
+  });
+
+  it("hides an expired artifact from get_artifact and list_artifacts", async () => {
+    const app = buildTestApp();
+    const { orgId, sessionCookie } = await registerAndLogin(app);
+    const apiKey = await issueKey(app, orgId, sessionCookie, ["artifacts:read", "artifacts:write"]);
+
+    const port = await startServer();
+    const client = await connectClient(port, apiKey);
+
+    const created = toolJson(await client.callTool({ name: "create_artifact", arguments: { title: "will expire", kind: "html", content: "<p>x</p>" } }));
+    const artifactId = created.id as string;
+
+    await getTestDb()
+      .update(artifacts)
+      .set({ expiresAt: new Date(Date.now() - 60_000) })
+      .where(eq(artifacts.id, artifactId));
+
+    const fetched = await client.callTool({ name: "get_artifact", arguments: { id: artifactId } });
+    expect(fetched.isError).toBe(true);
+
+    const listed = toolJson(await client.callTool({ name: "list_artifacts", arguments: {} }));
+    expect(listed.artifacts.some((a: { id: string }) => a.id === artifactId)).toBe(false);
+
+    await client.close();
   });
 });

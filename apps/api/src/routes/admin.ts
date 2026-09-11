@@ -8,6 +8,8 @@ import { listAuditLog, recordAudit } from "../services/audit.js";
 import { defaultInstanceSettings, getInstanceSettings, updateInstanceSettings } from "../services/settings.js";
 import { getTopArtifacts } from "../services/analytics.js";
 import { setUserStatus, CannotModifySuperadminError } from "../services/users.js";
+import { clampArtifactExpirations, clampOrgLifetimeOverrides } from "../services/lifetime.js";
+import { purgeExpiredArtifacts } from "../services/retention.js";
 
 export const adminRoutes = new Hono<AppBindings>();
 // Scoped to "/admin/*" rather than a bare "*": once merged into the shared `api` router (all
@@ -85,6 +87,8 @@ const settingsPatchSchema = z.object({
   viewRetentionDays: z.number().int().positive().optional(),
   maxArtifactSizeBytes: z.number().int().positive().optional(),
   inviteTtlDays: z.number().int().positive().optional(),
+  // Minutes; 0 = unlimited. Also the default lifetime for newly created artifacts.
+  maxArtifactLifetimeMinutes: z.number().int().nonnegative().optional(),
 });
 
 adminRoutes.patch("/admin/settings", async (c) => {
@@ -94,7 +98,30 @@ adminRoutes.patch("/admin/settings", async (c) => {
 
   const current = await getInstanceSettings(db, defaultInstanceSettings(c.get("env")));
   const next = await updateInstanceSettings(db, body.data, current);
-  return c.json({ settings: next });
+
+  let shortenedArtifacts: number | undefined;
+  if (body.data.maxArtifactLifetimeMinutes !== undefined && body.data.maxArtifactLifetimeMinutes !== current.maxArtifactLifetimeMinutes) {
+    // Keep stored team overrides truthful, then re-clamp every artifact's deadline from its own
+    // created_at. Lowering the max is a destructive, irreversible action (content gets hard-deleted
+    // once the sweeper catches up), so it gets its own audit entry.
+    await clampOrgLifetimeOverrides(db, body.data.maxArtifactLifetimeMinutes);
+    shortenedArtifacts = await clampArtifactExpirations(db, { globalMaxMinutes: body.data.maxArtifactLifetimeMinutes });
+    await recordAudit(db, {
+      identity: c.get("identity")!,
+      action: "settings.artifact_lifetime_update",
+      meta: { maxArtifactLifetimeMinutes: body.data.maxArtifactLifetimeMinutes, shortenedArtifacts },
+    });
+  }
+
+  return c.json({ settings: next, shortenedArtifacts });
+});
+
+/** Manual trigger for the retention sweeper — also the test-friendly way to purge without waiting for the interval. */
+adminRoutes.post("/admin/retention/purge", async (c) => {
+  const db = c.get("db");
+  const result = await purgeExpiredArtifacts(db);
+  await recordAudit(db, { identity: c.get("identity")!, action: "artifact.purge_run", meta: { purged: result.purged } });
+  return c.json(result);
 });
 
 const statusPatchSchema = z.object({ status: z.enum(["active", "blocked", "deleted"]) });

@@ -100,3 +100,16 @@ export function formatDate(value: string | Date): string {
   const date = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
+
+/** Renders a lifetime in minutes (`null` = unlimited) picking the largest exact unit — minutes/hours/days. */
+export function formatLifetime(minutes: number | null): string {
+  if (minutes === null) return "без ограничений";
+  if (minutes % (24 * 60) === 0) return `${minutes / (24 * 60)} ${pluralRu(minutes / (24 * 60), ["день", "дня", "дней"])}`;
+  if (minutes % 60 === 0) return `${minutes / 60} ${pluralRu(minutes / 60, ["час", "часа", "часов"])}`;
+  return `${minutes} ${pluralRu(minutes, ["минута", "минуты", "минут"])}`;
+}
+
+/** Renders an artifact's `expiresAt` (`null` = never) as an absolute date/time. */
+export function formatExpiry(expiresAt: string | null): string {
+  return expiresAt === null ? "никогда" : formatDateTime(expiresAt);
+}

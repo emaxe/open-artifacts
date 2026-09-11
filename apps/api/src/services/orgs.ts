@@ -1,6 +1,6 @@
 import { and, asc, eq, sql, ilike, inArray, isNull, ne, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import type { OrgRole } from "@open-artifacts/shared";
+import { effectiveLifetimeLimit, toLifetimeLimit, type OrgRole } from "@open-artifacts/shared";
 import type { Database } from "../db/client.js";
 import { artifacts, orgMembers, orgs, users } from "../db/schema.js";
 
@@ -287,12 +287,22 @@ export async function addMember(db: Database, orgId: string, userId: string, rol
   return { alreadyMember: false };
 }
 
-export async function updateOrg(db: Database, orgId: string, patch: { name?: string; storageQuotaBytes?: number }) {
+export async function updateOrg(
+  db: Database,
+  orgId: string,
+  patch: { name?: string; storageQuotaBytes?: number; maxArtifactLifetimeMinutes?: number | null },
+) {
   const [updated] = await db.update(orgs).set(patch).where(eq(orgs.id, orgId)).returning();
   return updated ?? null;
 }
 
-export async function getOrgDetail(db: Database, orgId: string) {
+/**
+ * `globalMaxLifetimeMinutes` is the instance-wide setting (0 = unlimited); passed in by the route,
+ * which already has `env`/settings in scope, so this function stays free of a settings-service
+ * dependency. Exposes both the raw per-team override (`null` = inherits) and the resolved ceiling,
+ * so the web UI can render the bound without a separate `/admin/settings` call.
+ */
+export async function getOrgDetail(db: Database, orgId: string, globalMaxLifetimeMinutes: number) {
   const org = await db.query.orgs.findFirst({ where: eq(orgs.id, orgId) });
   if (!org) return null;
   const [counts, owners] = await Promise.all([countsByOrg(db, [orgId]), ownersByOrg(db, [orgId])]);
@@ -302,6 +312,12 @@ export async function getOrgDetail(db: Database, orgId: string) {
     slug: org.slug,
     kind: org.kind,
     storageQuotaBytes: org.storageQuotaBytes,
+    maxArtifactLifetimeMinutes: org.maxArtifactLifetimeMinutes,
+    globalMaxArtifactLifetimeMinutes: toLifetimeLimit(globalMaxLifetimeMinutes),
+    effectiveMaxArtifactLifetimeMinutes: effectiveLifetimeLimit(
+      toLifetimeLimit(globalMaxLifetimeMinutes),
+      toLifetimeLimit(org.maxArtifactLifetimeMinutes),
+    ),
     createdAt: org.createdAt,
     memberCount: counts.get(orgId)?.members ?? 0,
     artifactCount: counts.get(orgId)?.artifacts ?? 0,

@@ -43,6 +43,13 @@
       "when": 1789129722369,
       "tag": "0005_wet_clint_barton",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789151085079,
+      "tag": "0006_peaceful_genesis",
+      "breakpoints": true
     }
   ]
 }

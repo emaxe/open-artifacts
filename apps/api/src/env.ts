@@ -12,6 +12,8 @@ const envSchema = z.object({
   SUPERADMIN_PASSWORD: z.string().min(8).optional(),
   DEFAULT_KEY_TTL_DAYS: z.coerce.number().int().nonnegative().default(90),
   DEFAULT_REGISTRATION_MODE: z.enum(["open", "invite_only", "closed"]).default("invite_only"),
+  /** How often the retention sweeper checks for expired artifacts to hard-delete. 0 disables it — the instance still enforces lifetimes lazily on read, it just never reclaims storage on its own. */
+  ARTIFACT_PURGE_INTERVAL_MINUTES: z.coerce.number().int().nonnegative().default(5),
 });
 
 export type Env = z.infer<typeof envSchema>;

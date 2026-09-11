@@ -69,7 +69,7 @@ export function PersonalKeysPage() {
 
       <Card className="mb-4 max-w-2xl">
         <form onSubmit={issueKey} className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-wrap items-start gap-3">
             <Field label="Название" className="min-w-56 flex-1" hint="например, MacBook CLI">
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="MacBook CLI" />
             </Field>

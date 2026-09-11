@@ -68,7 +68,8 @@ open-artifacts/
 3. **CSP на ответе с контентом:**
    `default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' <allowlist>; style-src 'unsafe-inline' https://fonts.googleapis.com; img-src data: blob: https:; font-src https://fonts.gstatic.com data:; connect-src 'none'; frame-ancestors <APP_ORIGIN>`
    плюс `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`.
-   Allowlist CDN редактируется в админке (дефолт: cdnjs.cloudflare.com, cdn.jsdelivr.net, code.jquery.com).
+   Allowlist CDN редактируется в админке (дефолт: cdnjs.cloudflare.com, cdn.jsdelivr.net, code.jquery.com,
+   cdn.tailwindcss.com).
 
 Markdown рендерится сервером (`markdown-it` + `DOMPurify` на jsdom), Mermaid — на клиенте внутри того же
 iframe. Санитизация здесь второй эшелон, а не единственная защита.
@@ -109,7 +110,7 @@ TTL по умолчанию — из настроек инстанса (`default
 | `agents` | id, org_id, name, description, created_by, created_at |
 | `api_keys` | id, agent_id, prefix, key_hash, scopes[], expires_at, last_used_at, revoked_at |
 | `device_auth_requests` | device_code, user_code, agent_name, requested_scopes, status, expires_at, approved_by, issued_key_id |
-| `artifacts` | id, org_id, owner_type: user\|agent, owner_id, title, description, kind: html\|markdown\|mermaid\|svg, current_version_id, visibility: private\|org, size_bytes, created_at, updated_at, deleted_at |
+| `artifacts` | id, org_id, owner_type: user\|agent, owner_id, title, description, kind: html\|markdown\|mermaid\|svg, current_version_id, visibility: private\|org, size_bytes, created_at, updated_at, deleted_at, **expires_at**, **purged_at** |
 | `artifact_versions` | id, artifact_id, version_no, content, content_hash, size_bytes, created_by_type, created_by_id, message, created_at |
 | `shares` | id, artifact_id, token, mode: public\|password, password_hash, expires_at, pinned_version_id, view_count, revoked_at |
 | `artifact_views` | id, artifact_id, share_id, viewed_at, ip_hash, ua_hash, referer |
@@ -117,11 +118,29 @@ TTL по умолчанию — из настроек инстанса (`default
 | `api_usage_hourly` | org_id, agent_id, key_id, endpoint, method, status_class, hour, count, p95_ms |
 | `audit_log` | id, org_id, actor_type, actor_id, action, target_type, target_id, meta jsonb, ip, at |
 | `settings` | key, value jsonb |
+| `orgs` | id, name, slug, storage_quota_bytes, **max_artifact_lifetime_minutes**, created_at |
 
 `artifact_versions.content` неизменяем; `artifacts.current_version_id` указывает на актуальную. Это защищает
 от агента, затершего чужую работу, и позволяет шарить конкретную версию (`shares.pinned_version_id`).
 
 Удаление артефакта — мягкое (`deleted_at`), фоновая задача чистит по retention из настроек.
+
+### Время жизни артефактов (TTL)
+
+Трёхуровневая политика: `settings.instance.maxArtifactLifetimeMinutes` (0 = без ограничений; он же
+дефолт для новых артефактов) → опциональный `orgs.max_artifact_lifetime_minutes` строже глобального
+→ выбор автора в рамках эффективного лимита при создании/обновлении. Превышение лимита — явная
+ошибка `400 lifetime_exceeds_max`, а не молчаливое обрезание.
+
+`artifacts.expires_at` (`NULL` = бессрочно) читается лениво на каждом чтении — истёкший артефакт
+пропадает из списков и выдаёт 404/410 ещё до того, как до него доберётся фоновая задача. Сама
+задача (`purgeExpiredArtifacts`, интервал `ARTIFACT_PURGE_INTERVAL_MINUTES`) безвозвратно удаляет
+строки `artifact_versions` и выставляет `purged_at` — первый и единственный фоновый процесс в
+проекте; строка `artifacts` остаётся надгробием для `audit_log`/`artifact_views`.
+
+Понижение лимита пересчитывает `expires_at` уже созданных артефактов от их `created_at`
+(`LEAST(expires_at, created_at + новый_максимум)`) — так уменьшение лимита действует и на прошлое,
+а повышение никогда не продлевает то, что уже создано.
 
 ### API (`/api/v1`)
 

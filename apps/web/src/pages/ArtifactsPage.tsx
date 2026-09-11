@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, type ArtifactSummary } from "../lib/api";
-import { formatDateTime } from "../lib/labels";
+import { api, type ArtifactSummary, type OrgDetail } from "../lib/api";
+import { formatDateTime, formatExpiry } from "../lib/labels";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Select, Textarea } from "../components/ui/Input";
 import { Field } from "../components/ui/Field";
+import { LifetimeSelect } from "../components/ui/LifetimeSelect";
 import { Table, THead, TBody, TR, TH, TD } from "../components/ui/Table";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -15,13 +16,18 @@ import { MailIcon } from "../components/ui/icons";
 export function ArtifactsPage() {
   const { orgId } = useParams();
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
+  const [orgDetail, setOrgDetail] = useState<OrgDetail | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   async function load() {
     if (!orgId) return;
-    const data = await api.get<{ artifacts: ArtifactSummary[] }>(`/artifacts?orgId=${orgId}`);
-    setArtifacts(data.artifacts);
+    const [artifactsRes, orgRes] = await Promise.all([
+      api.get<{ artifacts: ArtifactSummary[] }>(`/artifacts?orgId=${orgId}`),
+      api.get<OrgDetail>(`/orgs/${orgId}`),
+    ]);
+    setArtifacts(artifactsRes.artifacts);
+    setOrgDetail(orgRes);
     setLoaded(true);
   }
 
@@ -43,9 +49,10 @@ export function ArtifactsPage() {
         }
       />
 
-      {showCreate && (
+      {showCreate && orgDetail && (
         <CreateArtifactForm
           orgId={orgId}
+          maxLifetimeMinutes={orgDetail.effectiveMaxArtifactLifetimeMinutes}
           onCreated={() => {
             setShowCreate(false);
             load();
@@ -79,6 +86,7 @@ export function ArtifactsPage() {
                 <TH>Тип</TH>
                 <TH>Видимость</TH>
                 <TH>Обновлён</TH>
+                <TH>Истекает</TH>
               </TR>
             </THead>
             <TBody>
@@ -94,6 +102,7 @@ export function ArtifactsPage() {
                   </TD>
                   <TD>{a.visibility === "org" ? "команда" : "приватный"}</TD>
                   <TD className="text-muted">{formatDateTime(a.updatedAt)}</TD>
+                  <TD className="text-muted">{formatExpiry(a.expiresAt)}</TD>
                 </TR>
               ))}
             </TBody>
@@ -104,17 +113,26 @@ export function ArtifactsPage() {
   );
 }
 
-function CreateArtifactForm({ orgId, onCreated }: { orgId: string; onCreated: () => void }) {
+function CreateArtifactForm({
+  orgId,
+  maxLifetimeMinutes,
+  onCreated,
+}: {
+  orgId: string;
+  maxLifetimeMinutes: number | null;
+  onCreated: () => void;
+}) {
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<"html" | "markdown" | "mermaid" | "svg">("html");
   const [content, setContent] = useState("<h1>Hello, world</h1>");
+  const [lifetime, setLifetime] = useState<number | null>(maxLifetimeMinutes);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     try {
-      await api.post(`/artifacts?orgId=${orgId}`, { title, kind, content, visibility: "private" });
+      await api.post(`/artifacts?orgId=${orgId}`, { title, kind, content, visibility: "private", lifetime });
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
@@ -137,6 +155,9 @@ function CreateArtifactForm({ orgId, onCreated }: { orgId: string; onCreated: ()
         </Field>
         <Field label="Содержимое" required>
           <Textarea rows={8} value={content} onChange={(e) => setContent(e.target.value)} required />
+        </Field>
+        <Field label="Срок жизни" hint="После истечения содержимое удаляется безвозвратно.">
+          <LifetimeSelect value={lifetime} maxMinutes={maxLifetimeMinutes} onChange={setLifetime} />
         </Field>
         {error && <p className="text-sm text-danger">{error}</p>}
         <Button type="submit" className="self-start">

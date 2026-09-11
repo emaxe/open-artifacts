@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, ApiError, type OrgListItem } from "../../lib/api";
-import { formatDateTime } from "../../lib/labels";
+import { api, ApiError, type OrgDetail, type OrgListItem } from "../../lib/api";
+import { formatDateTime, formatLifetime } from "../../lib/labels";
 import { Card, CardHeader } from "../../components/ui/Card";
 import { Table, THead, TBody, TR, TH, TD, TableEmptyRow } from "../../components/ui/Table";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -12,6 +12,8 @@ import { Dialog } from "../../components/ui/Dialog";
 import { Input } from "../../components/ui/Input";
 import { Field } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
+import { Spinner } from "../../components/ui/Spinner";
+import { LifetimeSelect } from "../../components/ui/LifetimeSelect";
 import { OrgIdentity } from "../../components/OrgIdentity";
 import { useToast } from "../../components/ui/Toast";
 
@@ -27,6 +29,7 @@ export function AdminTeamsPage() {
   const [kind, setKind] = useState<KindFilter>("team");
   const [loading, setLoading] = useState(true);
   const [quotaOrg, setQuotaOrg] = useState<OrgListItem | null>(null);
+  const [lifetimeOrg, setLifetimeOrg] = useState<OrgListItem | null>(null);
 
   async function load() {
     setLoading(true);
@@ -97,6 +100,7 @@ export function AdminTeamsPage() {
                       items={[
                         { label: "Открыть", onSelect: () => (window.location.href = `/t/${o.id}`) },
                         { label: "Изменить квоту", onSelect: () => setQuotaOrg(o) },
+                        { label: "Срок жизни артефактов", onSelect: () => setLifetimeOrg(o) },
                       ]}
                     />
                   </TD>
@@ -118,7 +122,71 @@ export function AdminTeamsPage() {
           }}
         />
       )}
+
+      {lifetimeOrg && (
+        <LifetimeDialog
+          org={lifetimeOrg}
+          onClose={() => setLifetimeOrg(null)}
+          onDone={() => {
+            setLifetimeOrg(null);
+            load();
+          }}
+        />
+      )}
     </Card>
+  );
+}
+
+function LifetimeDialog({ org, onClose, onDone }: { org: OrgListItem; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [detail, setDetail] = useState<OrgDetail | null>(null);
+  const [minutes, setMinutes] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get<OrgDetail>(`/orgs/${org.id}`).then((d) => {
+      setDetail(d);
+      setMinutes(d.maxArtifactLifetimeMinutes);
+    });
+  }, [org.id]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api.patch(`/orgs/${org.id}`, { maxArtifactLifetimeMinutes: minutes });
+      toast.show("Срок жизни артефактов изменён", "success");
+      onDone();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось изменить срок жизни", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open onClose={onClose} title={`Срок жизни артефактов: ${org.name}`}>
+      {!detail ? (
+        <Spinner />
+      ) : (
+        <form onSubmit={submit} className="flex flex-col gap-3">
+          <Field
+            label="Максимум для этой команды"
+            hint={`Не больше лимита инстанса (${formatLifetime(detail.globalMaxArtifactLifetimeMinutes)}). «Без ограничений» доступно, только если у инстанса тоже нет лимита.`}
+          >
+            <LifetimeSelect value={minutes} maxMinutes={detail.globalMaxArtifactLifetimeMinutes} onChange={setMinutes} />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Отмена
+            </Button>
+            <Button type="submit" loading={busy}>
+              Сохранить
+            </Button>
+          </div>
+        </form>
+      )}
+    </Dialog>
   );
 }
 

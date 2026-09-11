@@ -11,12 +11,20 @@ export const orgRoleSchema = z.enum(["owner", "admin", "member", "viewer"]);
 
 export const apiKeyScopeSchema = z.enum(API_KEY_SCOPES);
 
+// Deliberately not named `expires` like `createShareSchema.expires` below: a bare number there
+// means DAYS, while here (artifact lifetime) a bare number means MINUTES. Same name, different
+// unit, would be a trap. Accepts a number of minutes, a duration string ("30m"/"2h"/"7d"), or
+// "0"/null for "no lifetime chosen" (falls back to the org's effective default/max). See
+// `parseLifetimeMinutes` in `./lifetime.ts`.
+const lifetimeSchema = z.union([z.string(), z.number()]).nullable().optional();
+
 export const createArtifactSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   kind: artifactKindSchema,
   content: z.string().min(1),
   visibility: artifactVisibilitySchema.default("private"),
+  lifetime: lifetimeSchema,
 });
 export type CreateArtifactInput = z.infer<typeof createArtifactSchema>;
 
@@ -26,6 +34,7 @@ export const updateArtifactSchema = z.object({
   visibility: artifactVisibilitySchema.optional(),
   content: z.string().min(1).optional(),
   message: z.string().max(500).optional(),
+  lifetime: lifetimeSchema,
 });
 export type UpdateArtifactInput = z.infer<typeof updateArtifactSchema>;
 

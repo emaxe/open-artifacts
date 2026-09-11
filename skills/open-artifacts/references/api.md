@@ -67,6 +67,14 @@ exactly one team — the server picks it automatically; with more than one and n
 request fails with `400 org_required` and the candidate list in the body (see the error shape
 below and the `org_required` row in `SKILL.md`'s error table).
 
+Optional `lifetime` field: a number of minutes, or a duration string like `"12h"`/`"7d"`; `0` or
+`null` for never. Omit it to get the team's default, which is also its maximum — passing something
+longer than that maximum fails with `400 lifetime_exceeds_max` and `maxLifetimeMinutes` in the
+body. Once `expiresAt` passes, the content is hard-deleted; there's no recovering it.
+```bash
+-d '{"title":"Q3 Report","kind":"html","content":"<h1>Hi</h1>","lifetime":"7d"}'
+```
+
 ## Update an artifact (creates a new version)
 
 ```bash
@@ -76,7 +84,9 @@ curl -sX PATCH "$OA_SERVER/api/v1/artifacts/$ARTIFACT_ID" \
 ```
 
 Add `If-Match: <contentHash>` (from a prior GET) to guard against overwriting someone else's
-concurrent change — a mismatch returns `409 version_conflict`.
+concurrent change — a mismatch returns `409 version_conflict`. `lifetime` can be changed here too,
+independently of `content` — it's recomputed from the artifact's original creation date, not from
+the moment of this update.
 
 ## Create a share link
 

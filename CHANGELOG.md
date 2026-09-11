@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-09-11
+
+### Added
+- **Artifact Lifetime (TTL)**: Artifacts can now be set to expire. A superadmin sets an instance-wide maximum artifact lifetime in `/admin/settings` (minutes; unlimited by default) — it also serves as the default lifetime for new artifacts. Team owners/admins may set their own stricter maximum for their team, but never looser than the instance one. Callers may choose any lifetime up to the effective limit at creation time (CLI `oa push --lifetime`, the web UI, or the `lifetime` field in the REST/MCP API), and change it later via `PATCH`. On expiry the artifact's content is hard-deleted (all versions removed irreversibly) — only a tombstone row remains for audit/analytics. A background sweeper (`ARTIFACT_PURGE_INTERVAL_MINUTES`, default 5) performs the actual deletion; reads treat an expired artifact as gone immediately either way.
+
+### Changed
+- Lowering the instance or team maximum lifetime re-clamps every affected artifact's expiry from its own creation date (`min(current deadline, created_at + new max)`) and can make already-existing artifacts expire immediately; raising a maximum never extends anything already created.
+- `GET /artifacts` and `GET /artifacts/:id` now omit/404 an artifact once its lifetime has passed, even before the background sweeper has run. Artifact payloads gained an `expiresAt` field.
+
 ## [0.3.0] - 2026-09-11
 
 ### Added

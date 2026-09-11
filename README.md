@@ -243,8 +243,22 @@ Configure the application through environment variables (see [`.env.example`](.e
 | `SUPERADMIN_PASSWORD` | Initial superadmin password | *Required in production* |
 | `DEFAULT_KEY_TTL_DAYS` | Default lifetime for agent API tokens (0 = never expires) | `90` |
 | `DEFAULT_REGISTRATION_MODE` | Who may self-register: `open`, `invite_only`, or `closed` | `invite_only` |
+| `ARTIFACT_PURGE_INTERVAL_MINUTES` | How often the background sweeper hard-deletes expired artifacts (0 disables it; lifetimes still apply lazily on read either way) | `5` |
 
-Most operational settings — registration mode, default key TTL, invite link lifetime, the CDN allowlist, and the maximum artifact size — can also be modified at runtime by superadmins in **Настройки инстанса** (`/admin/settings`); they don't need an environment variable or a restart.
+Most operational settings — registration mode, default key TTL, invite link lifetime, the CDN allowlist, the maximum artifact size, and the maximum/default artifact lifetime — can also be modified at runtime by superadmins in **Настройки инстанса** (`/admin/settings`); they don't need an environment variable or a restart.
+
+### Artifact lifetime (TTL)
+
+By default artifacts live forever. A superadmin can set an instance-wide maximum artifact
+lifetime (in minutes, in `/admin/settings`) — it doubles as the default for newly created
+artifacts. Team owners/admins may set their own stricter limit for their team, but never looser
+than the instance maximum. Callers (CLI `--lifetime`, the web UI, or the MCP/API `lifetime` field)
+may pick anything up to the effective limit at creation time, and change it later.
+
+Once an artifact's lifetime expires its content is **hard-deleted** — the version history is gone
+for good, only a tombstone row remains for audit/analytics. Lowering the maximum re-clamps every
+existing artifact's expiry from its own creation date (`min(current deadline, created_at + new
+max)`); raising it never extends anything already created.
 
 ---
 

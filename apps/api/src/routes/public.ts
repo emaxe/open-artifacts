@@ -5,7 +5,7 @@ import { buildEmbedCsp } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import { getShareByToken, incrementShareViewCount } from "../services/shares.js";
 import { verifySecret } from "../services/crypto.js";
-import { getArtifact, getCurrentVersion } from "../services/artifacts.js";
+import { getArtifactWithLiveness, getCurrentVersion } from "../services/artifacts.js";
 import { renderArtifactHtml } from "../services/render.js";
 import { recordArtifactView } from "../services/analytics.js";
 import { hashIp } from "../services/audit.js";
@@ -39,6 +39,12 @@ publicRoutes.get("/s/:token", async (c) => {
 
   const denialReason = isRevokedOrExpired(share);
   if (denialReason) return c.html(errorPage("This link is no longer available."), 410);
+
+  // The shell page below only renders an iframe pointed at /embed/:token — without this check it
+  // would render fine even for an expired artifact, and only the inner frame would 410.
+  const { liveness } = await getArtifactWithLiveness(db, share.artifactId);
+  if (liveness === "missing") return c.html(errorPage("This link does not exist."), 404);
+  if (liveness !== "live") return c.html(errorPage("This link is no longer available."), 410);
 
   const hasUnlock = share.mode === "password" ? isUnlocked(share.token, getCookie(c, unlockCookieName(share.token))) : true;
 
@@ -104,8 +110,9 @@ publicRoutes.get("/embed/:token", async (c) => {
     return c.html(errorPage("Password required."), 403);
   }
 
-  const artifact = await getArtifact(db, share.artifactId);
-  if (!artifact) return c.html(errorPage("Not found."), 404);
+  const { artifact, liveness } = await getArtifactWithLiveness(db, share.artifactId);
+  if (liveness === "missing" || !artifact) return c.html(errorPage("Not found."), 404);
+  if (liveness !== "live") return c.html(errorPage("This link is no longer available."), 410);
 
   const version = share.pinnedVersionId
     ? await db.query.artifactVersions.findFirst({ where: (v, { eq }) => eq(v.id, share.pinnedVersionId!) })

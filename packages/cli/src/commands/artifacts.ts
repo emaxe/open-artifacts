@@ -11,6 +11,7 @@ interface ArtifactSummary {
   kind: ArtifactKind;
   visibility: string;
   updatedAt: string;
+  expiresAt: string | null;
 }
 
 export function inferKind(filePath: string): ArtifactKind {
@@ -37,7 +38,8 @@ export async function listCommand(opts: { json?: boolean; org?: string }) {
       return;
     }
     for (const a of data.artifacts) {
-      console.log(`${a.id}  ${a.kind.padEnd(9)}  ${a.visibility.padEnd(8)}  ${a.title}`);
+      const expiry = a.expiresAt ? `expires ${a.expiresAt}` : "never expires";
+      console.log(`${a.id}  ${a.kind.padEnd(9)}  ${a.visibility.padEnd(8)}  ${expiry.padEnd(28)}  ${a.title}`);
     }
   } catch (err) {
     handleError(err);
@@ -46,7 +48,17 @@ export async function listCommand(opts: { json?: boolean; org?: string }) {
 
 export async function pushCommand(
   filePath: string,
-  opts: { title?: string; kind?: ArtifactKind; id?: string; share?: boolean; password?: string; message?: string; json?: boolean; org?: string },
+  opts: {
+    title?: string;
+    kind?: ArtifactKind;
+    id?: string;
+    share?: boolean;
+    password?: string;
+    message?: string;
+    json?: boolean;
+    org?: string;
+    lifetime?: string;
+  },
 ) {
   if (!existsSync(filePath)) die(`File not found: ${filePath}`);
   const content = readFileSync(filePath, "utf8");
@@ -58,22 +70,27 @@ export async function pushCommand(
 
   try {
     let artifactId = opts.id;
+    let expiresAt: string | null | undefined;
     if (artifactId) {
-      await client.patch(`/artifacts/${artifactId}`, { content, message: opts.message });
+      const res = await client.patch<{ artifact: { expiresAt: string | null } }>(`/artifacts/${artifactId}`, {
+        content,
+        message: opts.message,
+        lifetime: opts.lifetime,
+      });
+      expiresAt = res.artifact.expiresAt;
     } else {
       // Updating an existing artifact never needs an org (the id alone identifies it) — only
       // resolve one when we're about to create.
       const org = resolveOrg({ flag: opts.org, creds });
-      const res = await client.post<{ artifact: { id: string } }>(`/artifacts${org.orgId ? `?orgId=${org.orgId}` : ""}`, {
-        title,
-        kind,
-        content,
-        visibility: "private",
-      });
+      const res = await client.post<{ artifact: { id: string; expiresAt: string | null } }>(
+        `/artifacts${org.orgId ? `?orgId=${org.orgId}` : ""}`,
+        { title, kind, content, visibility: "private", lifetime: opts.lifetime },
+      );
       artifactId = res.artifact.id;
+      expiresAt = res.artifact.expiresAt;
     }
 
-    const result: Record<string, unknown> = { artifactId };
+    const result: Record<string, unknown> = { artifactId, expiresAt };
 
     if (opts.share) {
       const shareRes = await client.post<{ url: string }>(`/artifacts/${artifactId}/shares`, {
@@ -87,6 +104,7 @@ export async function pushCommand(
       console.log(JSON.stringify(result, null, 2));
     } else {
       console.log(`Artifact: ${artifactId}`);
+      console.log(expiresAt ? `Expires: ${expiresAt}` : "Expires: never");
       if (result.shareUrl) console.log(`Share URL: ${result.shareUrl}`);
     }
   } catch (err) {
@@ -135,6 +153,10 @@ export function handleError(err: unknown): never {
     }
     if (err.code === "version_conflict") {
       die("Someone else changed this artifact since you last read it (409). Fetch the latest with `oa get` and retry.");
+    }
+    if (err.code === "lifetime_exceeds_max") {
+      const maxMinutes = err.body?.error?.maxLifetimeMinutes;
+      die(`Requested lifetime exceeds the maximum this instance/team allows${maxMinutes ? ` (${maxMinutes} minutes)` : ""}. Retry with --lifetime <= that, or omit --lifetime to use the default.`);
     }
     if (err.code === "org_required") {
       const orgs = err.body?.error?.orgs ?? [];

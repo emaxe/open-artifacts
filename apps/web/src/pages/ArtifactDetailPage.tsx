@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, ApiError, type ArtifactSummary } from "../lib/api";
-import { formatDateTime, formatBytes } from "../lib/labels";
+import { api, ApiError, type ArtifactSummary, type OrgDetail } from "../lib/api";
+import { formatDateTime, formatBytes, formatExpiry, formatLifetime } from "../lib/labels";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Textarea } from "../components/ui/Input";
 import { Field } from "../components/ui/Field";
+import { LifetimeSelect } from "../components/ui/LifetimeSelect";
 import { Table, THead, TBody, TR, TH, TD, TableEmptyRow } from "../components/ui/Table";
+import { Badge } from "../components/ui/Badge";
 import { Dialog } from "../components/ui/Dialog";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { CopyButton } from "../components/ui/CopyButton";
@@ -37,6 +39,7 @@ export function ArtifactDetailPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const [artifact, setArtifact] = useState<ArtifactSummary | null>(null);
+  const [orgDetail, setOrgDetail] = useState<OrgDetail | null>(null);
   const [content, setContent] = useState("");
   const [contentHash, setContentHash] = useState("");
   const [versions, setVersions] = useState<Version[]>([]);
@@ -50,6 +53,8 @@ export function ArtifactDetailPage() {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [sharePassword, setSharePassword] = useState("");
   const [lastShareUrl, setLastShareUrl] = useState<string | null>(null);
+  const [lifetimeDialogOpen, setLifetimeDialogOpen] = useState(false);
+  const [lifetimeDraft, setLifetimeDraft] = useState<number | null>(null);
 
   async function load() {
     if (!id) return;
@@ -61,6 +66,7 @@ export function ArtifactDetailPage() {
     setVersions(v.versions);
     const s = await api.get<{ shares: Share[] }>(`/artifacts/${id}/shares`);
     setShares(s.shares);
+    if (orgId) setOrgDetail(await api.get<OrgDetail>(`/orgs/${orgId}`));
   }
 
   useEffect(() => {
@@ -110,6 +116,19 @@ export function ArtifactDetailPage() {
     navigate(`/t/${orgId}/artifacts`);
   }
 
+  async function saveLifetime() {
+    try {
+      await api.patch(`/artifacts/${id}`, { lifetime: lifetimeDraft });
+      setLifetimeDialogOpen(false);
+      await load();
+      toast.show("Срок жизни обновлён", "success");
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось изменить срок жизни", "error");
+    }
+  }
+
+  const expiresSoon = artifact?.expiresAt ? new Date(artifact.expiresAt).getTime() - Date.now() < 24 * 60 * 60 * 1000 : false;
+
   if (!artifact) return <Spinner />;
 
   return (
@@ -133,6 +152,21 @@ export function ArtifactDetailPage() {
           </div>
         }
       />
+
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted">
+        <span>Истекает:</span>
+        <Badge variant={expiresSoon ? "warning" : "neutral"}>{formatExpiry(artifact.expiresAt)}</Badge>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setLifetimeDraft(artifact.expiresAt ? Math.round((new Date(artifact.expiresAt).getTime() - Date.now()) / 60_000) : null);
+            setLifetimeDialogOpen(true);
+          }}
+        >
+          Изменить срок
+        </Button>
+      </div>
 
       {editing ? (
         <Card className="mb-4">
@@ -259,6 +293,27 @@ export function ArtifactDetailPage() {
         description={`«${artifact.title}» будет удалён без возможности восстановления.`}
         confirmLabel="Удалить"
       />
+
+      <Dialog open={lifetimeDialogOpen} onClose={() => setLifetimeDialogOpen(false)} title="Срок жизни артефакта">
+        <div className="flex flex-col gap-3">
+          <Field
+            label="Удалить через"
+            hint={`Не больше ${formatLifetime(orgDetail?.effectiveMaxArtifactLifetimeMinutes ?? null)} — лимит команды. После истечения срока содержимое удаляется безвозвратно.`}
+          >
+            <LifetimeSelect
+              value={lifetimeDraft}
+              maxMinutes={orgDetail?.effectiveMaxArtifactLifetimeMinutes ?? null}
+              onChange={setLifetimeDraft}
+            />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setLifetimeDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={saveLifetime}>Сохранить</Button>
+          </div>
+        </div>
+      </Dialog>
     </>
   );
 }

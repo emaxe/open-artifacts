@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, gte, inArray, lte, lt, or, sql } from "drizzle-orm";
-import type { Database } from "../db/client.js";
+import type { Database, DbOrTx } from "../db/client.js";
 import { auditLog, orgs, users } from "../db/schema.js";
 import type { Identity } from "../types.js";
 import { keyIdOf } from "./identity.js";
@@ -15,8 +15,12 @@ export interface RecordAuditInput {
   ip?: string;
 }
 
-/** Written synchronously, in the same transaction as the mutation it describes — an audit log that lags is a lie. */
-export async function recordAudit(db: Database, input: RecordAuditInput) {
+/**
+ * Written synchronously, in the same transaction as the mutation it describes — an audit log that
+ * lags is a lie. Accepts a `tx` (not just a top-level `Database`) so callers like the retention
+ * sweeper can write it inside the same transaction that deletes the content it describes.
+ */
+export async function recordAudit(db: DbOrTx, input: RecordAuditInput) {
   const actorType = input.identity.kind;
   const actorId =
     input.identity.kind === "user" || input.identity.kind === "user_key"

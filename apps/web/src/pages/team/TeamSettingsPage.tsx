@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, type OrgDetail, type OrgInvite, type OrgMember } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { ORG_ROLE_LABELS, INVITE_STATUS_LABELS, formatDateTime, label } from "../../lib/labels";
+import { ORG_ROLE_LABELS, INVITE_STATUS_LABELS, formatDateTime, formatLifetime, label } from "../../lib/labels";
 import { Card, CardHeader } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input, Select } from "../../components/ui/Input";
 import { Field } from "../../components/ui/Field";
 import { Badge } from "../../components/ui/Badge";
+import { LifetimeSelect } from "../../components/ui/LifetimeSelect";
 import { Table, THead, TBody, TR, TH, TD, TableEmptyRow } from "../../components/ui/Table";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { CopyButton } from "../../components/ui/CopyButton";
@@ -76,6 +77,17 @@ export function TeamSettingsPage() {
       toast.show(err instanceof ApiError ? err.message : "Не удалось сохранить название", "error");
     } finally {
       setSavingName(false);
+    }
+  }
+
+  async function handleSaveLifetime(minutes: number | null) {
+    if (!orgId) return;
+    try {
+      await api.patch(`/orgs/${orgId}`, { maxArtifactLifetimeMinutes: minutes });
+      toast.show("Срок жизни артефактов сохранён", "success");
+      await load();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось изменить срок жизни артефактов", "error");
     }
   }
 
@@ -173,6 +185,43 @@ export function TeamSettingsPage() {
           <Badge>{detail.memberCount} участников</Badge>
           <Badge>{detail.artifactCount} артефактов</Badge>
         </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Время жизни артефактов"
+          description={`Инстанс допускает не больше ${formatLifetime(detail.globalMaxArtifactLifetimeMinutes)}. Уменьшение необратимо укорачивает срок уже созданных артефактов.`}
+        />
+        {detail.maxArtifactLifetimeMinutes === null ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-muted">
+              Наследуется лимит инстанса: <strong className="text-fg">{formatLifetime(detail.effectiveMaxArtifactLifetimeMinutes)}</strong>
+            </p>
+            {canManageTeam && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleSaveLifetime(detail.globalMaxArtifactLifetimeMinutes ?? 1440)}
+              >
+                Задать своё значение
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <LifetimeSelect
+              value={detail.maxArtifactLifetimeMinutes}
+              maxMinutes={detail.globalMaxArtifactLifetimeMinutes}
+              disabled={!canManageTeam}
+              onChange={(minutes) => handleSaveLifetime(minutes ?? detail.globalMaxArtifactLifetimeMinutes)}
+            />
+            {canManageTeam && (
+              <Button variant="ghost" size="sm" onClick={() => handleSaveLifetime(null)}>
+                Наследовать лимит инстанса
+              </Button>
+            )}
+          </div>
+        )}
       </Card>
 
       <Card>

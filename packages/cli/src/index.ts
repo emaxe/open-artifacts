@@ -57,6 +57,7 @@ program
   .option("--share", "Also create a public share link and print its URL")
   .option("--password <password>", "Create a password-protected share instead of a public one (implies --share)")
   .option("--message <message>", "Version message")
+  .option("--lifetime <duration>", "Delete the artifact after this long: 30m, 12h, 7d, or 0 for never. Omit to use the team's default (its maximum)")
   .option("--json", "Output raw JSON")
   .option("--org <team>", "Team id or slug to publish into (overrides the project/machine default)")
   .action((file, opts) => pushCommand(file, { ...opts, share: opts.share || !!opts.password }));

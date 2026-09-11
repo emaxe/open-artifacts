@@ -66,6 +66,12 @@ export interface OrgDetail {
   slug: string;
   kind: "main" | "team";
   storageQuotaBytes: number;
+  /** This team's own override, in minutes. `null` = inherits the instance maximum. */
+  maxArtifactLifetimeMinutes: number | null;
+  /** The instance-wide maximum, in minutes. `null` = unlimited. */
+  globalMaxArtifactLifetimeMinutes: number | null;
+  /** The stricter of the two above — what new artifacts in this team actually get. `null` = unlimited. */
+  effectiveMaxArtifactLifetimeMinutes: number | null;
   createdAt: string;
   memberCount: number;
   artifactCount: number;
@@ -173,4 +179,6 @@ export interface ArtifactSummary {
   sizeBytes: number;
   createdAt: string;
   updatedAt: string;
+  /** `null` = never expires. */
+  expiresAt: string | null;
 }

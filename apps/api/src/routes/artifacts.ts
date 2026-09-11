@@ -6,6 +6,7 @@ import {
   ArtifactTooLargeError,
   QuotaExceededError,
   VersionConflictError,
+  LifetimeExceedsMaxError,
   createArtifact,
   getArtifact,
   getCurrentVersion,
@@ -25,6 +26,7 @@ import { requiresScope } from "../services/scopes.js";
 import { defaultInstanceSettings, getInstanceSettings } from "../services/settings.js";
 import { listMemberOrgIds } from "../services/orgs.js";
 import { resolveOrgScope, orgScopeErrorResponse } from "../services/org-scope.js";
+import { resolveLifetimeLimitForRequest } from "../services/lifetime.js";
 
 export const artifactRoutes = new Hono<AppBindings>();
 
@@ -73,12 +75,16 @@ artifactRoutes.post("/artifacts", requireAuth, async (c) => {
   if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
 
   try {
-    const { artifact, version } = await createArtifact(db, { orgId, identity, ...body.data });
+    const maxLifetimeMinutes = await resolveLifetimeLimitForRequest(db, c.get("env"), orgId);
+    const { artifact, version } = await createArtifact(db, { orgId, identity, ...body.data, maxLifetimeMinutes });
     await recordAudit(db, { orgId, identity, action: "artifact.create", targetType: "artifact", targetId: artifact.id });
     return c.json({ artifact, currentVersion: version.versionNo }, 201);
   } catch (err) {
     if (err instanceof ArtifactTooLargeError) return c.json({ error: { code: "artifact_too_large", message: err.message } }, 413);
     if (err instanceof QuotaExceededError) return c.json({ error: { code: "quota_exceeded", message: err.message } }, 413);
+    if (err instanceof LifetimeExceedsMaxError) {
+      return c.json({ error: { code: "lifetime_exceeds_max", message: err.message, maxLifetimeMinutes: err.maxMinutes } }, 400);
+    }
     throw err;
   }
 });
@@ -142,15 +148,23 @@ artifactRoutes.patch("/artifacts/:id", requireAuth, async (c) => {
   const body = updateArtifactSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
 
+  const { lifetime, ...rest } = body.data;
   const ifMatch = c.req.header("if-match");
   try {
-    const result = await updateArtifact(db, artifact.id, { ...body.data, identity, ifMatchContentHash: ifMatch });
+    const lifetimePatch =
+      lifetime !== undefined
+        ? { requested: lifetime, maxMinutes: await resolveLifetimeLimitForRequest(db, c.get("env"), artifact.orgId) }
+        : undefined;
+    const result = await updateArtifact(db, artifact.id, { ...rest, identity, ifMatchContentHash: ifMatch, lifetime: lifetimePatch });
     await recordAudit(db, { orgId: artifact.orgId, identity, action: "artifact.update", targetType: "artifact", targetId: artifact.id });
     return c.json({ artifact: result.artifact, newVersionNo: result.version?.versionNo });
   } catch (err) {
     if (err instanceof VersionConflictError) return c.json({ error: { code: "version_conflict", message: err.message } }, 409);
     if (err instanceof ArtifactTooLargeError) return c.json({ error: { code: "artifact_too_large", message: err.message } }, 413);
     if (err instanceof QuotaExceededError) return c.json({ error: { code: "quota_exceeded", message: err.message } }, 413);
+    if (err instanceof LifetimeExceedsMaxError) {
+      return c.json({ error: { code: "lifetime_exceeds_max", message: err.message, maxLifetimeMinutes: err.maxMinutes } }, 400);
+    }
     throw err;
   }
 });

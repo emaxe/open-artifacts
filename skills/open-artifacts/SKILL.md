@@ -88,6 +88,13 @@ oa push report.html --id <artifact-id> --message "Fixed the Q3 numbers"
 oa share <artifact-id> --password "correct horse" --expires 7d
 ```
 
+**Publish with a lifetime shorter than the team default** (the content is hard-deleted once it
+expires — there's no undo):
+```bash
+oa push report.html --lifetime 12h
+# omit --lifetime to get the team's default, which is also its maximum
+```
+
 **See what you've already published:**
 ```bash
 oa list
@@ -112,6 +119,51 @@ rather than show it to a human.
 `oa push` infers the kind from the file extension (`.html`, `.md`, `.mmd`/`.mermaid`, `.svg`);
 override with `--kind` if the extension doesn't match.
 
+## Using Tailwind and JS libraries inside an `html` artifact
+
+`html` artifacts render in an iframe with a strict Content-Security-Policy — not a normal page.
+Two rules decide what works:
+
+1. **`script-src`** only allows inline `<script>` blocks plus a fixed CDN allowlist (default:
+   `cdnjs.cloudflare.com`, `cdn.jsdelivr.net`, `code.jquery.com`, `cdn.tailwindcss.com` — an admin
+   can extend this in Admin Settings, but don't assume a host beyond these four is allowed).
+2. **`connect-src 'none'`** — the page can never `fetch`/`XHR`/open a `WebSocket` at runtime, to
+   itself or anywhere else. Any data the page needs (chart datasets, table rows, JSON) must be
+   embedded inline in the HTML at publish time, not loaded on load.
+3. **`style-src`** only allows inline `<style>`/`style="..."` plus `fonts.googleapis.com`. A
+   library's separate CSS file from a CDN will be silently blocked — inline the CSS yourself
+   (fetch its text and paste it into a `<style>` tag) or pick a library that needs no external CSS.
+4. **`img-src`** is open (`data:`, `blob:`, `https:`) — unlike scripts/styles, images and textures
+   (e.g. three.js texture maps) can load directly from any `https://` URL at runtime.
+
+Practical recipe: load each library as a `<script src="https://cdnjs.cloudflare.com/ajax/libs/
+<lib>/<exact-version>/<file>">` (cdnjs preferred; jsdelivr as fallback — `https://cdn.jsdelivr.net/
+npm/<pkg>@<exact-version>/dist/<file>`), pick the **UMD/browser build** that defines a global (not
+an ES module import, and never `unpkg.com`/`esm.sh` — both are blocked), pin an **exact version**,
+and place that `<script>` tag before any inline `<script>` that uses the global. Never assume a
+library exists on the CDN — if you're not sure of the exact path/version, don't guess.
+
+- **Tailwind CSS**: `<script src="https://cdn.tailwindcss.com"></script>` (the Play CDN — it
+  injects its own `<style>`, no separate stylesheet needed). Optional config before you use
+  classes: `<script>tailwind.config = { theme: { extend: { /* ... */ } } }</script>`.
+- **Charts**: Chart.js (`cdnjs.cloudflare.com/ajax/libs/Chart.js/<version>/chart.umd.min.js`), D3
+  (`.../d3/<version>/d3.min.js`), or ECharts (`.../echarts/<version>/echarts.min.js`) — all ship a
+  CSS-free UMD build, so no stylesheet problem.
+- **Tables**: prefer a plain `<table>` styled with Tailwind utility classes — it sidesteps the
+  external-CSS restriction entirely. If a grid library is genuinely needed (e.g. Grid.js), its
+  companion CSS file must be inlined into a `<style>` tag by hand; don't link it from the CDN.
+- **Diagrams**: if the whole artifact *is* a diagram, publish it as `kind: "mermaid"` instead (the
+  server renders it, no CSP concerns). To mix a diagram into a larger `html` page, load
+  `mermaid.js` as a UMD script from cdnjs/jsdelivr and call `mermaid.initialize({ startOnLoad:
+  true })` the same way the server-rendered `mermaid` kind does internally.
+- **3D / three.js**: load the UMD build (`three.min.js`) plus any addons (`OrbitControls.js`, etc.)
+  as separate pinned `<script>` tags in dependency order; textures can be fetched live from
+  `https://` URLs (`img-src` allows it) even though `connect-src` blocks everything else.
+
+If a script silently fails to run in the published artifact (blank canvas, "X is not defined"),
+suspect CSP first — check the CDN host is in the allowlist above and that you loaded a UMD build,
+not an ESM one.
+
 ## Errors you'll hit and what to do
 
 | Error | Meaning | What to do |
@@ -123,6 +175,7 @@ override with `--kind` if the extension doesn't match.
 | `quota_exceeded` (413) | The org hit its storage quota | Tell the human — an admin needs to raise the quota or free up space |
 | `artifact_too_large` (413) | A single artifact exceeds the size cap (default 5 MiB) | Split the content or reduce it — there's no per-artifact override |
 | `version_conflict` (409) | Someone else changed this artifact since you last read it | `oa get <id>` to see the latest, merge your change, retry |
+| `lifetime_exceeds_max` (400) | The requested `--lifetime`/`lifetime` is longer than the instance/team maximum | The error body carries `maxLifetimeMinutes` — retry within that bound, or omit `--lifetime` to get the default (which is also the max) |
 
 If you don't have the CLI available (no Node/npm), see `references/api.md` for raw HTTP/curl
 examples covering the same operations.
@@ -134,6 +187,8 @@ HTTP) with the same API key as a Bearer token, and use its tools instead of shel
 `whoami`, `list_orgs`, `list_artifacts`, `get_artifact`, `create_artifact`, `update_artifact`,
 `delete_artifact`, `create_share`, `list_shares`, `revoke_share`. Same scopes, same error
 semantics as the table above — just called as MCP tools rather than CLI commands.
+`create_artifact`/`update_artifact` take an optional `lifetime` argument (minutes, or a duration
+like `"12h"`/`"7d"`) mirroring `oa push --lifetime`; omit it to get the team's default/maximum.
 
 A personal key spans every team it belongs to, same as with the CLI. `list_artifacts` and
 `create_artifact` take an optional `orgId` argument; omit it and the connection's default (set via

@@ -55,6 +55,8 @@ export const orgs = pgTable("orgs", {
   name: text("name").notNull(),
   slug: text("slug").notNull(),
   storageQuotaBytes: integer("storage_quota_bytes").notNull().default(1_073_741_824), // 1 GiB
+  // NULL = inherit the instance-wide max artifact lifetime; superadmin-controlled bound applies regardless.
+  maxArtifactLifetimeMinutes: integer("max_artifact_lifetime_minutes"),
   kind: orgKindEnum("kind").notNull().default("team"),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -163,9 +165,15 @@ export const artifacts = pgTable("artifacts", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  // NULL = never expires. Enforced lazily on read and swept by purgeExpiredArtifacts().
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  // Set once the sweeper has hard-deleted this artifact's version content. `artifacts` itself
+  // is kept as a tombstone (audit log + view analytics reference it), only the content goes.
+  purgedAt: timestamp("purged_at", { withTimezone: true }),
 }, (table) => [
   index("artifacts_org_id_idx").on(table.orgId),
   index("artifacts_owner_idx").on(table.ownerType, table.ownerId),
+  index("artifacts_expiry_idx").on(table.expiresAt).where(sql`${table.expiresAt} is not null and ${table.purgedAt} is null`),
 ]);
 
 export const artifactVersions = pgTable("artifact_versions", {

@@ -10,6 +10,13 @@ export interface InstanceSettings {
   viewRetentionDays: number;
   maxArtifactSizeBytes: number;
   inviteTtlDays: number;
+  /**
+   * Maximum AND default artifact lifetime, in minutes. `0` = unlimited (the pre-existing
+   * behavior, and the default after upgrade — no change until a superadmin sets this).
+   * Teams may set their own stricter override (`orgs.maxArtifactLifetimeMinutes`), but never
+   * looser than this. See `services/lifetime.ts`.
+   */
+  maxArtifactLifetimeMinutes: number;
 }
 
 export function defaultInstanceSettings(env: { DEFAULT_REGISTRATION_MODE: string; DEFAULT_KEY_TTL_DAYS: number }): InstanceSettings {
@@ -20,6 +27,7 @@ export function defaultInstanceSettings(env: { DEFAULT_REGISTRATION_MODE: string
     viewRetentionDays: 30,
     maxArtifactSizeBytes: 5 * 1024 * 1024,
     inviteTtlDays: 7,
+    maxArtifactLifetimeMinutes: 0,
   };
 }
 

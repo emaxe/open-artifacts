@@ -28,4 +28,5 @@ export const DEFAULT_CDN_ALLOWLIST = [
   "https://cdnjs.cloudflare.com",
   "https://cdn.jsdelivr.net",
   "https://code.jquery.com",
+  "https://cdn.tailwindcss.com",
 ];

@@ -22,6 +22,7 @@ import {
   getOrgDetail,
 } from "../services/orgs.js";
 import { defaultInstanceSettings, getInstanceSettings } from "../services/settings.js";
+import { clampArtifactExpirations } from "../services/lifetime.js";
 import {
   createOrReissueInvite,
   listOrgInvites,
@@ -58,8 +59,9 @@ orgRoutes.get("/orgs/:id", requireAuth, async (c) => {
 
   const orgId = c.req.param("id");
   const db = c.get("db");
-  
-  const detail = await getOrgDetail(db, orgId);
+
+  const instanceSettings = await getInstanceSettings(db, defaultInstanceSettings(c.get("env")));
+  const detail = await getOrgDetail(db, orgId, instanceSettings.maxArtifactLifetimeMinutes);
   if (!detail) return c.json({ error: { code: "not_found" } }, 404);
 
   const myRole = await getOrgRole(db, orgId, identity.userId);
@@ -71,6 +73,10 @@ orgRoutes.get("/orgs/:id", requireAuth, async (c) => {
 const updateOrgSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   storageQuotaBytes: z.number().int().positive().optional(),
+  // A positive integer sets a team-local ceiling (must be within the instance max); `null` reverts
+  // to inheriting the instance max. `0` is rejected — "explicitly unlimited" is meaningless once
+  // a finite instance max exists, and would be indistinguishable from "inherit" in the UI.
+  maxArtifactLifetimeMinutes: z.number().int().positive().nullable().optional(),
 });
 
 orgRoutes.patch("/orgs/:id", requireAuth, async (c) => {
@@ -89,10 +95,40 @@ orgRoutes.patch("/orgs/:id", requireAuth, async (c) => {
   if (!role) return c.json({ error: { code: "forbidden" } }, 403);
 
   const db = c.get("db");
+
+  // Unlike storageQuotaBytes, a team owner/admin MAY set this themselves — but never looser than
+  // the instance-wide maximum.
+  let globalMaxMinutes: number | undefined;
+  if (body.data.maxArtifactLifetimeMinutes !== undefined && body.data.maxArtifactLifetimeMinutes !== null) {
+    const instanceSettings = await getInstanceSettings(db, defaultInstanceSettings(c.get("env")));
+    globalMaxMinutes = instanceSettings.maxArtifactLifetimeMinutes;
+    if (globalMaxMinutes > 0 && body.data.maxArtifactLifetimeMinutes > globalMaxMinutes) {
+      return c.json(
+        { error: { code: "lifetime_exceeds_max", message: "Team lifetime cannot exceed the instance maximum", maxLifetimeMinutes: globalMaxMinutes } },
+        400,
+      );
+    }
+  }
+
   const updated = await updateOrg(db, orgId, body.data);
   if (!updated) return c.json({ error: { code: "not_found" } }, 404);
   await recordAudit(db, { orgId, identity, action: "org.update", targetType: "org", targetId: orgId, meta: body.data });
-  return c.json({ id: updated.id, name: updated.name, slug: updated.slug, storageQuotaBytes: updated.storageQuotaBytes });
+
+  if (body.data.maxArtifactLifetimeMinutes !== undefined) {
+    if (globalMaxMinutes === undefined) {
+      const instanceSettings = await getInstanceSettings(db, defaultInstanceSettings(c.get("env")));
+      globalMaxMinutes = instanceSettings.maxArtifactLifetimeMinutes;
+    }
+    await clampArtifactExpirations(db, { globalMaxMinutes, orgId });
+  }
+
+  return c.json({
+    id: updated.id,
+    name: updated.name,
+    slug: updated.slug,
+    storageQuotaBytes: updated.storageQuotaBytes,
+    maxArtifactLifetimeMinutes: updated.maxArtifactLifetimeMinutes,
+  });
 });
 
 orgRoutes.post("/orgs", requireAuth, async (c) => {

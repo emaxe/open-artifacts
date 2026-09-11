@@ -1,5 +1,13 @@
-import { and, eq, isNull, sql, inArray } from "drizzle-orm";
-import { computeContentHash, resolveOrgArtifactAccess, type ArtifactAccessResult, type OwnerType } from "@open-artifacts/shared";
+import { and, eq, gt, isNull, or, sql, inArray } from "drizzle-orm";
+import {
+  computeContentHash,
+  resolveOrgArtifactAccess,
+  parseLifetimeMinutes,
+  lifetimeExceedsLimit,
+  expiresAtFromMinutes,
+  type ArtifactAccessResult,
+  type OwnerType,
+} from "@open-artifacts/shared";
 import type { Database } from "../db/client.js";
 import { artifacts, artifactVersions, orgs } from "../db/schema.js";
 import type { Identity } from "../types.js";
@@ -26,6 +34,40 @@ export class ArtifactTooLargeError extends Error {
   }
 }
 
+export class LifetimeExceedsMaxError extends Error {
+  constructor(public readonly maxMinutes: number | null) {
+    super(`Requested artifact lifetime exceeds the maximum allowed (${maxMinutes} minutes)`);
+  }
+}
+
+/**
+ * Resolves a caller-supplied `lifetime` (wire value: string duration, number of minutes, `null`
+ * for "never", or `undefined` to use the ceiling) into an absolute `expiresAt`, validated against
+ * `maxLifetimeMinutes` (`null` = unlimited). Throws `LifetimeExceedsMaxError` rather than
+ * silently clamping — the caller should learn about the retention policy, not get a shorter
+ * lifetime than requested without being told.
+ */
+function resolveArtifactExpiry(
+  lifetime: string | number | null | undefined,
+  maxLifetimeMinutes: number | null,
+  from: Date,
+): Date | null {
+  const requestedMinutes = lifetime === undefined ? maxLifetimeMinutes : parseLifetimeMinutes(lifetime);
+  if (lifetimeExceedsLimit(requestedMinutes, maxLifetimeMinutes)) {
+    throw new LifetimeExceedsMaxError(maxLifetimeMinutes);
+  }
+  return expiresAtFromMinutes(requestedMinutes, from);
+}
+
+/**
+ * The single predicate for "an artifact a normal read should see": not soft-deleted and not past
+ * its lifetime. Used by every list/read path (REST, MCP, the authed preview, and — via
+ * `getArtifact` — the public embed) so lazy expiry never needs to be re-implemented per call site.
+ */
+export function liveArtifactWhere(now: Date = new Date()) {
+  return and(isNull(artifacts.deletedAt), or(isNull(artifacts.expiresAt), gt(artifacts.expiresAt, now)));
+}
+
 function ownerFromIdentity(identity: Identity): { ownerType: OwnerType; ownerId: string } {
   return actorRef(identity);
 }
@@ -37,7 +79,7 @@ async function assertWithinQuota(db: Database, orgId: string, additionalBytes: n
   const rows = await db
     .select({ total: sql<number>`coalesce(sum(${artifacts.sizeBytes}), 0)` })
     .from(artifacts)
-    .where(and(eq(artifacts.orgId, orgId), isNull(artifacts.deletedAt)));
+    .where(and(eq(artifacts.orgId, orgId), liveArtifactWhere()));
   const total = rows[0]!.total;
 
   if (Number(total) + additionalBytes > org.storageQuotaBytes) {
@@ -53,6 +95,14 @@ export interface CreateArtifactInput {
   kind: "html" | "markdown" | "mermaid" | "svg";
   content: string;
   visibility: "private" | "org";
+  /** Caller's choice: a duration string, a number of minutes, `null` for "never", or omitted to use `maxLifetimeMinutes`. */
+  lifetime?: string | number | null;
+  /**
+   * The effective ceiling for this org (`null` = unlimited), from `resolveLifetimeLimitForRequest`.
+   * Required on purpose — the compiler forces every creation surface to resolve the policy rather
+   * than silently skipping it, the mistake `MAX_ARTIFACT_SIZE_BYTES` above already made once.
+   */
+  maxLifetimeMinutes: number | null;
 }
 
 export async function createArtifact(db: Database, input: CreateArtifactInput) {
@@ -62,6 +112,10 @@ export async function createArtifact(db: Database, input: CreateArtifactInput) {
 
   const owner = ownerFromIdentity(input.identity);
   const contentHash = computeContentHash(input.content);
+  const now = new Date();
+  // Derived from the same `now` used for createdAt below, so a later policy-lowering recompute
+  // (which reads back created_at from the row) agrees with the deadline set here.
+  const expiresAt = resolveArtifactExpiry(input.lifetime, input.maxLifetimeMinutes, now);
 
   return db.transaction(async (tx) => {
     const [artifact] = await tx
@@ -75,6 +129,9 @@ export async function createArtifact(db: Database, input: CreateArtifactInput) {
         kind: input.kind,
         visibility: input.visibility,
         sizeBytes,
+        createdAt: now,
+        updatedAt: now,
+        expiresAt,
       })
       .returning();
 
@@ -102,7 +159,25 @@ export async function createArtifact(db: Database, input: CreateArtifactInput) {
 }
 
 export async function getArtifact(db: Database, artifactId: string) {
-  return db.query.artifacts.findFirst({ where: and(eq(artifacts.id, artifactId), isNull(artifacts.deletedAt)) });
+  return db.query.artifacts.findFirst({ where: and(eq(artifacts.id, artifactId), liveArtifactWhere()) });
+}
+
+export type ArtifactLiveness = "live" | "expired" | "deleted" | "missing";
+
+/**
+ * Like `getArtifact`, but ignores the liveness filter so a public share/embed viewer can tell
+ * "this link is gone" (410) apart from "this link never existed" (404) instead of both 404-ing.
+ */
+export async function getArtifactWithLiveness(
+  db: Database,
+  artifactId: string,
+  now: Date = new Date(),
+): Promise<{ artifact: typeof artifacts.$inferSelect | null; liveness: ArtifactLiveness }> {
+  const artifact = await db.query.artifacts.findFirst({ where: eq(artifacts.id, artifactId) });
+  if (!artifact) return { artifact: null, liveness: "missing" };
+  if (artifact.deletedAt !== null) return { artifact, liveness: "deleted" };
+  if (artifact.expiresAt !== null && artifact.expiresAt.getTime() <= now.getTime()) return { artifact, liveness: "expired" };
+  return { artifact, liveness: "live" };
 }
 
 export async function getCurrentVersion(db: Database, artifact: typeof artifacts.$inferSelect) {
@@ -125,7 +200,7 @@ export async function listVersions(db: Database, artifactId: string) {
 
 export async function listArtifactsForOrg(db: Database, orgId: string) {
   return db.query.artifacts.findMany({
-    where: and(eq(artifacts.orgId, orgId), isNull(artifacts.deletedAt)),
+    where: and(eq(artifacts.orgId, orgId), liveArtifactWhere()),
     orderBy: (a, { desc }) => [desc(a.updatedAt)],
   });
 }
@@ -133,14 +208,14 @@ export async function listArtifactsForOrg(db: Database, orgId: string) {
 export async function listArtifactsForOrgs(db: Database, orgIds: string[]) {
   if (orgIds.length === 0) return [];
   return db.query.artifacts.findMany({
-    where: and(inArray(artifacts.orgId, orgIds), isNull(artifacts.deletedAt)),
+    where: and(inArray(artifacts.orgId, orgIds), liveArtifactWhere()),
     orderBy: (a, { desc }) => [desc(a.updatedAt)],
   });
 }
 
 export async function listAllArtifacts(db: Database) {
   return db.query.artifacts.findMany({
-    where: isNull(artifacts.deletedAt),
+    where: liveArtifactWhere(),
     orderBy: (a, { desc }) => [desc(a.updatedAt)],
   });
 }
@@ -154,12 +229,17 @@ export interface UpdateArtifactInput {
   identity: Identity;
   /** Optimistic-locking guard: if provided, must match the artifact's current content hash. */
   ifMatchContentHash?: string;
+  /**
+   * Present only when the caller is changing the lifetime. Bundled with the ceiling so the two
+   * can't travel apart; `restoreVersion` below simply omits this and leaves the lifetime alone.
+   */
+  lifetime?: { requested: string | number | null; maxMinutes: number | null };
 }
 
 export async function updateArtifact(db: Database, artifactId: string, input: UpdateArtifactInput) {
   return db.transaction(async (tx) => {
     const artifact = await tx.query.artifacts.findFirst({
-      where: and(eq(artifacts.id, artifactId), isNull(artifacts.deletedAt)),
+      where: and(eq(artifacts.id, artifactId), liveArtifactWhere()),
     });
     if (!artifact) throw new Error("Artifact not found");
 
@@ -176,6 +256,12 @@ export async function updateArtifact(db: Database, artifactId: string, input: Up
     if (input.title !== undefined) patch.title = input.title;
     if (input.description !== undefined) patch.description = input.description;
     if (input.visibility !== undefined) patch.visibility = input.visibility;
+    if (input.lifetime !== undefined) {
+      // Recomputed from the artifact's ORIGINAL created_at, not "now" — the same rule the policy
+      // recompute uses, so extending then having the instance lower its max can't smuggle in
+      // extra lifetime relative to a fresh artifact created under the same policy.
+      patch.expiresAt = resolveArtifactExpiry(input.lifetime.requested, input.lifetime.maxMinutes, artifact.createdAt);
+    }
 
     let newVersion: typeof artifactVersions.$inferSelect | undefined;
     if (input.content !== undefined) {
@@ -185,7 +271,7 @@ export async function updateArtifact(db: Database, artifactId: string, input: Up
       const usageRows = await tx
         .select({ total: sql<number>`coalesce(sum(${artifacts.sizeBytes}), 0)` })
         .from(artifacts)
-        .where(and(eq(artifacts.orgId, artifact.orgId), isNull(artifacts.deletedAt)));
+        .where(and(eq(artifacts.orgId, artifact.orgId), liveArtifactWhere()));
       const total = usageRows[0]!.total;
       if (Number(total) - artifact.sizeBytes + sizeBytes > (await tx.query.orgs.findFirst({ where: eq(orgs.id, artifact.orgId) }))!.storageQuotaBytes) {
         throw new QuotaExceededError();
