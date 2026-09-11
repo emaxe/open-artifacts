@@ -27,7 +27,7 @@ orgRoutes.get("/orgs", requireAuth, async (c) => {
 
   const db = c.get("db");
   const result = identity.isSuperadmin
-    ? await listAllOrgs(db, { search, page, pageSize })
+    ? await listAllOrgs(db, { search, page, pageSize }, identity.userId)
     : await listOrgsForUser(db, identity.userId, { search, page, pageSize });
 
   return c.json({ orgs: result.orgs, total: result.total, page, pageSize });

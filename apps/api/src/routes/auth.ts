@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { setCookie, deleteCookie } from "hono/cookie";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, inArray } from "drizzle-orm";
 import { loginSchema, registerSchema } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import {
@@ -13,7 +13,7 @@ import {
   verifyLogin,
   updateOwnAccount,
 } from "../services/users.js";
-import { invites, orgMembers, users } from "../db/schema.js";
+import { invites, orgMembers, orgs, users } from "../db/schema.js";
 import { getInstanceSettings, defaultInstanceSettings } from "../services/settings.js";
 import { recordAudit } from "../services/audit.js";
 import { SESSION_COOKIE_NAME, requireAuth } from "../middleware/auth.js";
@@ -145,12 +145,36 @@ authRoutes.get("/auth/me", async (c) => {
   const user = await db.query.users.findFirst({ where: eq(users.id, identity.userId) });
   if (!user) return c.json({ error: { code: "unauthorized" } }, 401);
 
-  const memberships = await db.query.orgMembers.findMany({ where: eq(orgMembers.userId, identity.userId) });
+  let orgList: { orgId: string; name: string; role: string | null }[] = [];
+  if (user.isSuperadmin) {
+    const all = await db.query.orgs.findMany({ orderBy: (o, { asc }) => [asc(o.name)] });
+    const memberships = await db.query.orgMembers.findMany({ where: eq(orgMembers.userId, identity.userId) });
+    const roleMap = new Map(memberships.map((m) => [m.orgId, m.role]));
+    orgList = all.map((o) => ({
+      orgId: o.id,
+      name: o.name,
+      role: roleMap.get(o.id) ?? null,
+    }));
+  } else {
+    const memberships = await db.query.orgMembers.findMany({ where: eq(orgMembers.userId, identity.userId) });
+    const orgIds = memberships.map((m) => m.orgId);
+    let orgMap = new Map<string, string>();
+    if (orgIds.length > 0) {
+      const rows = await db.query.orgs.findMany({ where: inArray(orgs.id, orgIds) });
+      orgMap = new Map(rows.map((r) => [r.id, r.name]));
+    }
+    orgList = memberships.map((m) => ({
+      orgId: m.orgId,
+      name: orgMap.get(m.orgId) ?? m.orgId.slice(0, 8),
+      role: m.role,
+    }));
+  }
+
   return c.json({
     id: user.id,
     email: user.email,
     name: user.name,
     isSuperadmin: user.isSuperadmin,
-    orgs: memberships.map((m) => ({ orgId: m.orgId, role: m.role })),
+    orgs: orgList,
   });
 });

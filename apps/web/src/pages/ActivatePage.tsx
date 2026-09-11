@@ -69,7 +69,7 @@ export function ActivatePage() {
             <ul>{pending.scopes.map((s) => <li key={s} className="muted">{s}</li>)}</ul>
             <label className="muted">Организация</label>
             <select value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-              {me.orgs.map((o) => <option key={o.orgId} value={o.orgId}>{o.orgId.slice(0, 8)} ({o.role})</option>)}
+              {me.orgs.map((o) => <option key={o.orgId} value={o.orgId}>{o.name || o.orgId.slice(0, 8)}{o.role ? ` (${o.role})` : ""}</option>)}
             </select>
             <div className="row">
               <button className="btn" onClick={approve}>Разрешить</button>

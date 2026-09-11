@@ -61,7 +61,7 @@ async function countMembers(db: Database, orgId: string): Promise<number> {
   return Number(countRow?.n ?? 0);
 }
 
-export async function listAllOrgs(db: Database, opts: PageOpts): Promise<{ orgs: OrgListItem[]; total: number }> {
+export async function listAllOrgs(db: Database, opts: PageOpts, currentUserId?: string): Promise<{ orgs: OrgListItem[]; total: number }> {
   const where = opts.search ? ilike(orgs.name, `%${opts.search}%`) : undefined;
   const [countRow] = await db.select({ n: sql<number>`count(*)` }).from(orgs).where(where);
   const total = countRow?.n ?? 0;
@@ -71,8 +71,22 @@ export async function listAllOrgs(db: Database, opts: PageOpts): Promise<{ orgs:
     limit: opts.pageSize,
     offset: (opts.page - 1) * opts.pageSize,
   });
+  const orgIds = rows.map((r) => r.id);
+  const memberships = currentUserId && orgIds.length > 0
+    ? await db.query.orgMembers.findMany({
+        where: and(eq(orgMembers.userId, currentUserId), inArray(orgMembers.orgId, orgIds)),
+      })
+    : [];
+  const roleByOrgId = new Map(memberships.map((m) => [m.orgId, m.role]));
+
   const list = await Promise.all(
-    rows.map(async (o) => ({ id: o.id, name: o.name, slug: o.slug, role: null as string | null, memberCount: await countMembers(db, o.id) })),
+    rows.map(async (o) => ({
+      id: o.id,
+      name: o.name,
+      slug: o.slug,
+      role: roleByOrgId.get(o.id) ?? null,
+      memberCount: await countMembers(db, o.id),
+    })),
   );
   return { orgs: list, total: Number(total) };
 }

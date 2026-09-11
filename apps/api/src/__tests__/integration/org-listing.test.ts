@@ -29,8 +29,20 @@ describe("GET /orgs", () => {
     await getTestDb().update(users).set({ isSuperadmin: true }).where(eq(users.id, admin.userId));
 
     const res = await app.request("/api/v1/orgs?pageSize=100", { headers: { Cookie: `oa_session=${admin.sessionCookie}` } });
-    const body = (await res.json()) as { orgs: { id: string }[] };
-    expect(body.orgs.some((o) => o.id === owner.orgId)).toBe(true);
+    const body = (await res.json()) as { orgs: { id: string; name: string; role: string | null }[] };
+    const ownerOrg = body.orgs.find((o) => o.id === owner.orgId);
+    expect(ownerOrg).toBeDefined();
+    expect(ownerOrg?.role).toBeNull();
+
+    const adminOrg = body.orgs.find((o) => o.id === admin.orgId);
+    expect(adminOrg).toBeDefined();
+    expect(adminOrg?.role).toBe("owner");
+
+    // Also verify GET /auth/me returns all orgs with names for superadmin
+    const meRes = await app.request("/api/v1/auth/me", { headers: { Cookie: `oa_session=${admin.sessionCookie}` } });
+    const meBody = (await meRes.json()) as { orgs: { orgId: string; name: string; role: string | null }[] };
+    expect(meBody.orgs.some((o) => o.orgId === owner.orgId && o.name.includes("workspace"))).toBe(true);
+    expect(meBody.orgs.some((o) => o.orgId === admin.orgId && o.name.includes("workspace"))).toBe(true);
   });
 });
 

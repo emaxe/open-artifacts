@@ -34,7 +34,7 @@ export interface Me {
   email: string;
   name: string;
   isSuperadmin: boolean;
-  orgs: { orgId: string; role: string }[];
+  orgs: { orgId: string; name: string; role: string | null }[];
 }
 
 export interface ArtifactSummary {
