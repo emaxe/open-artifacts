@@ -1,7 +1,19 @@
 {
   "name": "open-artifacts",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "keywords": [
+    "ai-agents",
+    "artifacts",
+    "claude-artifacts",
+    "claude",
+    "mcp",
+    "model-context-protocol",
+    "self-hosted",
+    "docker",
+    "developer-tools",
+    "open-artifacts"
+  ],
   "engines": {
     "node": ">=20"
   },

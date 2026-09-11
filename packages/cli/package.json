@@ -1,10 +1,21 @@
 {
   "name": "@emaxe/oa",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "CLI for Open Artifacts — publish HTML/Markdown/Mermaid/SVG content to a self-hosted artifact host and get back a shareable link.",
-  "keywords": ["ai-agents", "artifacts", "self-hosted", "cli", "mcp", "claude"],
+  "keywords": [
+    "ai-agents",
+    "artifacts",
+    "claude-artifacts",
+    "claude",
+    "mcp",
+    "model-context-protocol",
+    "self-hosted",
+    "cli",
+    "open-artifacts",
+    "developer-tools"
+  ],
   "license": "MIT",
-  "author": "",
+  "author": "emaxe",
   "homepage": "https://github.com/emaxe/open-artifacts#readme",
   "repository": {
     "type": "git",
@@ -19,7 +30,12 @@
     "node": ">=20"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "README.ru.md",
+    "CHANGELOG.md",
+    "CHANGELOG.ru.md",
+    "LICENSE"
   ],
   "bin": {
     "oa": "dist/index.js"

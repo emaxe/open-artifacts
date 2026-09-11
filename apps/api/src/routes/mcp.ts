@@ -42,7 +42,7 @@ const visibilitySchema = z.enum(["private", "org"]);
  * reusing state left over from a concurrent request on a shared server instance.
  */
 function createMcpServer(db: Database, env: Env, identity: Identity): McpServer {
-  const server = new McpServer({ name: "open-artifacts", version: "0.1.0" });
+  const server = new McpServer({ name: "open-artifacts", version: "0.2.0" });
 
   server.registerTool(
     "whoami",
