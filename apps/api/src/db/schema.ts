@@ -26,6 +26,7 @@ export const deviceAuthStatusEnum = pgEnum("device_auth_status", [
   "consumed",
 ]);
 export const registrationModeEnum = pgEnum("registration_mode", ["open", "invite_only", "closed"]);
+export const userStatusEnum = pgEnum("user_status", ["active", "blocked", "deleted"]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -33,6 +34,7 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   name: text("name").notNull(),
   isSuperadmin: boolean("is_superadmin").notNull().default(false),
+  status: userStatusEnum("status").notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("users_email_idx").on(table.email)]);
 

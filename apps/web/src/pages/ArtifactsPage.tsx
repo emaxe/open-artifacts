@@ -1,25 +1,24 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api, type ArtifactSummary } from "../lib/api";
-import { useAuth } from "../lib/auth";
 
 export function ArtifactsPage() {
-  const { currentOrgId } = useAuth();
+  const { orgId } = useParams();
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
   const [showCreate, setShowCreate] = useState(false);
 
   async function load() {
-    if (!currentOrgId) return;
-    const data = await api.get<{ artifacts: ArtifactSummary[] }>(`/artifacts?orgId=${currentOrgId}`);
+    if (!orgId) return;
+    const data = await api.get<{ artifacts: ArtifactSummary[] }>(`/artifacts?orgId=${orgId}`);
     setArtifacts(data.artifacts);
   }
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentOrgId]);
+  }, [orgId]);
 
-  if (!currentOrgId) return <p className="muted">Нет организации. Создайте её на вкладке «Команда».</p>;
+  if (!orgId) return null;
 
   return (
     <div>
@@ -30,7 +29,7 @@ export function ArtifactsPage() {
 
       {showCreate && (
         <CreateArtifactForm
-          orgId={currentOrgId}
+          orgId={orgId}
           onCreated={() => {
             setShowCreate(false);
             load();
@@ -46,7 +45,7 @@ export function ArtifactsPage() {
           <tbody>
             {artifacts.map((a) => (
               <tr key={a.id}>
-                <td><Link to={`/artifacts/${a.id}`}>{a.title}</Link></td>
+                <td><Link to={`/t/${orgId}/artifacts/${a.id}`}>{a.title}</Link></td>
                 <td><span className="badge">{a.kind}</span></td>
                 <td>{a.visibility === "org" ? "команда" : "приватный"}</td>
                 <td className="muted">{new Date(a.updatedAt).toLocaleString()}</td>

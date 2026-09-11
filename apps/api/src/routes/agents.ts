@@ -3,10 +3,11 @@ import { eq } from "drizzle-orm";
 import { createAgentSchema, createApiKeySchema } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import { requireAuth } from "../middleware/auth.js";
-import { createAgent, issueApiKey, listAgentsForOrg, listKeysForAgent, revokeApiKey } from "../services/agents.js";
+import { createAgent, issueApiKey, listAgentsForOrg, listKeysForAgent, revokeApiKey, listAllAgents, listAgentsForOrgs } from "../services/agents.js";
 import { getOrgRole } from "../services/users.js";
 import { recordAudit } from "../services/audit.js";
 import { getInstanceSettings, defaultInstanceSettings } from "../services/settings.js";
+import { listMemberOrgIds } from "../services/orgs.js";
 import { agents, apiKeys } from "../db/schema.js";
 
 export const agentRoutes = new Hono<AppBindings>();
@@ -20,12 +21,18 @@ async function requireOrgMember(c: Context<AppBindings>, orgId: string) {
 }
 
 agentRoutes.get("/agents", requireAuth, async (c) => {
+  const identity = c.get("identity")!;
   const orgId = c.req.query("orgId");
-  if (!orgId) return c.json({ error: { code: "invalid_input", message: "orgId query param is required" } }, 400);
-  if (!(await requireOrgMember(c, orgId))) return c.json({ error: { code: "forbidden" } }, 403);
+  const db = c.get("db");
 
-  const list = await listAgentsForOrg(c.get("db"), orgId);
-  return c.json({ agents: list });
+  if (orgId) {
+    if (!(await requireOrgMember(c, orgId))) return c.json({ error: { code: "forbidden" } }, 403);
+    return c.json({ agents: await listAgentsForOrg(db, orgId) });
+  }
+
+  if (identity.kind !== "user") return c.json({ error: { code: "invalid_input", message: "orgId query param is required" } }, 400);
+  if (identity.isSuperadmin) return c.json({ agents: await listAllAgents(db) });
+  return c.json({ agents: await listAgentsForOrgs(db, await listMemberOrgIds(db, identity.userId)) });
 });
 
 agentRoutes.post("/agents", requireAuth, async (c) => {

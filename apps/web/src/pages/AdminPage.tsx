@@ -74,6 +74,8 @@ export function AdminPage() {
         </div>
       )}
 
+      <AdminUsersSection />
+
       <div className="card">
         <h3>Audit log</h3>
         <table>
@@ -99,6 +101,69 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
     <div className="card" style={{ minWidth: 140 }}>
       <div className="muted">{label}</div>
       <div style={{ fontSize: 24, fontWeight: 600 }}>{value}</div>
+    </div>
+  );
+}
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  isSuperadmin: boolean;
+  status: "active" | "blocked" | "deleted";
+  createdAt: string;
+}
+
+function AdminUsersSection() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  async function load() {
+    const data = await api.get<{ users: User[]; total: number }>(`/users?page=${page}&pageSize=20`);
+    setUsers(data.users);
+    setTotal(data.total);
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  async function setStatus(userId: string, status: string) {
+    if (!confirm(`Изменить статус на ${status}?`)) return;
+    await api.patch(`/admin/users/${userId}/status`, { status });
+    load();
+  }
+
+  return (
+    <div className="card">
+      <h3>Пользователи ({total})</h3>
+      <table>
+        <thead>
+          <tr><th>Email</th><th>Имя</th><th>Роль</th><th>Статус</th><th>Действия</th></tr>
+        </thead>
+        <tbody>
+          {users.map((u) => (
+            <tr key={u.id}>
+              <td>{u.email}</td>
+              <td>{u.name}</td>
+              <td>{u.isSuperadmin ? "Superadmin" : "User"}</td>
+              <td>{u.status}</td>
+              <td>
+                {!u.isSuperadmin && u.status === "active" && <button className="btn secondary" onClick={() => setStatus(u.id, "blocked")}>Block</button>}
+                {!u.isSuperadmin && u.status === "blocked" && <button className="btn secondary" onClick={() => setStatus(u.id, "active")}>Unblock</button>}
+                {!u.isSuperadmin && u.status !== "deleted" && <button className="btn danger" style={{ marginLeft: 8 }} onClick={() => setStatus(u.id, "deleted")}>Delete</button>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="row" style={{ marginTop: 16 }}>
+        <button className="btn secondary" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Назад</button>
+        <span>Страница {page}</span>
+        <button className="btn secondary" disabled={users.length < 20} onClick={() => setPage(p => p + 1)}>Вперёд</button>
+      </div>
     </div>
   );
 }

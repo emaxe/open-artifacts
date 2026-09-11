@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -21,31 +22,31 @@ interface ApiKeySummary {
 const ALL_SCOPES = ["artifacts:read", "artifacts:write", "artifacts:delete", "shares:write"];
 
 export function AgentsPage() {
-  const { currentOrgId } = useAuth();
+  const { orgId } = useParams();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [name, setName] = useState("");
   const [issuedToken, setIssuedToken] = useState<string | null>(null);
 
   async function load() {
-    if (!currentOrgId) return;
-    const data = await api.get<{ agents: Agent[] }>(`/agents?orgId=${currentOrgId}`);
+    if (!orgId) return;
+    const data = await api.get<{ agents: Agent[] }>(`/agents?orgId=${orgId}`);
     setAgents(data.agents);
   }
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentOrgId]);
+  }, [orgId]);
 
   async function createAgent(e: React.FormEvent) {
     e.preventDefault();
-    if (!currentOrgId) return;
-    await api.post(`/agents?orgId=${currentOrgId}`, { name });
+    if (!orgId) return;
+    await api.post(`/agents?orgId=${orgId}`, { name });
     setName("");
     await load();
   }
 
-  if (!currentOrgId) return <p className="muted">Выберите организацию.</p>;
+  if (!orgId) return null;
 
   return (
     <div>

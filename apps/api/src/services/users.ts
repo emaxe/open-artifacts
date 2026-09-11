@@ -17,23 +17,11 @@ export class InvalidCredentialsError extends Error {
   }
 }
 
-function slugify(name: string): string {
-  const base = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-  return `${base || "org"}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
 export interface RegisterResult {
   userId: string;
-  orgId: string;
 }
 
-/**
- * Registers a user and provisions a personal org they own. Keeping this atomic (one org per
- * new user) means every artifact/agent always has an unambiguous home org from minute one.
- */
+/** Registers a user. Does not provision any org — a user is not required to belong to one. */
 export async function registerUser(
   db: Database,
   input: { email: string; password: string; name: string; isSuperadmin?: boolean },
@@ -42,24 +30,28 @@ export async function registerUser(
   if (existing) throw new EmailAlreadyRegisteredError();
 
   const passwordHash = await hashSecret(input.password);
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: input.email.toLowerCase(),
+      passwordHash,
+      name: input.name,
+      isSuperadmin: input.isSuperadmin ?? false,
+    })
+    .returning();
+  return { userId: user!.id };
+}
 
-  return db.transaction(async (tx) => {
-    const [user] = await tx
-      .insert(users)
-      .values({
-        email: input.email.toLowerCase(),
-        passwordHash,
-        name: input.name,
-        isSuperadmin: input.isSuperadmin ?? false,
-      })
-      .returning();
-    const [org] = await tx
-      .insert(orgs)
-      .values({ name: `${input.name}'s workspace`, slug: slugify(input.name) })
-      .returning();
-    await tx.insert(orgMembers).values({ orgId: org!.id, userId: user!.id, role: "owner" });
-    return { userId: user!.id, orgId: org!.id };
-  });
+export class AccountInactiveError extends Error {
+  constructor(public status: "blocked" | "deleted") {
+    super(status === "blocked" ? "This account has been blocked" : "This account no longer exists");
+  }
+}
+
+export class CannotModifySuperadminError extends Error {
+  constructor() {
+    super("Cannot change status of the superadmin account");
+  }
 }
 
 export async function verifyLogin(db: Database, email: string, password: string) {
@@ -67,6 +59,7 @@ export async function verifyLogin(db: Database, email: string, password: string)
   if (!user) throw new InvalidCredentialsError();
   const ok = await verifySecret(password, user.passwordHash);
   if (!ok) throw new InvalidCredentialsError();
+  if (user.status !== "active") throw new AccountInactiveError(user.status);
   return user;
 }
 
@@ -105,4 +98,44 @@ export async function getOrgRole(db: Database, orgId: string, userId: string) {
     where: (m, { and, eq }) => and(eq(m.orgId, orgId), eq(m.userId, userId)),
   });
   return membership?.role ?? null;
+}
+
+export async function setUserStatus(db: Database, userId: string, status: "active" | "blocked" | "deleted") {
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+  if (!user) throw new Error("User not found");
+  if (user.isSuperadmin) throw new CannotModifySuperadminError();
+
+  await db.transaction(async (tx) => {
+    await tx.update(users).set({ status }).where(eq(users.id, userId));
+    if (status !== "active") {
+      await tx.delete(sessions).where(eq(sessions.userId, userId));
+    }
+    if (status === "deleted") {
+      await tx.delete(orgMembers).where(eq(orgMembers.userId, userId));
+    }
+  });
+}
+
+export async function updateOwnAccount(
+  db: Database,
+  userId: string,
+  input: { currentPassword: string; email?: string; name?: string; newPassword?: string },
+) {
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+  if (!user) throw new InvalidCredentialsError();
+  const ok = await verifySecret(input.currentPassword, user.passwordHash);
+  if (!ok) throw new InvalidCredentialsError();
+
+  if (input.email && input.email.toLowerCase() !== user.email) {
+    const existing = await db.query.users.findFirst({ where: eq(users.email, input.email.toLowerCase()) });
+    if (existing) throw new EmailAlreadyRegisteredError();
+  }
+
+  const patch: Partial<typeof users.$inferInsert> = {};
+  if (input.email) patch.email = input.email.toLowerCase();
+  if (input.name) patch.name = input.name;
+  if (input.newPassword) patch.passwordHash = await hashSecret(input.newPassword);
+
+  const [updated] = await db.update(users).set(patch).where(eq(users.id, userId)).returning();
+  return updated!;
 }

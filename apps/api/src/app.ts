@@ -18,6 +18,7 @@ import { shareRoutes } from "./routes/shares.js";
 import { adminRoutes } from "./routes/admin.js";
 import { publicRoutes } from "./routes/public.js";
 import { mcpRoutes } from "./routes/mcp.js";
+import { userRoutes } from "./routes/users.js";
 
 export function createApp(db: Database, env: Env) {
   const app = new Hono<AppBindings>();
@@ -45,6 +46,7 @@ export function createApp(db: Database, env: Env) {
   api.route("/", artifactRoutes);
   api.route("/", shareRoutes);
   api.route("/", adminRoutes);
+  api.route("/", userRoutes);
 
   app.route("/api/v1", api);
 

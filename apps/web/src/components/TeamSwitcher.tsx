@@ -1,0 +1,32 @@
+import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../lib/auth";
+
+export function TeamSwitcher() {
+  const { me } = useAuth();
+  const navigate = useNavigate();
+  const { orgId } = useParams();
+  
+  if (!me) return null;
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <label className="muted" style={{ display: "block", fontSize: "0.85em", marginBottom: 4 }}>
+        Текущая команда
+      </label>
+      <select
+        value={orgId ?? ""}
+        onChange={(e) => {
+          if (e.target.value) {
+            navigate(`/t/${e.target.value}`);
+          }
+        }}
+        style={{ width: "100%", padding: "8px", borderRadius: "4px" }}
+      >
+        <option value="" disabled>Выберите команду</option>
+        {me.orgs.map((o) => (
+          <option key={o.orgId} value={o.orgId}>{o.orgId.slice(0, 8)}</option>
+        ))}
+      </select>
+    </div>
+  );
+}

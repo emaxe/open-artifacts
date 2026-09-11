@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, inArray } from "drizzle-orm";
 import { resolveExpiresAt, type ApiKeyScope } from "@open-artifacts/shared";
 import type { Database } from "../db/client.js";
 import { agents, apiKeys } from "../db/schema.js";
@@ -89,6 +89,15 @@ export async function verifyApiKeyToken(
 
 export async function listAgentsForOrg(db: Database, orgId: string) {
   return db.query.agents.findMany({ where: eq(agents.orgId, orgId) });
+}
+
+export async function listAgentsForOrgs(db: Database, orgIds: string[]) {
+  if (orgIds.length === 0) return [];
+  return db.query.agents.findMany({ where: inArray(agents.orgId, orgIds) });
+}
+
+export async function listAllAgents(db: Database) {
+  return db.query.agents.findMany();
 }
 
 export async function listKeysForAgent(db: Database, agentId: string) {

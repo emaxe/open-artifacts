@@ -21,7 +21,7 @@ interface Share {
 }
 
 export function ArtifactDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { orgId, id } = useParams<{ orgId: string; id: string }>();
   const navigate = useNavigate();
   const [artifact, setArtifact] = useState<ArtifactSummary | null>(null);
   const [content, setContent] = useState("");
@@ -85,7 +85,7 @@ export function ArtifactDetailPage() {
   async function remove() {
     if (!confirm("Удалить артефакт?")) return;
     await api.delete(`/artifacts/${id}`);
-    navigate("/artifacts");
+    navigate(`/t/${orgId}/artifacts`);
   }
 
   if (!artifact) return <p className="muted">Загрузка…</p>;

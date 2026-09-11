@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
-import { useAuth } from "../lib/auth";
 
 interface Member {
   userId: string;
@@ -10,74 +10,77 @@ interface Member {
 }
 
 export function OrgPage() {
-  const { currentOrgId, refresh } = useAuth();
+  const { orgId } = useParams();
   const [members, setMembers] = useState<Member[]>([]);
-  const [newOrgName, setNewOrgName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLink, setInviteLink] = useState<string | null>(null);
 
   async function load() {
-    if (!currentOrgId) return;
-    const data = await api.get<{ members: Member[] }>(`/orgs/${currentOrgId}/members`);
+    if (!orgId) return;
+    const data = await api.get<{ members: Member[] }>(`/orgs/${orgId}/members`);
     setMembers(data.members);
   }
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentOrgId]);
-
-  async function createOrg(e: React.FormEvent) {
-    e.preventDefault();
-    await api.post("/orgs", { name: newOrgName });
-    setNewOrgName("");
-    await refresh();
-  }
+  }, [orgId]);
 
   async function invite(e: React.FormEvent) {
     e.preventDefault();
-    if (!currentOrgId) return;
-    const res = await api.post<{ token: string }>(`/orgs/${currentOrgId}/invites`, { email: inviteEmail, role: "member" });
+    if (!orgId) return;
+    const res = await api.post<{ token: string }>(`/orgs/${orgId}/invites`, { email: inviteEmail, role: "member" });
     setInviteLink(`${window.location.origin}/register?invite=${res.token}`);
     setInviteEmail("");
   }
 
+  async function changeRole(userId: string, role: string) {
+    if (!orgId) return;
+    await api.patch(`/orgs/${orgId}/members/${userId}`, { role });
+    await load();
+  }
+
+  if (!orgId) return null;
+
   return (
     <div>
-      <h2>Команда</h2>
+      <h2>Настройки команды</h2>
 
       <div className="card">
-        <h3>Создать новую организацию</h3>
-        <form onSubmit={createOrg} className="row">
-          <input placeholder="Название" value={newOrgName} onChange={(e) => setNewOrgName(e.target.value)} required />
-          <button className="btn" type="submit">Создать</button>
+        <h3>Пригласить участника</h3>
+        <form onSubmit={invite} className="row">
+          <input type="email" placeholder="email@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
+          <button className="btn" type="submit">Пригласить</button>
         </form>
+        {inviteLink && <p className="muted">Ссылка для регистрации: <code>{inviteLink}</code></p>}
       </div>
 
-      {currentOrgId && (
-        <>
-          <div className="card">
-            <h3>Пригласить участника</h3>
-            <form onSubmit={invite} className="row">
-              <input type="email" placeholder="email@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
-              <button className="btn" type="submit">Пригласить</button>
-            </form>
-            {inviteLink && <p className="muted">Ссылка для регистрации: <code>{inviteLink}</code></p>}
-          </div>
-
-          <div className="card">
-            <h3>Участники</h3>
-            <table>
-              <thead><tr><th>Имя</th><th>Email</th><th>Роль</th></tr></thead>
-              <tbody>
-                {members.map((m) => (
-                  <tr key={m.userId}><td>{m.name}</td><td>{m.email}</td><td>{m.role}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+      <div className="card">
+        <h3>Участники</h3>
+        <table>
+          <thead><tr><th>Имя</th><th>Email</th><th>Роль</th></tr></thead>
+          <tbody>
+            {members.map((m) => (
+              <tr key={m.userId}>
+                <td>{m.name}</td>
+                <td>{m.email}</td>
+                <td>
+                  <select
+                    value={m.role}
+                    onChange={(e) => changeRole(m.userId, e.target.value)}
+                    style={{ padding: "4px 8px", borderRadius: 4 }}
+                  >
+                    <option value="owner">Owner</option>
+                    <option value="admin">Admin</option>
+                    <option value="member">Member</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

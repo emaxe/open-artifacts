@@ -66,8 +66,16 @@ export async function registerAndLogin(app: ReturnType<typeof buildTestApp>, ove
     body: JSON.stringify({ email, password, name }),
   });
   if (res.status !== 201) throw new Error(`register failed: ${res.status} ${await res.text()}`);
-  const body = (await res.json()) as { userId: string; orgId: string };
+  const body = (await res.json()) as { userId: string };
   const sessionCookie = extractCookie(res, "oa_session")!;
 
-  return { userId: body.userId, orgId: body.orgId, sessionCookie, email, password };
+  const orgRes = await app.request("/api/v1/orgs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: `oa_session=${sessionCookie}` },
+    body: JSON.stringify({ name: `${name}'s workspace` }),
+  });
+  if (orgRes.status !== 201) throw new Error(`org creation failed: ${orgRes.status} ${await orgRes.text()}`);
+  const orgBody = (await orgRes.json()) as { id: string };
+
+  return { userId: body.userId, orgId: orgBody.id, sessionCookie, email, password };
 }

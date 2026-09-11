@@ -6,15 +6,18 @@ import type { AppBindings } from "../types.js";
 import {
   EmailAlreadyRegisteredError,
   InvalidCredentialsError,
+  AccountInactiveError,
   createSession,
   deleteSession,
   registerUser,
   verifyLogin,
+  updateOwnAccount,
 } from "../services/users.js";
 import { invites, orgMembers, users } from "../db/schema.js";
 import { getInstanceSettings, defaultInstanceSettings } from "../services/settings.js";
 import { recordAudit } from "../services/audit.js";
-import { SESSION_COOKIE_NAME } from "../middleware/auth.js";
+import { SESSION_COOKIE_NAME, requireAuth } from "../middleware/auth.js";
+import { z } from "zod";
 
 export const authRoutes = new Hono<AppBindings>();
 
@@ -61,13 +64,13 @@ authRoutes.post("/auth/register", async (c) => {
     const session = await createSession(db, result.userId, { ip: c.req.header("x-forwarded-for"), userAgent: c.req.header("user-agent") });
     setCookie(c, SESSION_COOKIE_NAME, session.id, SESSION_COOKIE_OPTS);
     await recordAudit(db, {
-      orgId: invite?.orgId ?? result.orgId,
+      orgId: invite?.orgId,
       identity: { kind: "user", userId: result.userId, isSuperadmin: false },
       action: "user.register",
       targetType: "user",
       targetId: result.userId,
     });
-    return c.json({ userId: result.userId, orgId: invite?.orgId ?? result.orgId }, 201);
+    return c.json({ userId: result.userId, orgId: invite?.orgId ?? null }, 201);
   } catch (err) {
     if (err instanceof EmailAlreadyRegisteredError) {
       return c.json({ error: { code: "email_taken", message: err.message } }, 409);
@@ -90,6 +93,9 @@ authRoutes.post("/auth/login", async (c) => {
     if (err instanceof InvalidCredentialsError) {
       return c.json({ error: { code: "invalid_credentials", message: err.message } }, 401);
     }
+    if (err instanceof AccountInactiveError) {
+      return c.json({ error: { code: `account_${err.status}`, message: err.message } }, 403);
+    }
     throw err;
   }
 });
@@ -104,6 +110,31 @@ authRoutes.post("/auth/logout", async (c) => {
   }
   deleteCookie(c, SESSION_COOKIE_NAME, { path: "/" });
   return c.json({ ok: true });
+});
+
+const updateMeSchema = z.object({
+  email: z.string().email().optional(),
+  name: z.string().min(1).max(200).optional(),
+  newPassword: z.string().min(8).max(200).optional(),
+  currentPassword: z.string().min(1),
+});
+
+authRoutes.patch("/auth/me", requireAuth, async (c) => {
+  const identity = c.get("identity")!;
+  if (identity.kind !== "user") return c.json({ error: { code: "forbidden" } }, 403);
+
+  const body = updateMeSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
+
+  const db = c.get("db");
+  try {
+    const updated = await updateOwnAccount(db, identity.userId, body.data);
+    return c.json({ id: updated.id, email: updated.email, name: updated.name });
+  } catch (err) {
+    if (err instanceof InvalidCredentialsError) return c.json({ error: { code: "invalid_credentials", message: err.message } }, 401);
+    if (err instanceof EmailAlreadyRegisteredError) return c.json({ error: { code: "email_taken", message: err.message } }, 409);
+    throw err;
+  }
 });
 
 authRoutes.get("/auth/me", async (c) => {

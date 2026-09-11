@@ -4,9 +4,10 @@ import { z } from "zod";
 import type { AppBindings } from "../types.js";
 import { requireAuth, requireSuperadmin } from "../middleware/auth.js";
 import { artifacts, agents, orgs, users } from "../db/schema.js";
-import { listAuditLog } from "../services/audit.js";
+import { listAuditLog, recordAudit } from "../services/audit.js";
 import { defaultInstanceSettings, getInstanceSettings, updateInstanceSettings } from "../services/settings.js";
 import { getTopArtifacts } from "../services/analytics.js";
+import { setUserStatus, CannotModifySuperadminError } from "../services/users.js";
 
 export const adminRoutes = new Hono<AppBindings>();
 // Scoped to "/admin/*" rather than a bare "*": once merged into the shared `api` router (all
@@ -33,11 +34,7 @@ adminRoutes.get("/admin/stats", async (c) => {
   });
 });
 
-adminRoutes.get("/admin/orgs", async (c) => {
-  const db = c.get("db");
-  const list = await db.query.orgs.findMany();
-  return c.json({ orgs: list });
-});
+
 
 adminRoutes.get("/admin/orgs/:id/top-artifacts", async (c) => {
   const db = c.get("db");
@@ -45,11 +42,7 @@ adminRoutes.get("/admin/orgs/:id/top-artifacts", async (c) => {
   return c.json({ topArtifacts: top });
 });
 
-adminRoutes.get("/admin/users", async (c) => {
-  const db = c.get("db");
-  const list = await db.query.users.findMany();
-  return c.json({ users: list.map((u) => ({ id: u.id, email: u.email, name: u.name, isSuperadmin: u.isSuperadmin, createdAt: u.createdAt })) });
-});
+
 
 adminRoutes.get("/admin/audit", async (c) => {
   const db = c.get("db");
@@ -81,4 +74,22 @@ adminRoutes.patch("/admin/settings", async (c) => {
   const current = await getInstanceSettings(db, defaultInstanceSettings(c.get("env")));
   const next = await updateInstanceSettings(db, body.data, current);
   return c.json({ settings: next });
+});
+
+const statusPatchSchema = z.object({ status: z.enum(["active", "blocked", "deleted"]) });
+
+adminRoutes.patch("/admin/users/:id/status", async (c) => {
+  const db = c.get("db");
+  const targetId = c.req.param("id");
+  const body = statusPatchSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
+
+  try {
+    await setUserStatus(db, targetId, body.data.status);
+  } catch (err) {
+    if (err instanceof CannotModifySuperadminError) return c.json({ error: { code: "forbidden", message: err.message } }, 403);
+    throw err;
+  }
+  await recordAudit(db, { identity: c.get("identity")!, action: "user.set_status", targetType: "user", targetId, meta: { status: body.data.status } });
+  return c.json({ ok: true });
 });

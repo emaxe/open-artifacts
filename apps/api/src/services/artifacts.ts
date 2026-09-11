@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, sql, inArray } from "drizzle-orm";
 import { computeContentHash, resolveOrgArtifactAccess, type ArtifactAccessResult, type OwnerType } from "@open-artifacts/shared";
 import type { Database } from "../db/client.js";
 import { artifacts, artifactVersions, orgs } from "../db/schema.js";
@@ -127,6 +127,21 @@ export async function listVersions(db: Database, artifactId: string) {
 export async function listArtifactsForOrg(db: Database, orgId: string) {
   return db.query.artifacts.findMany({
     where: and(eq(artifacts.orgId, orgId), isNull(artifacts.deletedAt)),
+    orderBy: (a, { desc }) => [desc(a.updatedAt)],
+  });
+}
+
+export async function listArtifactsForOrgs(db: Database, orgIds: string[]) {
+  if (orgIds.length === 0) return [];
+  return db.query.artifacts.findMany({
+    where: and(inArray(artifacts.orgId, orgIds), isNull(artifacts.deletedAt)),
+    orderBy: (a, { desc }) => [desc(a.updatedAt)],
+  });
+}
+
+export async function listAllArtifacts(db: Database) {
+  return db.query.artifacts.findMany({
+    where: isNull(artifacts.deletedAt),
     orderBy: (a, { desc }) => [desc(a.updatedAt)],
   });
 }

@@ -8,6 +8,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { orgMembers, orgs, users, invites } from "../db/schema.js";
 import { getOrgRole } from "../services/users.js";
 import { recordAudit } from "../services/audit.js";
+import { changeMemberRole, LastOwnerError, NotAMemberError, listAllOrgs, listOrgsForUser, getOrgDetail } from "../services/orgs.js";
 
 export const orgRoutes = new Hono<AppBindings>();
 
@@ -19,15 +20,33 @@ function slugify(name: string): string {
 orgRoutes.get("/orgs", requireAuth, async (c) => {
   const identity = c.get("identity")!;
   if (identity.kind !== "user") return c.json({ error: { code: "forbidden" } }, 403);
+
+  const search = c.req.query("search") || undefined;
+  const page = Math.max(1, Number(c.req.query("page") ?? "1"));
+  const pageSize = Math.min(100, Math.max(1, Number(c.req.query("pageSize") ?? "20")));
+
   const db = c.get("db");
-  const memberships = await db.query.orgMembers.findMany({ where: eq(orgMembers.userId, identity.userId) });
-  const orgList = await Promise.all(
-    memberships.map(async (m) => {
-      const org = await db.query.orgs.findFirst({ where: eq(orgs.id, m.orgId) });
-      return { id: org!.id, name: org!.name, slug: org!.slug, role: m.role };
-    }),
-  );
-  return c.json({ orgs: orgList });
+  const result = identity.isSuperadmin
+    ? await listAllOrgs(db, { search, page, pageSize })
+    : await listOrgsForUser(db, identity.userId, { search, page, pageSize });
+
+  return c.json({ orgs: result.orgs, total: result.total, page, pageSize });
+});
+
+orgRoutes.get("/orgs/:id", requireAuth, async (c) => {
+  const identity = c.get("identity")!;
+  if (identity.kind !== "user") return c.json({ error: { code: "forbidden" } }, 403);
+
+  const orgId = c.req.param("id");
+  const db = c.get("db");
+  
+  const detail = await getOrgDetail(db, orgId);
+  if (!detail) return c.json({ error: { code: "not_found" } }, 404);
+
+  const myRole = await getOrgRole(db, orgId, identity.userId);
+  if (!myRole && !identity.isSuperadmin) return c.json({ error: { code: "forbidden" } }, 403);
+
+  return c.json({ ...detail, myRole });
 });
 
 orgRoutes.post("/orgs", requireAuth, async (c) => {
@@ -103,5 +122,28 @@ orgRoutes.delete("/orgs/:id/members/:userId", requireAuth, async (c) => {
   const db = c.get("db");
   await db.delete(orgMembers).where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, targetUserId)));
   await recordAudit(db, { orgId, identity: c.get("identity")!, action: "org.remove_member", targetType: "user", targetId: targetUserId });
+  return c.json({ ok: true });
+});
+
+const changeRoleSchema = z.object({ role: orgRoleSchema });
+
+orgRoutes.patch("/orgs/:id/members/:userId", requireAuth, async (c) => {
+  const orgId = c.req.param("id");
+  const targetUserId = c.req.param("userId");
+  const role = await requireOrgRole(c, orgId, ["owner", "admin"]);
+  if (!role) return c.json({ error: { code: "forbidden" } }, 403);
+
+  const body = changeRoleSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
+
+  const db = c.get("db");
+  try {
+    await changeMemberRole(db, orgId, targetUserId, body.data.role);
+  } catch (err) {
+    if (err instanceof LastOwnerError) return c.json({ error: { code: "last_owner", message: err.message } }, 409);
+    if (err instanceof NotAMemberError) return c.json({ error: { code: "not_found", message: err.message } }, 404);
+    throw err;
+  }
+  await recordAudit(db, { orgId, identity: c.get("identity")!, action: "org.change_role", targetType: "user", targetId: targetUserId, meta: { role: body.data.role } });
   return c.json({ ok: true });
 });

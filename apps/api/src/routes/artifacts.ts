@@ -16,12 +16,15 @@ import {
   restoreVersion,
   softDeleteArtifact,
   updateArtifact,
+  listArtifactsForOrgs,
+  listAllArtifacts,
 } from "../services/artifacts.js";
 import { renderArtifactHtml } from "../services/render.js";
 import { recordAudit } from "../services/audit.js";
 import { getOrgRole } from "../services/users.js";
 import { requiresScope } from "../services/scopes.js";
 import { defaultInstanceSettings, getInstanceSettings } from "../services/settings.js";
+import { listMemberOrgIds } from "../services/orgs.js";
 
 export const artifactRoutes = new Hono<AppBindings>();
 
@@ -29,11 +32,20 @@ artifactRoutes.get("/artifacts", requireAuth, async (c) => {
   const identity = c.get("identity")!;
   if (!requiresScope(identity, "artifacts:read")) return c.json({ error: { code: "forbidden", message: "Missing scope artifacts:read" } }, 403);
 
-  const orgId = identity.kind === "agent" ? identity.orgId : c.req.query("orgId");
-  if (!orgId) return c.json({ error: { code: "invalid_input", message: "orgId query param is required" } }, 400);
-
   const db = c.get("db");
-  const all = await listArtifactsForOrg(db, orgId);
+  const orgIdParam = identity.kind === "agent" ? identity.orgId : c.req.query("orgId");
+
+  let all;
+  if (orgIdParam) {
+    all = await listArtifactsForOrg(db, orgIdParam);
+  } else if (identity.kind === "user" && identity.isSuperadmin) {
+    all = await listAllArtifacts(db);
+  } else if (identity.kind === "user") {
+    all = await listArtifactsForOrgs(db, await listMemberOrgIds(db, identity.userId));
+  } else {
+    return c.json({ error: { code: "invalid_input", message: "orgId query param is required" } }, 400);
+  }
+
   const visible = [];
   for (const artifact of all) {
     const access = await resolveAccessForIdentity(db, identity, artifact);

@@ -46,9 +46,16 @@ async function setupMaliciousShare(baseURL: string): Promise<string> {
     body: JSON.stringify({ email, password: "correct horse battery staple", name: "Victim" }),
   });
   if (!registerRes.ok) throw new Error(`register failed: ${registerRes.status} ${await registerRes.text()}`);
-  const { orgId } = (await registerRes.json()) as { orgId: string };
   const setCookie = registerRes.headers.get("set-cookie")!;
   const sessionCookie = /oa_session=([^;]+)/.exec(setCookie)![1];
+
+  const orgRes = await fetch(`${baseURL}/api/v1/orgs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: `oa_session=${sessionCookie}` },
+    body: JSON.stringify({ name: "Victim's workspace" }),
+  });
+  if (!orgRes.ok) throw new Error(`org creation failed: ${orgRes.status} ${await orgRes.text()}`);
+  const { id: orgId } = (await orgRes.json()) as { id: string };
 
   const createRes = await fetch(`${baseURL}/api/v1/artifacts?orgId=${orgId}`, {
     method: "POST",
