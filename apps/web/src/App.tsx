@@ -27,6 +27,7 @@ export function App() {
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/instructions" element={<AdminPage />} />
             
             <Route path="/t/:orgId" element={<TeamLayout />}>
               <Route path="" element={<Navigate to="artifacts" replace />} />

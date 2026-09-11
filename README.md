@@ -74,36 +74,83 @@ or call the API — the whole security model in one assertion.
 
 ## Skill (for AI agents)
 
-`skills/open-artifacts/` is installable directly from this repo via [skills.sh](https://skills.sh):
+Open Artifacts provides a standardized skill that teaches AI agents (Claude Code, Cursor, Codex, Windsurf, Antigravity, OpenCode, etc.) how to interact with your instance: install the `oa` CLI, authenticate, publish artifacts, and return shareable links in chat.
+
+### 1. Installation via [skills.sh](https://skills.sh/emaxe/open-artifacts)
+
+Install the skill directly from this repository:
 
 ```bash
+# Install in the current project workspace (recommended):
 npx skills add emaxe/open-artifacts
+
+# Or install globally for all projects on your machine:
+npx skills add emaxe/open-artifacts -g
 ```
 
-This drops the skill into whichever supported agent it detects (Claude Code, Cursor, Codex,
-OpenCode, and more) so the agent knows how to install the `oa` CLI, log in, and publish/share
-artifacts. See `skills/open-artifacts/SKILL.md` for what it teaches the agent.
+`skills.sh` automatically detects your agent environment (e.g. `.agents/skills/open-artifacts/` or `.claude/skills/`) and places `SKILL.md` there.
 
-## MCP server
+### 2. Agent Authentication
 
-Every instance exposes an MCP server at `<APP_ORIGIN>/mcp` (Streamable HTTP) — no separate process
-or package to install. Point any MCP client's remote-server config at it with an agent API key
-(the same kind `oa login` or the web UI's Agents page issues) as a Bearer token:
+Agents can authenticate with your Open Artifacts instance in two ways:
+
+#### Option A: Interactive OAuth Device Flow (Recommended for CLI)
+1. The agent (or you) runs in the terminal:
+   ```bash
+   oa login --server http://localhost:3000
+   ```
+   *(replace `http://localhost:3000` with your instance URL)*
+2. The CLI prints a one-time code (e.g., `ABCD-1234`) and a verification URL.
+3. Open `http://localhost:3000/activate?code=ABCD-1234` in your browser, select an organization, and click **Approve** («Разрешить»). Superadmins can grant access to any organization in the system.
+4. Credentials are automatically saved to `~/.config/open-artifacts/credentials.json`.
+
+#### Option B: Non-interactive Environment Variables
+Issue an API key directly in the web UI under **Team > Agents** (`/t/:orgId/agents`) by clicking **Issue Key** («Выпустить ключ»). Then inject the variables into the agent's environment:
+
+```bash
+export OA_SERVER="http://localhost:3000"
+export OA_TOKEN="oa_live_xxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+Verify connection:
+```bash
+oa whoami
+```
+
+### 3. Quick CLI Recipes for Agents
+
+| Task | Command |
+|---|---|
+| Publish new artifact & get share link | `oa push report.html --title "Q3 Report" --share` |
+| Update an existing artifact (new version) | `oa push report.html --id <artifact-id> --message "Fixed typos"` |
+| Share with password & 7-day expiration | `oa share <artifact-id> --password "secret123" --expires 7d` |
+| List artifacts in current team | `oa list` |
+| Download artifact content | `oa get <artifact-id> -o local.html` |
+
+Supported artifact types: `html`, `markdown`, `mermaid`, `svg`.
+
+## MCP server (Model Context Protocol)
+
+Every instance exposes an MCP server at `<APP_ORIGIN>/mcp` (Streamable HTTP) — no separate process or package required. Point any MCP client (Cursor, Claude Desktop, Claude Code) at it using an agent API key as a Bearer token:
 
 ```json
 {
   "mcpServers": {
     "open-artifacts": {
       "url": "http://localhost:3000/mcp",
-      "headers": { "Authorization": "Bearer oa_live_..." }
+      "headers": {
+        "Authorization": "Bearer oa_live_xxxxxxxxxxxxxxxxxxxxxxxx"
+      }
     }
   }
 }
 ```
 
-Tools: `whoami`, `list_artifacts`, `get_artifact`, `create_artifact`, `update_artifact`,
-`delete_artifact`, `create_share`, `list_shares`, `revoke_share` — each enforces the calling key's
-scopes exactly like the REST API (see `apps/api/src/routes/mcp.ts`).
+Available tools: `whoami`, `list_artifacts`, `get_artifact`, `create_artifact`, `update_artifact`, `delete_artifact`, `create_share`, `list_shares`, `revoke_share`.
+
+## Admin Instructions Page
+
+A complete interactive cheat-sheet with copyable commands, real-time instance URLs, and links to `/activate` is also built directly into the web UI at **Admin > Instructions** (`/admin/instructions` or `/admin?tab=instructions`).
 
 ## Configuration
 
