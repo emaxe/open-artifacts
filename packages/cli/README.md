@@ -42,7 +42,7 @@ Connect to your Open Artifacts server using the interactive OAuth Device Flow:
 oa login --server https://artifacts.your-company.com
 ```
 
-The CLI outputs a short code (e.g. `ABCD-1234`) and an activation link. Open the link in your browser, select your organization, and approve access. Credentials are saved locally to `~/.config/open-artifacts/credentials.json` (`600` permissions).
+The CLI outputs a short code (e.g. `ABCD-1234`) and an activation link. Open the link in your browser and approve access. This issues a **personal key** by default — it's valid across every team you belong to, not locked to one. Credentials are saved locally to `~/.config/open-artifacts/credentials.json` (`600` permissions).
 
 Verify your session at any time:
 
@@ -50,7 +50,18 @@ Verify your session at any time:
 oa whoami
 ```
 
-### 2. Publish Content
+### 2. Pick a team
+
+If you belong to more than one team, tell the CLI which one to use for this project:
+
+```bash
+oa orgs           # list your teams, with a * next to the current default
+oa use <team>     # set the default for this project (writes a secret-free .oa.json you can commit)
+```
+
+With exactly one team, this step is optional — it's used automatically. Override it for a single command with `--org <team>` on `oa list` / `oa push`, without changing the saved default.
+
+### 3. Publish Content
 
 ```bash
 # Publish an HTML file and get a public shareable URL:
@@ -76,12 +87,27 @@ Authorizes the CLI with an Open Artifacts server using the OAuth device flow.
 ```bash
 oa login [options]
   --server <url>      Open Artifacts server URL (default: "http://localhost:3000")
-  --name <name>        Agent or client name to register
+  --name <name>        Name to register this device/agent as
   --scopes <scopes>    Comma-separated list of scopes (default: "artifacts:read,artifacts:write,shares:write")
+  --agent               Issue an agent key locked to one team, instead of a personal key spanning all your teams
 ```
 
 ### `oa whoami`
-Displays current credentials, server endpoint, organization ID, and token expiration.
+Displays current credentials, server endpoint, key type, effective team, and token expiration.
+
+### `oa orgs`
+Lists the teams your key can act in, marking the one currently selected for this project.
+
+```bash
+oa orgs [--json]
+```
+
+### `oa use <team>`
+Sets the default team (by id or slug) for the current project, or for the whole machine.
+
+```bash
+oa use <team> [--global]
+```
 
 ### `oa push <file>`
 Creates a new artifact or updates an existing one from a local file.
@@ -95,14 +121,15 @@ oa push <file> [options]
   --password <pass>     Protect the share link with a password (implies --share)
   --expires <ttl>       Share expiration: 1h, 1d, 7d, 30d (implies --share)
   --message <msg>       Version commit message
+  --org <team>          Team id or slug to publish into (overrides the project/machine default)
   --json                Output result as JSON
 ```
 
 ### `oa list`
-Lists all artifacts in your active organization.
+Lists all artifacts in your active team.
 
 ```bash
-oa list [--json]
+oa list [--org <team>] [--json]
 ```
 
 ### `oa get <artifact-id>`
@@ -147,7 +174,7 @@ export OA_SERVER="https://artifacts.your-company.com"
 export OA_TOKEN="oa_live_xxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
-Generate agent API tokens directly in the Open Artifacts web dashboard under **Team > Agents**.
+For CI, an agent key (`oa login --agent`, or generated in the web dashboard under **Team > Agents**) is usually the right choice — it's locked to one team, which keeps the blast radius of a leaked CI secret small. A personal key issued from **Settings > Личные API-ключи** also works via `OA_TOKEN`, but it spans every team you belong to.
 
 ---
 

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { setCookie, deleteCookie } from "hono/cookie";
-import { and, eq, isNull, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { loginSchema, registerSchema } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import {
@@ -13,10 +13,11 @@ import {
   verifyLogin,
   updateOwnAccount,
 } from "../services/users.js";
-import { invites, orgMembers, orgs, users } from "../db/schema.js";
+import { invites, orgMembers, users } from "../db/schema.js";
 import { getInstanceSettings, defaultInstanceSettings } from "../services/settings.js";
 import { recordAudit } from "../services/audit.js";
 import { SESSION_COOKIE_NAME, requireAuth } from "../middleware/auth.js";
+import { acceptInvite, countPendingInvitesForEmail, normalizeEmail } from "../services/invites.js";
 import { z } from "zod";
 
 export const authRoutes = new Hono<AppBindings>();
@@ -28,11 +29,21 @@ const SESSION_COOKIE_OPTS = {
   maxAge: 30 * 24 * 60 * 60,
 };
 
+// Used only when registering via an invite token: the public invite preview never reveals the
+// real email (see services/invites.ts's maskEmail), so the web form can't prefill or submit it —
+// the server derives it from the invite instead. `email` stays optional here only so a raw API
+// caller can still assert it if they already know it; when they do, it's checked against the
+// invite below rather than silently ignored.
+const registerViaInviteSchema = z.object({
+  name: z.string().min(1).max(200),
+  password: z.string().min(8).max(200),
+  email: z.string().email().optional(),
+});
+
 authRoutes.post("/auth/register", async (c) => {
   const db = c.get("db");
   const env = c.get("env");
-  const body = registerSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
+  const rawBody = await c.req.json().catch(() => ({}));
 
   const inviteToken = c.req.query("invite");
   const settings = await getInstanceSettings(db, defaultInstanceSettings(env));
@@ -40,7 +51,7 @@ authRoutes.post("/auth/register", async (c) => {
   let invite: typeof invites.$inferSelect | undefined;
   if (inviteToken) {
     invite = await db.query.invites.findFirst({
-      where: and(eq(invites.token, inviteToken), isNull(invites.acceptedAt)),
+      where: and(eq(invites.token, inviteToken), eq(invites.status, "pending")),
     });
     if (!invite || invite.expiresAt.getTime() <= Date.now()) {
       return c.json({ error: { code: "invalid_invite", message: "Invite is invalid or expired" } }, 400);
@@ -51,14 +62,28 @@ authRoutes.post("/auth/register", async (c) => {
     return c.json({ error: { code: "invite_required", message: "An invite is required to register" } }, 403);
   }
 
+  const body = invite ? registerViaInviteSchema.safeParse(rawBody) : registerSchema.safeParse(rawBody);
+  if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
+
+  let effectiveEmail: string;
+  if (invite) {
+    // Reject a mismatched email loudly rather than silently substituting the invite's address —
+    // only reachable by a raw API caller who chose to assert one; the web UI never sends this field.
+    if ("email" in body.data && body.data.email && normalizeEmail(body.data.email) !== invite.email) {
+      return c.json({ error: { code: "invite_email_mismatch", message: "This invite was issued to a different email address" } }, 400);
+    }
+    effectiveEmail = invite.email;
+  } else {
+    effectiveEmail = (body.data as { email: string }).email;
+  }
+
   try {
-    const result = await registerUser(db, body.data);
+    const result = await registerUser(db, { name: body.data.name, password: body.data.password, email: effectiveEmail });
 
     if (invite) {
-      await db.transaction(async (tx) => {
-        await tx.insert(orgMembers).values({ orgId: invite!.orgId, userId: result.userId, role: invite!.role });
-        await tx.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, invite!.id));
-      });
+      // Reuses the same acceptance path an already-registered user goes through — no duplicated
+      // transaction logic between "register with an invite" and "accept an invite".
+      await acceptInvite(db, invite.token, { id: result.userId, email: effectiveEmail });
     }
 
     const session = await createSession(db, result.userId, { ip: c.req.header("x-forwarded-for"), userAgent: c.req.header("user-agent") });
@@ -70,10 +95,12 @@ authRoutes.post("/auth/register", async (c) => {
       targetType: "user",
       targetId: result.userId,
     });
-    return c.json({ userId: result.userId, orgId: invite?.orgId ?? null }, 201);
+    return c.json({ userId: result.userId, mainOrgId: result.mainOrgId, orgId: invite?.orgId ?? null }, 201);
   } catch (err) {
     if (err instanceof EmailAlreadyRegisteredError) {
-      return c.json({ error: { code: "email_taken", message: err.message } }, 409);
+      // Surface the invite token so the web app can bounce to a login screen that returns
+      // straight to /invite/:token instead of dead-ending on "email taken".
+      return c.json({ error: { code: "email_taken", message: err.message }, inviteToken: invite?.token ?? null }, 409);
     }
     throw err;
   }
@@ -145,30 +172,19 @@ authRoutes.get("/auth/me", async (c) => {
   const user = await db.query.users.findFirst({ where: eq(users.id, identity.userId) });
   if (!user) return c.json({ error: { code: "unauthorized" } }, 401);
 
-  let orgList: { orgId: string; name: string; role: string | null }[] = [];
-  if (user.isSuperadmin) {
-    const all = await db.query.orgs.findMany({ orderBy: (o, { asc }) => [asc(o.name)] });
-    const memberships = await db.query.orgMembers.findMany({ where: eq(orgMembers.userId, identity.userId) });
-    const roleMap = new Map(memberships.map((m) => [m.orgId, m.role]));
-    orgList = all.map((o) => ({
-      orgId: o.id,
-      name: o.name,
-      role: roleMap.get(o.id) ?? null,
-    }));
-  } else {
-    const memberships = await db.query.orgMembers.findMany({ where: eq(orgMembers.userId, identity.userId) });
-    const orgIds = memberships.map((m) => m.orgId);
-    let orgMap = new Map<string, string>();
-    if (orgIds.length > 0) {
-      const rows = await db.query.orgs.findMany({ where: inArray(orgs.id, orgIds) });
-      orgMap = new Map(rows.map((r) => [r.id, r.name]));
-    }
-    orgList = memberships.map((m) => ({
-      orgId: m.orgId,
-      name: orgMap.get(m.orgId) ?? m.orgId.slice(0, 8),
-      role: m.role,
-    }));
-  }
+  // Own memberships only — for everyone, including superadmins. Superadmins previously saw every
+  // org in the instance here, which stops making sense once every user has their own auto-
+  // provisioned "main" workspace: the list would be dominated by other people's personal orgs.
+  // A superadmin reaches orgs they don't belong to through GET /orgs?search= on demand instead.
+  const memberships = await db.query.orgMembers.findMany({
+    where: eq(orgMembers.userId, identity.userId),
+    with: { org: true },
+  });
+  const orgList = memberships
+    .filter((m) => m.org)
+    .map((m) => ({ orgId: m.orgId, name: m.org!.name, slug: m.org!.slug, kind: m.org!.kind, role: m.role }));
+  const mainOrgId = memberships.find((m) => m.org?.kind === "main")?.orgId ?? null;
+  const pendingInviteCount = await countPendingInvitesForEmail(db, user.email);
 
   return c.json({
     id: user.id,
@@ -176,5 +192,7 @@ authRoutes.get("/auth/me", async (c) => {
     name: user.name,
     isSuperadmin: user.isSuperadmin,
     orgs: orgList,
+    mainOrgId,
+    pendingInviteCount,
   });
 });

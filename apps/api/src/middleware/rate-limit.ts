@@ -1,5 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import type { AppBindings } from "../types.js";
+import { keyIdOf } from "../services/identity.js";
 
 interface Bucket {
   tokens: number;
@@ -22,7 +23,8 @@ export interface RateLimitOptions {
 export function rateLimit(opts: RateLimitOptions) {
   return createMiddleware<AppBindings>(async (c, next) => {
     const identity = c.get("identity");
-    const key = identity?.kind === "agent" ? `key:${identity.keyId}` : `ip:${c.req.header("x-forwarded-for") ?? "unknown"}`;
+    const keyId = identity ? keyIdOf(identity) : null;
+    const key = keyId ? `key:${keyId}` : `ip:${c.req.header("x-forwarded-for") ?? "unknown"}`;
 
     const now = Date.now();
     const bucket = buckets.get(key) ?? { tokens: opts.limit, lastRefillMs: now };

@@ -22,7 +22,7 @@ oauthDeviceRoutes.post("/oauth/device/code", async (c) => {
 
   const db = c.get("db");
   const env = c.get("env");
-  const request = await createDeviceAuthRequest(db, body.data.agentName, body.data.scopes);
+  const request = await createDeviceAuthRequest(db, body.data.agentName, body.data.scopes, body.data.grantKind);
   const verificationUri = `${env.APP_ORIGIN}/activate`;
 
   return c.json({
@@ -56,12 +56,11 @@ oauthDeviceRoutes.post("/oauth/device/token", async (c) => {
     case "access_denied":
       return c.json({ error: "access_denied" }, 403);
     case "ok":
-      return c.json({
-        api_key: result.apiKey,
-        expires_at: result.expiresAt,
-        org_id: result.orgId,
-        agent_id: result.agentId,
-      });
+      return c.json(
+        result.grantKind === "user"
+          ? { api_key: result.apiKey, expires_at: result.expiresAt, grant_kind: "user", user_id: result.userId, org_id: null, agent_id: null }
+          : { api_key: result.apiKey, expires_at: result.expiresAt, grant_kind: "agent", org_id: result.orgId, agent_id: result.agentId },
+      );
   }
 });
 
@@ -73,24 +72,37 @@ oauthDeviceRoutes.get("/oauth/device/pending", requireAuth, async (c) => {
   const db = c.get("db");
   const request = await findPendingByUserCode(db, userCode);
   if (!request) return c.json({ error: { code: "not_found" } }, 404);
-  return c.json({ agentName: request.agentName, scopes: request.requestedScopes, expiresAt: request.expiresAt });
+  return c.json({ agentName: request.agentName, scopes: request.requestedScopes, grantKind: request.grantKind, expiresAt: request.expiresAt });
 });
 
 oauthDeviceRoutes.post("/oauth/device/approve", requireAuth, async (c) => {
   const identity = c.get("identity")!;
   if (identity.kind !== "user") return c.json({ error: { code: "forbidden" } }, 403);
 
-  const body = z.object({ userCode: z.string().min(1), orgId: z.string().uuid() }).safeParse(await c.req.json().catch(() => ({})));
+  const body = z.object({ userCode: z.string().min(1), orgId: z.string().uuid().optional() }).safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
 
   const db = c.get("db");
+  // grantKind comes from the stored request, not the approver's client — an approver can't turn
+  // a "personal key" request into an org-locked agent grant (or vice versa) by sending a different body.
+  const pending = await findPendingByUserCode(db, body.data.userCode);
+  if (!pending) return c.json({ error: { code: "not_found" } }, 404);
+
+  if (pending.grantKind === "user") {
+    const result = await approveDeviceAuthRequest(db, body.data.userCode, identity.userId, { kind: "user" });
+    if (!result.ok) return c.json({ error: { code: result.error } }, 400);
+    await recordAudit(db, { identity, action: "device_auth.approve", meta: { userCode: body.data.userCode, grantKind: "user" } });
+    return c.json({ ok: true });
+  }
+
+  if (!body.data.orgId) return c.json({ error: { code: "invalid_input", message: "orgId is required to approve an agent grant" } }, 400);
   const role = identity.isSuperadmin ? "owner" : await getOrgRole(db, body.data.orgId, identity.userId);
   if (!role) return c.json({ error: { code: "forbidden", message: "You are not a member of that org" } }, 403);
 
-  const result = await approveDeviceAuthRequest(db, body.data.userCode, identity.userId, body.data.orgId);
+  const result = await approveDeviceAuthRequest(db, body.data.userCode, identity.userId, { kind: "agent", orgId: body.data.orgId });
   if (!result.ok) return c.json({ error: { code: result.error } }, 400);
 
-  await recordAudit(db, { orgId: body.data.orgId, identity, action: "device_auth.approve", meta: { userCode: body.data.userCode } });
+  await recordAudit(db, { orgId: body.data.orgId, identity, action: "device_auth.approve", meta: { userCode: body.data.userCode, grantKind: "agent" } });
   return c.json({ ok: true });
 });
 

@@ -15,6 +15,34 @@
       "when": 1789106277373,
       "tag": "0001_safe_lila_cheney",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789119159958,
+      "tag": "0002_mysterious_sentry",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789119201086,
+      "tag": "0003_woozy_molten_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789124446483,
+      "tag": "0004_backfill_main_workspaces",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789129722369,
+      "tag": "0005_wet_clint_barton",
+      "breakpoints": true
     }
   ]
 }

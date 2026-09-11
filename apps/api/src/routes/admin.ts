@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { isNull, sql } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AppBindings } from "../types.js";
 import { requireAuth, requireSuperadmin } from "../middleware/auth.js";
@@ -17,9 +17,10 @@ adminRoutes.use("/admin/*", requireAuth, requireSuperadmin);
 
 adminRoutes.get("/admin/stats", async (c) => {
   const db = c.get("db");
-  const [[artifactCount], [orgCount], [agentCount], [userCount], [storage]] = await Promise.all([
+  const [[artifactCount], [teamOrgCount], [mainOrgCount], [agentCount], [userCount], [storage]] = await Promise.all([
     db.select({ n: sql<number>`count(*)` }).from(artifacts).where(isNull(artifacts.deletedAt)),
-    db.select({ n: sql<number>`count(*)` }).from(orgs),
+    db.select({ n: sql<number>`count(*)` }).from(orgs).where(eq(orgs.kind, "team")),
+    db.select({ n: sql<number>`count(*)` }).from(orgs).where(eq(orgs.kind, "main")),
     db.select({ n: sql<number>`count(*)` }).from(agents),
     db.select({ n: sql<number>`count(*)` }).from(users),
     db.select({ total: sql<number>`coalesce(sum(${artifacts.sizeBytes}), 0)` }).from(artifacts).where(isNull(artifacts.deletedAt)),
@@ -27,7 +28,12 @@ adminRoutes.get("/admin/stats", async (c) => {
 
   return c.json({
     artifacts: Number(artifactCount!.n),
-    orgs: Number(orgCount!.n),
+    // "orgs" kept for backward compat with any existing consumer; teamOrgs/mainOrgs is what the
+    // new overview UI actually renders — a combined "Организации" count stopped meaning much once
+    // every user got an auto-provisioned main workspace (see docs/superpowers/specs).
+    orgs: Number(teamOrgCount!.n) + Number(mainOrgCount!.n),
+    teamOrgs: Number(teamOrgCount!.n),
+    mainOrgs: Number(mainOrgCount!.n),
     agents: Number(agentCount!.n),
     users: Number(userCount!.n),
     storageBytes: Number(storage!.total),
@@ -46,10 +52,24 @@ adminRoutes.get("/admin/orgs/:id/top-artifacts", async (c) => {
 
 adminRoutes.get("/admin/audit", async (c) => {
   const db = c.get("db");
-  const orgId = c.req.query("orgId");
-  const limit = Number(c.req.query("limit") ?? 100);
-  const log = await listAuditLog(db, { orgId, limit });
-  return c.json({ auditLog: log });
+  const orgId = c.req.query("orgId") || undefined;
+  const actorId = c.req.query("actorId") || undefined;
+  const action = c.req.query("action") || undefined;
+  const fromRaw = c.req.query("from");
+  const toRaw = c.req.query("to");
+  const cursor = c.req.query("cursor") || undefined;
+  const limit = Number(c.req.query("limit") ?? 50);
+
+  const { entries, nextCursor } = await listAuditLog(db, {
+    orgId,
+    actorId,
+    action,
+    from: fromRaw ? new Date(fromRaw) : undefined,
+    to: toRaw ? new Date(toRaw) : undefined,
+    cursor,
+    limit,
+  });
+  return c.json({ entries, nextCursor });
 });
 
 adminRoutes.get("/admin/settings", async (c) => {
@@ -64,6 +84,7 @@ const settingsPatchSchema = z.object({
   cdnAllowlist: z.array(z.string().url()).optional(),
   viewRetentionDays: z.number().int().positive().optional(),
   maxArtifactSizeBytes: z.number().int().positive().optional(),
+  inviteTtlDays: z.number().int().positive().optional(),
 });
 
 adminRoutes.patch("/admin/settings", async (c) => {

@@ -1,91 +1,98 @@
+@import "tailwindcss";
+
+/*
+ * Dark mode is theme-var driven, not `dark:`-variant driven. Every `--oa-*` token below is wired
+ * into Tailwind's namespace via `@theme inline`, so utilities like `bg-bg`/`text-muted`/
+ * `border-border` resolve through the live CSS variable and automatically track the active theme
+ * — most components never need a `dark:` class at all. `@custom-variant dark` exists only for the
+ * rare case the variable trick doesn't cover (e.g. shadow opacity, image dimming).
+ *
+ * Three states, matching the documented contract:
+ *  - explicit "light"  -> [data-theme="light"] on <html>
+ *  - explicit "dark"   -> [data-theme="dark"] on <html>
+ *  - "system" (default) -> no attribute; prefers-color-scheme decides
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   color-scheme: light;
-  --bg: #fafafa;
-  --panel: #fff;
-  --border: #e4e4e7;
-  --text: #18181b;
-  --muted: #71717a;
-  --accent: #111827;
-  --danger: #dc2626;
+  --oa-bg: #fafafa;
+  --oa-panel: #ffffff;
+  --oa-panel-muted: #f4f4f5;
+  --oa-border: #e4e4e7;
+  --oa-fg: #18181b;
+  --oa-muted: #71717a;
+  --oa-accent: #111827;
+  --oa-accent-fg: #ffffff;
+  --oa-danger: #dc2626;
+  --oa-danger-fg: #ffffff;
+  --oa-success: #16a34a;
+  --oa-ring: #a1a1aa;
 }
 
-* { box-sizing: border-box; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --oa-bg: #0a0a0b;
+    --oa-panel: #18181b;
+    --oa-panel-muted: #232326;
+    --oa-border: #2c2c31;
+    --oa-fg: #f4f4f5;
+    --oa-muted: #a1a1aa;
+    --oa-accent: #e4e4e7;
+    --oa-accent-fg: #18181b;
+    --oa-danger: #f87171;
+    --oa-danger-fg: #1a0a0a;
+    --oa-success: #4ade80;
+    --oa-ring: #52525b;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --oa-bg: #0a0a0b;
+  --oa-panel: #18181b;
+  --oa-panel-muted: #232326;
+  --oa-border: #2c2c31;
+  --oa-fg: #f4f4f5;
+  --oa-muted: #a1a1aa;
+  --oa-accent: #e4e4e7;
+  --oa-accent-fg: #18181b;
+  --oa-danger: #f87171;
+  --oa-danger-fg: #1a0a0a;
+  --oa-success: #4ade80;
+  --oa-ring: #52525b;
+}
+
+@theme inline {
+  --color-bg: var(--oa-bg);
+  --color-panel: var(--oa-panel);
+  --color-panel-muted: var(--oa-panel-muted);
+  --color-border: var(--oa-border);
+  --color-fg: var(--oa-fg);
+  --color-muted: var(--oa-muted);
+  --color-accent: var(--oa-accent);
+  --color-accent-fg: var(--oa-accent-fg);
+  --color-danger: var(--oa-danger);
+  --color-danger-fg: var(--oa-danger-fg);
+  --color-success: var(--oa-success);
+  --color-ring: var(--oa-ring);
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--oa-bg);
+  color: var(--oa-fg);
+  font-family: var(--font-sans);
 }
 
-a { color: inherit; }
-
-.app-shell { display: flex; min-height: 100vh; }
-
-.sidebar {
-  width: 220px;
-  background: var(--panel);
-  border-right: 1px solid var(--border);
-  padding: 16px;
-  flex-shrink: 0;
+* {
+  box-sizing: border-box;
 }
 
-.sidebar h1 { font-size: 16px; margin: 0 0 20px; }
-.sidebar nav a {
-  display: block;
-  padding: 8px 10px;
-  border-radius: 6px;
-  text-decoration: none;
-  font-size: 14px;
-  color: var(--muted);
-  margin-bottom: 2px;
-}
-.sidebar nav a.active, .sidebar nav a:hover { background: #f4f4f5; color: var(--text); }
-
-.main { flex: 1; padding: 24px; max-width: 960px; }
-
-.card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
-  margin-bottom: 12px;
-}
-
-.btn {
-  background: var(--accent);
-  color: #fff;
-  border: 0;
-  padding: 8px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-}
-.btn.secondary { background: #f4f4f5; color: var(--text); }
-.btn.danger { background: var(--danger); }
-.btn:disabled { opacity: .5; cursor: default; }
-
-input, select, textarea {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 10px;
-  font-size: 14px;
-  width: 100%;
-}
-
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
-
-.muted { color: var(--muted); font-size: 13px; }
-.error { color: var(--danger); font-size: 13px; }
-.row { display: flex; gap: 8px; align-items: center; }
-.stack { display: flex; flex-direction: column; gap: 8px; }
-
-.badge {
-  display: inline-block;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 100px;
-  background: #f4f4f5;
-  color: var(--muted);
+a {
+  color: inherit;
 }

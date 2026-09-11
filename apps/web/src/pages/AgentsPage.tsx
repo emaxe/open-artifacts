@@ -1,7 +1,17 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
-import { useAuth } from "../lib/auth";
+import { formatDate, formatDateTime } from "../lib/labels";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Card, CardHeader } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Field } from "../components/ui/Field";
+import { Table, THead, TBody, TR, TH, TD, TableEmptyRow } from "../components/ui/Table";
+import { Badge } from "../components/ui/Badge";
+import { CopyButton } from "../components/ui/CopyButton";
+import { EmptyState } from "../components/ui/EmptyState";
+import { UsersIcon } from "../components/ui/icons";
 
 interface Agent {
   id: string;
@@ -49,25 +59,41 @@ export function AgentsPage() {
   if (!orgId) return null;
 
   return (
-    <div>
-      <h2>Агенты и ключи</h2>
-      <form onSubmit={createAgent} className="card row">
-        <input placeholder="Имя агента (например, my-langchain-bot)" value={name} onChange={(e) => setName(e.target.value)} required />
-        <button className="btn" type="submit">Создать агента</button>
-      </form>
+    <>
+      <PageHeader title="Агенты и ключи" />
+
+      <Card className="mb-4">
+        <form onSubmit={createAgent} className="flex flex-wrap items-end gap-3">
+          <Field label="Имя агента" className="min-w-64 flex-1">
+            <Input placeholder="например, my-langchain-bot" value={name} onChange={(e) => setName(e.target.value)} required />
+          </Field>
+          <Button type="submit">Создать агента</Button>
+        </form>
+      </Card>
 
       {issuedToken && (
-        <div className="card" style={{ borderColor: "#111" }}>
-          <strong>Новый API-ключ (показывается один раз):</strong>
-          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{issuedToken}</pre>
-          <button className="btn secondary" onClick={() => setIssuedToken(null)}>Скрыть</button>
-        </div>
+        <Card className="mb-4 border-accent">
+          <p className="mb-2 text-sm font-medium text-fg">Новый API-ключ (показывается один раз):</p>
+          <div className="mb-2 flex items-start gap-2">
+            <pre className="flex-1 overflow-x-auto whitespace-pre-wrap break-all rounded-control bg-panel-muted p-2.5 text-xs">{issuedToken}</pre>
+            <CopyButton value={issuedToken} />
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => setIssuedToken(null)}>
+            Скрыть
+          </Button>
+        </Card>
       )}
 
-      {agents.map((agent) => (
-        <AgentCard key={agent.id} agent={agent} onIssued={setIssuedToken} />
-      ))}
-    </div>
+      {agents.length === 0 ? (
+        <EmptyState icon={<UsersIcon size={28} />} title="Агентов пока нет" description="Создайте агента выше, чтобы выпустить для него API-ключ." />
+      ) : (
+        <div className="flex flex-col gap-4">
+          {agents.map((agent) => (
+            <AgentCard key={agent.id} agent={agent} onIssued={setIssuedToken} />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -102,33 +128,53 @@ function AgentCard({ agent, onIssued }: { agent: Agent; onIssued: (token: string
   }
 
   return (
-    <div className="card">
-      <h3>{agent.name}</h3>
-      <div className="row" style={{ flexWrap: "wrap", marginBottom: 8 }}>
+    <Card>
+      <CardHeader title={agent.name} description={`Создан ${formatDate(agent.createdAt)}`} />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         {ALL_SCOPES.map((scope) => (
-          <label key={scope} className="row" style={{ gap: 4 }}>
-            <input type="checkbox" checked={scopes.includes(scope)} onChange={() => toggleScope(scope)} />
-            <span className="muted">{scope}</span>
+          <label key={scope} className="flex items-center gap-1.5 text-sm">
+            <input type="checkbox" checked={scopes.includes(scope)} onChange={() => toggleScope(scope)} className="size-3.5" />
+            <span className="text-muted">{scope}</span>
           </label>
         ))}
-        <input style={{ width: 100 }} value={ttl} onChange={(e) => setTtl(e.target.value)} placeholder="TTL, напр. 90d" />
-        <button className="btn secondary" onClick={issueKey}>Выпустить ключ</button>
+        <Input className="w-28" value={ttl} onChange={(e) => setTtl(e.target.value)} placeholder="TTL, напр. 90d" />
+        <Button variant="secondary" size="sm" onClick={issueKey}>
+          Выпустить ключ
+        </Button>
       </div>
-      <table>
-        <thead><tr><th>Префикс</th><th>Scopes</th><th>Истекает</th><th>Последнее использование</th><th></th></tr></thead>
-        <tbody>
+      <Table>
+        <THead>
+          <TR>
+            <TH>Префикс</TH>
+            <TH>Scopes</TH>
+            <TH>Истекает</TH>
+            <TH>Последнее использование</TH>
+            <TH />
+          </TR>
+        </THead>
+        <TBody>
+          {keys.length === 0 && <TableEmptyRow colSpan={5}>Ключей ещё нет</TableEmptyRow>}
           {keys.map((k) => (
-            <tr key={k.id}>
-              <td>oa_live_{k.prefix}_…</td>
-              <td className="muted">{k.scopes.join(", ")}</td>
-              <td className="muted">{k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : "никогда"}</td>
-              <td className="muted">{k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString() : "ещё не использовался"}</td>
-              <td><button className="btn secondary" onClick={() => revoke(k.id)}>Отозвать</button></td>
-            </tr>
+            <TR key={k.id}>
+              <TD className="font-mono text-xs">oa_live_{k.prefix}_…</TD>
+              <TD>
+                <div className="flex flex-wrap gap-1">
+                  {k.scopes.map((s) => (
+                    <Badge key={s}>{s}</Badge>
+                  ))}
+                </div>
+              </TD>
+              <TD className="text-muted">{k.expiresAt ? formatDate(k.expiresAt) : "никогда"}</TD>
+              <TD className="text-muted">{k.lastUsedAt ? formatDateTime(k.lastUsedAt) : "ещё не использовался"}</TD>
+              <TD className="text-right">
+                <Button variant="ghost" size="sm" onClick={() => revoke(k.id)}>
+                  Отозвать
+                </Button>
+              </TD>
+            </TR>
           ))}
-          {keys.length === 0 && <tr><td colSpan={5} className="muted">Ключей ещё нет</td></tr>}
-        </tbody>
-      </table>
-    </div>
+        </TBody>
+      </Table>
+    </Card>
   );
 }

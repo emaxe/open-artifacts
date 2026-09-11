@@ -2,7 +2,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, basename } from "node:path";
 import type { ArtifactKind } from "../scopes.js";
 import { requireCredentials } from "../config.js";
-import { makeClient, CliApiError } from "../client.js";
+import { makeClient, CliApiError, type OrgChoice } from "../client.js";
+import { resolveOrg } from "../org.js";
 
 interface ArtifactSummary {
   id: string;
@@ -25,11 +26,12 @@ function die(message: string): never {
   process.exit(1);
 }
 
-export async function listCommand(opts: { json?: boolean }) {
+export async function listCommand(opts: { json?: boolean; org?: string }) {
   const creds = requireCredentials();
   const client = makeClient(creds);
+  const org = resolveOrg({ flag: opts.org, creds });
   try {
-    const data = await client.get<{ artifacts: ArtifactSummary[] }>(`/artifacts?orgId=${creds.orgId}`);
+    const data = await client.get<{ artifacts: ArtifactSummary[] }>(`/artifacts${org.orgId ? `?orgId=${org.orgId}` : ""}`);
     if (opts.json) {
       console.log(JSON.stringify(data.artifacts, null, 2));
       return;
@@ -44,7 +46,7 @@ export async function listCommand(opts: { json?: boolean }) {
 
 export async function pushCommand(
   filePath: string,
-  opts: { title?: string; kind?: ArtifactKind; id?: string; share?: boolean; password?: string; message?: string; json?: boolean },
+  opts: { title?: string; kind?: ArtifactKind; id?: string; share?: boolean; password?: string; message?: string; json?: boolean; org?: string },
 ) {
   if (!existsSync(filePath)) die(`File not found: ${filePath}`);
   const content = readFileSync(filePath, "utf8");
@@ -59,7 +61,10 @@ export async function pushCommand(
     if (artifactId) {
       await client.patch(`/artifacts/${artifactId}`, { content, message: opts.message });
     } else {
-      const res = await client.post<{ artifact: { id: string } }>(`/artifacts?orgId=${creds.orgId}`, {
+      // Updating an existing artifact never needs an org (the id alone identifies it) — only
+      // resolve one when we're about to create.
+      const org = resolveOrg({ flag: opts.org, creds });
+      const res = await client.post<{ artifact: { id: string } }>(`/artifacts${org.orgId ? `?orgId=${org.orgId}` : ""}`, {
         title,
         kind,
         content,
@@ -116,6 +121,10 @@ export async function rmCommand(id: string) {
   }
 }
 
+export function formatOrgChoices(orgs: OrgChoice[]): string {
+  return orgs.map((o) => `  ${o.slug.padEnd(24)}  ${o.role.padEnd(7)}  ${o.name}`).join("\n");
+}
+
 export function handleError(err: unknown): never {
   if (err instanceof CliApiError) {
     if (err.code === "key_expired") {
@@ -126,6 +135,10 @@ export function handleError(err: unknown): never {
     }
     if (err.code === "version_conflict") {
       die("Someone else changed this artifact since you last read it (409). Fetch the latest with `oa get` and retry.");
+    }
+    if (err.code === "org_required") {
+      const orgs = err.body?.error?.orgs ?? [];
+      die(`Not sure which team to publish to — you belong to several:\n${formatOrgChoices(orgs)}\n\nRun \`oa use <slug>\` to set a default for this project, or pass --org <slug>.`);
     }
     die(`Error (${err.code}): ${err.message}`);
   }

@@ -1,0 +1,18 @@
+import type { HTMLAttributes, ReactNode } from "react";
+import { cn } from "../../lib/cn";
+
+export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("rounded-card border border-border bg-panel p-4", className)} {...props} />;
+}
+
+export function CardHeader({ title, description, action }: { title: ReactNode; description?: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="mb-4 flex items-start justify-between gap-3">
+      <div>
+        <h3 className="text-sm font-semibold text-fg">{title}</h3>
+        {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}

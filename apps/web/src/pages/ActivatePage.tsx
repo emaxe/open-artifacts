@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { PageContainer } from "../components/PageContainer";
+import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { Input, Select } from "../components/ui/Input";
+import { Field } from "../components/ui/Field";
+import { Badge } from "../components/ui/Badge";
+import { Spinner } from "../components/ui/Spinner";
 
 interface PendingRequest {
   agentName: string;
   scopes: string[];
+  grantKind: "agent" | "user";
   expiresAt: string;
 }
 
@@ -40,7 +48,8 @@ export function ActivatePage() {
   }, []);
 
   async function approve() {
-    await api.post("/oauth/device/approve", { userCode: code, orgId });
+    // A personal-key request isn't locked to one team — no orgId to send (see routes/oauth-device.ts).
+    await api.post("/oauth/device/approve", pending?.grantKind === "user" ? { userCode: code } : { userCode: code, orgId });
     setStatus("done");
   }
 
@@ -49,35 +58,79 @@ export function ActivatePage() {
     setStatus("denied");
   }
 
-  if (loading) return <p className="muted">Загрузка…</p>;
-  if (!me) return <p>Сначала <a href="/login">войдите</a>, чтобы подтвердить агента.</p>;
+  if (loading) return <Spinner />;
+  if (!me)
+    return (
+      <PageContainer>
+        <p className="text-sm text-muted">
+          Сначала <Link to="/login" className="underline">войдите</Link>, чтобы подтвердить агента.
+        </p>
+      </PageContainer>
+    );
 
-  if (status === "done") return <div className="card">Готово! Агент авторизован, вернитесь в CLI/агента.</div>;
-  if (status === "denied") return <div className="card">Запрос отклонён.</div>;
+  if (status === "done")
+    return (
+      <PageContainer>
+        <Card className="mx-auto max-w-md text-center">Готово! Агент авторизован, вернитесь в CLI/агента.</Card>
+      </PageContainer>
+    );
+  if (status === "denied")
+    return (
+      <PageContainer>
+        <Card className="mx-auto max-w-md text-center">Запрос отклонён.</Card>
+      </PageContainer>
+    );
 
   return (
-    <div style={{ maxWidth: 420, margin: "10vh auto" }}>
-      <h2>Подтверждение агента</h2>
-      <div className="card stack">
-        <input placeholder="Код из терминала, напр. WXYZ-1234" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
-        <button className="btn secondary" onClick={lookup}>Найти запрос</button>
-        {error && <div className="error">{error}</div>}
+    <div className="mx-auto mt-[10vh] max-w-md px-4">
+      <h2 className="mb-4 text-xl font-semibold text-fg">Подтверждение агента</h2>
+      <Card>
+        <div className="flex flex-col gap-3">
+          <Field label="Код из терминала">
+            <Input placeholder="например, WXYZ-1234" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
+          </Field>
+          <Button variant="secondary" onClick={lookup}>
+            Найти запрос
+          </Button>
+          {error && <p className="text-sm text-danger">{error}</p>}
 
-        {pending && (
-          <>
-            <p><strong>{pending.agentName}</strong> запрашивает доступ:</p>
-            <ul>{pending.scopes.map((s) => <li key={s} className="muted">{s}</li>)}</ul>
-            <label className="muted">Организация</label>
-            <select value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-              {me.orgs.map((o) => <option key={o.orgId} value={o.orgId}>{o.name || o.orgId.slice(0, 8)}{o.role ? ` (${o.role})` : ""}</option>)}
-            </select>
-            <div className="row">
-              <button className="btn" onClick={approve}>Разрешить</button>
-              <button className="btn danger" onClick={deny}>Отклонить</button>
-            </div>
-          </>
-        )}
-      </div>
+          {pending && (
+            <>
+              <p className="text-sm text-fg">
+                <strong>{pending.agentName}</strong> запрашивает {pending.grantKind === "user" ? "личный доступ" : "доступ"}:
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {pending.scopes.map((s) => (
+                  <Badge key={s}>{s}</Badge>
+                ))}
+              </div>
+              {pending.grantKind === "user" ? (
+                <p className="text-sm text-muted">
+                  Ключ будет действовать во всех ваших командах (сейчас и в будущем) с вашей текущей ролью в каждой из них.
+                  Административные функции ему недоступны.
+                </p>
+              ) : (
+                <Field label="Команда">
+                  <Select value={orgId} onChange={(e) => setOrgId(e.target.value)}>
+                    {me.orgs.map((o) => (
+                      <option key={o.orgId} value={o.orgId}>
+                        {o.name || o.orgId.slice(0, 8)}
+                        {o.role ? ` (${o.role})` : ""}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+              <div className="flex gap-2">
+                <Button onClick={approve}>Разрешить</Button>
+                <Button variant="danger" onClick={deny}>
+                  Отклонить
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }

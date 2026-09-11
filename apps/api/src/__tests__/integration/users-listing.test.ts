@@ -30,4 +30,28 @@ describe("GET /users", () => {
     expect(body.users).toHaveLength(1);
     expect(body.page).toBe(1);
   });
+
+  it("searches by name as well as email", async () => {
+    const app = buildTestApp();
+    await registerAndLogin(app, { name: "Grigory Skovoroda", email: "grigory@example.com" });
+    const admin = await registerAndLogin(app, { name: "Admin", email: "admin-search@example.com" });
+    await getTestDb().update(users).set({ isSuperadmin: true }).where(eq(users.id, admin.userId));
+
+    const res = await app.request("/api/v1/users?search=Skovoroda", { headers: { Cookie: `oa_session=${admin.sessionCookie}` } });
+    const body = (await res.json()) as { users: { name: string }[] };
+    expect(body.users.some((u) => u.name === "Grigory Skovoroda")).toBe(true);
+  });
+
+  it("includes each user's org memberships as chips", async () => {
+    const app = buildTestApp();
+    const user = await registerAndLogin(app, { name: "Chipped", email: "chipped@example.com" });
+    const admin = await registerAndLogin(app);
+    await getTestDb().update(users).set({ isSuperadmin: true }).where(eq(users.id, admin.userId));
+
+    const res = await app.request(`/api/v1/users?search=chipped`, { headers: { Cookie: `oa_session=${admin.sessionCookie}` } });
+    const body = (await res.json()) as { users: { id: string; orgs: { orgId: string; kind: string; role: string }[]; orgCount: number }[] };
+    const found = body.users.find((u) => u.id === user.userId);
+    expect(found?.orgCount).toBe(2); // main workspace + the explicit team registerAndLogin creates
+    expect(found?.orgs.some((o) => o.orgId === user.mainOrgId && o.kind === "main" && o.role === "owner")).toBe(true);
+  });
 });

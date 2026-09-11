@@ -27,9 +27,11 @@ async function startServer(): Promise<number> {
   });
 }
 
-async function connectClient(port: number, apiKey: string): Promise<Client> {
+async function connectClient(port: number, apiKey: string, opts: { orgId?: string } = {}): Promise<Client> {
   const client = new Client({ name: "test-client", version: "0.0.1" });
-  const transport = new StreamableHTTPClientTransport(new URL(`http://localhost:${port}/mcp`), {
+  const url = new URL(`http://localhost:${port}/mcp`);
+  if (opts.orgId) url.searchParams.set("orgId", opts.orgId);
+  const transport = new StreamableHTTPClientTransport(url, {
     requestInit: { headers: { Authorization: `Bearer ${apiKey}` } },
   });
   await client.connect(transport);
@@ -52,6 +54,16 @@ async function issueKey(app: ReturnType<typeof buildTestApp>, orgId: string, ses
   return key.token;
 }
 
+async function issueUserKey(app: ReturnType<typeof buildTestApp>, sessionCookie: string, scopes: string[]) {
+  const res = await app.request("/api/v1/me/keys", {
+    method: "POST",
+    headers: authedHeaders(sessionCookie),
+    body: JSON.stringify({ name: "mcp-test-key", scopes }),
+  });
+  const key = (await res.json()) as { token: string };
+  return key.token;
+}
+
 function toolJson(result: Awaited<ReturnType<Client["callTool"]>>): any {
   const first = (result.content as Array<{ type: string; text?: string }>)[0];
   if (first?.type !== "text") throw new Error("expected a text content block");
@@ -59,7 +71,7 @@ function toolJson(result: Awaited<ReturnType<Client["callTool"]>>): any {
 }
 
 describe("MCP server", () => {
-  it("lists all 9 tools and exercises the full publish/share flow", async () => {
+  it("lists all 10 tools and exercises the full publish/share flow", async () => {
     const app = buildTestApp();
     const { orgId, sessionCookie } = await registerAndLogin(app);
     const apiKey = await issueKey(app, orgId, sessionCookie, ["artifacts:read", "artifacts:write", "artifacts:delete", "shares:write"]);
@@ -69,7 +81,7 @@ describe("MCP server", () => {
 
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ["whoami", "list_artifacts", "get_artifact", "create_artifact", "update_artifact", "delete_artifact", "create_share", "list_shares", "revoke_share"].sort(),
+      ["whoami", "list_orgs", "list_artifacts", "get_artifact", "create_artifact", "update_artifact", "delete_artifact", "create_share", "list_shares", "revoke_share"].sort(),
     );
 
     const who = toolJson(await client.callTool({ name: "whoami", arguments: {} }));
@@ -120,6 +132,45 @@ describe("MCP server", () => {
     expect((result.content as Array<{ text: string }>)[0]!.text).toContain("Missing scope: artifacts:write");
 
     await client.close();
+  });
+
+  it("a personal key spans every team: org_required without orgId, success with ?orgId= on the connection URL", async () => {
+    const app = buildTestApp();
+    const user = await registerAndLogin(app); // main org + one team org
+    const key = await issueUserKey(app, user.sessionCookie, ["artifacts:read", "artifacts:write"]);
+
+    const port = await startServer();
+
+    const clientNoOrg = await connectClient(port, key);
+    const who = toolJson(await clientNoOrg.callTool({ name: "whoami", arguments: {} }));
+    expect(who.kind).toBe("user_key");
+    expect(who.orgs.map((o: { orgId: string }) => o.orgId).sort()).toEqual([user.mainOrgId, user.orgId].sort());
+
+    const orgsListed = toolJson(await clientNoOrg.callTool({ name: "list_orgs", arguments: {} }));
+    expect(orgsListed.orgs).toHaveLength(2);
+
+    const ambiguous = await clientNoOrg.callTool({ name: "create_artifact", arguments: { title: "no team", kind: "html", content: "<p>x</p>" } });
+    expect(ambiguous.isError).toBe(true);
+    const ambiguousBody = JSON.parse((ambiguous.content as Array<{ text: string }>)[0]!.text);
+    expect(ambiguousBody.code).toBe("org_required");
+    expect(ambiguousBody.orgs).toHaveLength(2);
+    await clientNoOrg.close();
+
+    // A project's .mcp.json sets the default team via ?orgId= on the connection URL.
+    const clientWithOrg = await connectClient(port, key, { orgId: user.orgId });
+    const created = toolJson(await clientWithOrg.callTool({ name: "create_artifact", arguments: { title: "scoped", kind: "html", content: "<p>x</p>" } }));
+    expect(created.id).toEqual(expect.any(String));
+
+    const listed = toolJson(await clientWithOrg.callTool({ name: "list_artifacts", arguments: {} }));
+    expect(listed.artifacts.some((a: { id: string }) => a.id === created.id)).toBe(true);
+
+    // A call-level orgId argument still overrides the connection default.
+    const createdInOther = toolJson(
+      await clientWithOrg.callTool({ name: "create_artifact", arguments: { title: "other team", kind: "html", content: "<p>y</p>", orgId: user.mainOrgId } }),
+    );
+    expect(createdInOther.id).toEqual(expect.any(String));
+
+    await clientWithOrg.close();
   });
 
   it("rejects a request with no Authorization header before the MCP protocol even starts", async () => {

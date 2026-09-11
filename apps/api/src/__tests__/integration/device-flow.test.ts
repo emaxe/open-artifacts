@@ -95,6 +95,48 @@ describe("OAuth device flow", () => {
     expect(body.error.code).toBe("key_expired");
   });
 
+  it("issues a personal key spanning all the approver's orgs when grantKind is 'user'", async () => {
+    const app = buildTestApp();
+    const user = await registerAndLogin(app); // main org + one team org
+
+    const codeRes = await app.request("/api/v1/oauth/device/code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentName: "my-laptop", scopes: ["artifacts:read", "artifacts:write"], grantKind: "user" }),
+    });
+    const device = (await codeRes.json()) as { device_code: string; user_code: string };
+
+    // The approval page doesn't need (or accept picking) an org for a personal-key request.
+    const pendingRes = await app.request(`/api/v1/oauth/device/pending?code=${device.user_code}`, {
+      headers: { Cookie: `oa_session=${user.sessionCookie}` },
+    });
+    expect(((await pendingRes.json()) as { grantKind: string }).grantKind).toBe("user");
+
+    const approveRes = await app.request("/api/v1/oauth/device/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `oa_session=${user.sessionCookie}` },
+      body: JSON.stringify({ userCode: device.user_code }), // no orgId
+    });
+    expect(approveRes.status).toBe(200);
+
+    const tokenRes = await app.request("/api/v1/oauth/device/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceCode: device.device_code, grantType: "urn:ietf:params:oauth:grant-type:device_code" }),
+    });
+    expect(tokenRes.status).toBe(200);
+    const tokenBody = (await tokenRes.json()) as { api_key: string; grant_kind: string; org_id: string | null; agent_id: string | null; user_id: string };
+    expect(tokenBody.grant_kind).toBe("user");
+    expect(tokenBody.org_id).toBeNull();
+    expect(tokenBody.agent_id).toBeNull();
+    expect(tokenBody.user_id).toBe(user.userId);
+
+    // Works across both of the approver's orgs, not just one.
+    const meOrgsRes = await app.request("/api/v1/me/orgs", { headers: { Authorization: `Bearer ${tokenBody.api_key}` } });
+    const meOrgsBody = (await meOrgsRes.json()) as { orgs: { orgId: string }[] };
+    expect(meOrgsBody.orgs.map((o) => o.orgId).sort()).toEqual([user.mainOrgId, user.orgId].sort());
+  });
+
   it("rejects an unapproved / denied device code with access_denied", async () => {
     const app = buildTestApp();
     const { sessionCookie } = await registerAndLogin(app);

@@ -11,6 +11,7 @@ import { rateLimit } from "./middleware/rate-limit.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { orgRoutes } from "./routes/orgs.js";
+import { inviteRoutes } from "./routes/invites.js";
 import { agentRoutes } from "./routes/agents.js";
 import { oauthDeviceRoutes } from "./routes/oauth-device.js";
 import { artifactRoutes } from "./routes/artifacts.js";
@@ -19,6 +20,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { publicRoutes } from "./routes/public.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { userRoutes } from "./routes/users.js";
+import { meRoutes } from "./routes/me.js";
 
 export function createApp(db: Database, env: Env) {
   const app = new Hono<AppBindings>();
@@ -41,12 +43,14 @@ export function createApp(db: Database, env: Env) {
   api.use("*", rateLimit({ limit: 120, windowMs: 60_000 }));
   api.route("/", authRoutes);
   api.route("/", orgRoutes);
+  api.route("/", inviteRoutes);
   api.route("/", agentRoutes);
   api.route("/", oauthDeviceRoutes);
   api.route("/", artifactRoutes);
   api.route("/", shareRoutes);
   api.route("/", adminRoutes);
   api.route("/", userRoutes);
+  api.route("/", meRoutes);
 
   app.route("/api/v1", api);
 

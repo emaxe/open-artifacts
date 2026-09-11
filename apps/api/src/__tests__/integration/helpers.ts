@@ -55,6 +55,12 @@ export function extractCookie(res: Response, name: string): string | undefined {
   return match?.[1];
 }
 
+/**
+ * Registers a fresh user (who now always gets an auto-provisioned "main" workspace) and, on top
+ * of that, creates one more explicit team org — most existing tests are written against "the
+ * org this user owns" and expect exactly one, so `orgId` here is that explicit team, kept
+ * distinct from `mainOrgId` so callers can tell them apart where it matters.
+ */
 export async function registerAndLogin(app: ReturnType<typeof buildTestApp>, overrides: Partial<{ email: string; password: string; name: string }> = {}) {
   const email = overrides.email ?? `user-${Math.random().toString(36).slice(2)}@example.com`;
   const password = overrides.password ?? "correct horse battery staple";
@@ -66,7 +72,7 @@ export async function registerAndLogin(app: ReturnType<typeof buildTestApp>, ove
     body: JSON.stringify({ email, password, name }),
   });
   if (res.status !== 201) throw new Error(`register failed: ${res.status} ${await res.text()}`);
-  const body = (await res.json()) as { userId: string };
+  const body = (await res.json()) as { userId: string; mainOrgId: string };
   const sessionCookie = extractCookie(res, "oa_session")!;
 
   const orgRes = await app.request("/api/v1/orgs", {
@@ -77,5 +83,5 @@ export async function registerAndLogin(app: ReturnType<typeof buildTestApp>, ove
   if (orgRes.status !== 201) throw new Error(`org creation failed: ${orgRes.status} ${await orgRes.text()}`);
   const orgBody = (await orgRes.json()) as { id: string };
 
-  return { userId: body.userId, orgId: orgBody.id, sessionCookie, email, password };
+  return { userId: body.userId, mainOrgId: body.mainOrgId, orgId: orgBody.id, sessionCookie, email, password };
 }

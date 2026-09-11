@@ -21,10 +21,10 @@ import {
 } from "../services/artifacts.js";
 import { renderArtifactHtml } from "../services/render.js";
 import { recordAudit } from "../services/audit.js";
-import { getOrgRole } from "../services/users.js";
 import { requiresScope } from "../services/scopes.js";
 import { defaultInstanceSettings, getInstanceSettings } from "../services/settings.js";
 import { listMemberOrgIds } from "../services/orgs.js";
+import { resolveOrgScope, orgScopeErrorResponse } from "../services/org-scope.js";
 
 export const artifactRoutes = new Hono<AppBindings>();
 
@@ -37,10 +37,15 @@ artifactRoutes.get("/artifacts", requireAuth, async (c) => {
 
   let all;
   if (orgIdParam) {
-    all = await listArtifactsForOrg(db, orgIdParam);
+    const scope = await resolveOrgScope(db, identity, orgIdParam);
+    if (!scope.ok) return orgScopeErrorResponse(c, scope);
+    c.set("resolvedOrgId", scope.orgId);
+    all = await listArtifactsForOrg(db, scope.orgId);
   } else if (identity.kind === "user" && identity.isSuperadmin) {
     all = await listAllArtifacts(db);
-  } else if (identity.kind === "user") {
+  } else if (identity.kind === "user" || identity.kind === "user_key") {
+    // No single org to attribute usage metering to for this aggregate listing — resolvedOrgId
+    // stays unset, and the metering middleware skips the row (see middleware/usage.ts).
     all = await listArtifactsForOrgs(db, await listMemberOrgIds(db, identity.userId));
   } else {
     return c.json({ error: { code: "invalid_input", message: "orgId query param is required" } }, 400);
@@ -58,17 +63,15 @@ artifactRoutes.post("/artifacts", requireAuth, async (c) => {
   const identity = c.get("identity")!;
   if (!requiresScope(identity, "artifacts:write")) return c.json({ error: { code: "forbidden", message: "Missing scope artifacts:write" } }, 403);
 
-  const orgId = identity.kind === "agent" ? identity.orgId : c.req.query("orgId");
-  if (!orgId) return c.json({ error: { code: "invalid_input", message: "orgId query param is required" } }, 400);
-  if (identity.kind === "user") {
-    const role = identity.isSuperadmin ? "owner" : await getOrgRole(c.get("db"), orgId, identity.userId);
-    if (!role) return c.json({ error: { code: "forbidden" } }, 403);
-  }
+  const db = c.get("db");
+  const scope = await resolveOrgScope(db, identity, c.req.query("orgId"));
+  if (!scope.ok) return orgScopeErrorResponse(c, scope);
+  const orgId = scope.orgId;
+  c.set("resolvedOrgId", orgId);
 
   const body = createArtifactSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
 
-  const db = c.get("db");
   try {
     const { artifact, version } = await createArtifact(db, { orgId, identity, ...body.data });
     await recordAudit(db, { orgId, identity, action: "artifact.create", targetType: "artifact", targetId: artifact.id });

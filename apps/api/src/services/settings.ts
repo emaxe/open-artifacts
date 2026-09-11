@@ -9,6 +9,7 @@ export interface InstanceSettings {
   cdnAllowlist: string[];
   viewRetentionDays: number;
   maxArtifactSizeBytes: number;
+  inviteTtlDays: number;
 }
 
 export function defaultInstanceSettings(env: { DEFAULT_REGISTRATION_MODE: string; DEFAULT_KEY_TTL_DAYS: number }): InstanceSettings {
@@ -18,6 +19,7 @@ export function defaultInstanceSettings(env: { DEFAULT_REGISTRATION_MODE: string
     cdnAllowlist: DEFAULT_CDN_ALLOWLIST,
     viewRetentionDays: 30,
     maxArtifactSizeBytes: 5 * 1024 * 1024,
+    inviteTtlDays: 7,
   };
 }
 

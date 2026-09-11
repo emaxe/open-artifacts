@@ -1,6 +1,7 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -27,6 +28,8 @@ export const deviceAuthStatusEnum = pgEnum("device_auth_status", [
 ]);
 export const registrationModeEnum = pgEnum("registration_mode", ["open", "invite_only", "closed"]);
 export const userStatusEnum = pgEnum("user_status", ["active", "blocked", "deleted"]);
+export const orgKindEnum = pgEnum("org_kind", ["main", "team"]);
+export const inviteStatusEnum = pgEnum("invite_status", ["pending", "accepted", "declined", "revoked"]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -52,8 +55,15 @@ export const orgs = pgTable("orgs", {
   name: text("name").notNull(),
   slug: text("slug").notNull(),
   storageQuotaBytes: integer("storage_quota_bytes").notNull().default(1_073_741_824), // 1 GiB
+  kind: orgKindEnum("kind").notNull().default("team"),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("orgs_slug_idx").on(table.slug)]);
+}, (table) => [
+  uniqueIndex("orgs_slug_idx").on(table.slug),
+  index("orgs_kind_idx").on(table.kind),
+  // At most one "main" (auto-provisioned personal) workspace per user.
+  uniqueIndex("orgs_main_owner_idx").on(table.createdBy).where(sql`kind = 'main'`),
+]);
 
 export const orgMembers = pgTable("org_members", {
   orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
@@ -68,13 +78,27 @@ export const orgMembers = pgTable("org_members", {
 export const invites = pgTable("invites", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
+  // Always lowercased by services/invites.ts before insert/update — normalizeEmail() is the one chokepoint.
   email: text("email").notNull(),
   role: orgRoleEnum("role").notNull().default("member"),
   token: text("token").notNull(),
+  status: inviteStatusEnum("status").notNull().default("pending"),
+  invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
+  // Denormalized convenience only — never an authorization input. Accept/decline always re-check
+  // invites.email against the live user's current email (see services/invites.ts).
+  invitedUserId: uuid("invited_user_id").references(() => users.id, { onDelete: "set null" }),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  respondedAt: timestamp("responded_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("invites_token_idx").on(table.token)]);
+}, (table) => [
+  uniqueIndex("invites_token_idx").on(table.token),
+  // At most one live invite per (org, email) at a time; re-inviting reissues the same row.
+  uniqueIndex("invites_pending_org_email_idx").on(table.orgId, table.email).where(sql`status = 'pending'`),
+  index("invites_email_idx").on(table.email),
+  index("invites_org_id_idx").on(table.orgId),
+  check("invites_email_lower_check", sql`${table.email} = lower(${table.email})`),
+]);
 
 export const agents = pgTable("agents", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -87,7 +111,13 @@ export const agents = pgTable("agents", {
 
 export const apiKeys = pgTable("api_keys", {
   id: uuid("id").primaryKey().defaultRandom(),
-  agentId: uuid("agent_id").notNull().references(() => agents.id, { onDelete: "cascade" }),
+  // Exactly one of agentId/userId is set (see api_keys_owner_check below): agent-scoped keys are
+  // locked to one org via agents.orgId; user-scoped ("personal") keys act across every org the
+  // user is a member of, resolved fresh per request — see services/org-scope.ts.
+  agentId: uuid("agent_id").references(() => agents.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  // Device label for personal keys (e.g. "MacBook CLI"); null for agent keys, which are named via agents.name.
+  name: text("name"),
   prefix: text("prefix").notNull(),
   keyHash: text("key_hash").notNull(),
   scopes: text("scopes").array().notNull(),
@@ -98,6 +128,8 @@ export const apiKeys = pgTable("api_keys", {
 }, (table) => [
   uniqueIndex("api_keys_prefix_idx").on(table.prefix),
   index("api_keys_agent_id_idx").on(table.agentId),
+  index("api_keys_user_id_idx").on(table.userId),
+  check("api_keys_owner_check", sql`num_nonnulls(${table.agentId}, ${table.userId}) = 1`),
 ]);
 
 export const deviceAuthRequests = pgTable("device_auth_requests", {
@@ -106,6 +138,9 @@ export const deviceAuthRequests = pgTable("device_auth_requests", {
   agentName: text("agent_name").notNull(),
   requestedScopes: text("requested_scopes").array().notNull(),
   status: deviceAuthStatusEnum("status").notNull().default("pending"),
+  // "agent": locked to orgId at approval time (unchanged behavior). "user": personal key spanning
+  // all the approver's orgs — orgId stays null. Old clients never send this, so it defaults to "agent".
+  grantKind: text("grant_kind").notNull().default("agent"),
   orgId: uuid("org_id").references(() => orgs.id),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   lastPolledAt: timestamp("last_polled_at", { withTimezone: true }),
@@ -184,9 +219,9 @@ export const artifactViewDaily = pgTable("artifact_view_daily", {
 
 export const apiUsageHourly = pgTable("api_usage_hourly", {
   orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
-  // Non-null in practice: usage metering only tracks agent/API-key traffic (see services/analytics.ts),
-  // and both columns participate in the composite primary key below, which Postgres requires NOT NULL.
-  agentId: uuid("agent_id").notNull().references(() => agents.id, { onDelete: "cascade" }),
+  // Null for personal (user-scoped) key traffic — those keys aren't tied to an agent. keyId alone
+  // (not in the PK's uniqueness the way orgId is) is enough to attribute usage either way.
+  agentId: uuid("agent_id").references(() => agents.id, { onDelete: "cascade" }),
   keyId: uuid("key_id").notNull().references(() => apiKeys.id, { onDelete: "cascade" }),
   endpoint: text("endpoint").notNull(),
   method: text("method").notNull(),
@@ -243,4 +278,15 @@ export const artifactVersionsRelations = relations(artifactVersions, ({ one }) =
 export const agentsRelations = relations(agents, ({ many, one }) => ({
   apiKeys: many(apiKeys),
   org: one(orgs, { fields: [agents.orgId], references: [orgs.id] }),
+}));
+
+export const orgMembersRelations = relations(orgMembers, ({ one }) => ({
+  org: one(orgs, { fields: [orgMembers.orgId], references: [orgs.id] }),
+  user: one(users, { fields: [orgMembers.userId], references: [users.id] }),
+}));
+
+export const invitesRelations = relations(invites, ({ one }) => ({
+  org: one(orgs, { fields: [invites.orgId], references: [orgs.id] }),
+  inviter: one(users, { fields: [invites.invitedBy], references: [users.id], relationName: "invite_inviter" }),
+  invitedUser: one(users, { fields: [invites.invitedUserId], references: [users.id], relationName: "invite_invitee" }),
 }));

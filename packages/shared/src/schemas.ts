@@ -53,9 +53,24 @@ export const createApiKeySchema = z.object({
 });
 export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>;
 
+/** For POST /me/keys — a personal key isn't tied to an agent, so it carries its own device label instead. */
+export const createUserApiKeySchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  scopes: z.array(apiKeyScopeSchema).min(1),
+  expires: z.union([z.string(), z.number()]).optional(),
+});
+export type CreateUserApiKeyInput = z.infer<typeof createUserApiKeySchema>;
+
+export const deviceGrantKindSchema = z.enum(["agent", "user"]);
+export type DeviceGrantKind = z.infer<typeof deviceGrantKindSchema>;
+
 export const deviceCodeRequestSchema = z.object({
+  // Device/agent display name either way: an agent locked to one team, or the label for a
+  // personal key's issuing device (e.g. "MacBook CLI"). Old clients never send grantKind, so it
+  // defaults to "agent" — the only grant kind that ever existed before personal keys.
   agentName: z.string().min(1).max(100),
   scopes: z.array(apiKeyScopeSchema).min(1),
+  grantKind: deviceGrantKindSchema.default("agent"),
 });
 export type DeviceCodeRequestInput = z.infer<typeof deviceCodeRequestSchema>;
 
@@ -77,3 +92,12 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export const inviteStatusSchema = z.enum(["pending", "accepted", "declined", "revoked"]);
+export type InviteStatus = z.infer<typeof inviteStatusSchema>;
+
+export const createInviteSchema = z.object({
+  email: z.string().email(),
+  role: orgRoleSchema.default("member"),
+});
+export type CreateInviteInput = z.infer<typeof createInviteSchema>;

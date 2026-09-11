@@ -4,6 +4,7 @@ import type { Database } from "../db/client.js";
 import { artifacts, artifactVersions, orgs } from "../db/schema.js";
 import type { Identity } from "../types.js";
 import { getOrgRole } from "./users.js";
+import { actorRef } from "./identity.js";
 
 export const MAX_ARTIFACT_SIZE_BYTES = 5 * 1024 * 1024; // 5 MiB, plan default
 
@@ -26,9 +27,7 @@ export class ArtifactTooLargeError extends Error {
 }
 
 function ownerFromIdentity(identity: Identity): { ownerType: OwnerType; ownerId: string } {
-  return identity.kind === "user"
-    ? { ownerType: "user", ownerId: identity.userId }
-    : { ownerType: "agent", ownerId: identity.agentId };
+  return actorRef(identity);
 }
 
 async function assertWithinQuota(db: Database, orgId: string, additionalBytes: number) {
@@ -245,6 +244,16 @@ export async function resolveAccessForIdentity(
 ): Promise<ArtifactAccessResult> {
   if (identity.kind === "user") {
     if (identity.isSuperadmin) return { read: true, write: true, delete: true };
+    const role = await getOrgRole(db, artifact.orgId, identity.userId);
+    return resolveOrgArtifactAccess(
+      { actorType: "user", actorId: identity.userId, role },
+      { ownerType: artifact.ownerType, ownerId: artifact.ownerId, visibility: artifact.visibility },
+    );
+  }
+
+  if (identity.kind === "user_key") {
+    // No superadmin bypass here, unlike the cookie-session branch above: a personal key must
+    // never exceed what the holder's actual org role grants, even for a superadmin's own key.
     const role = await getOrgRole(db, artifact.orgId, identity.userId);
     return resolveOrgArtifactAccess(
       { actorType: "user", actorId: identity.userId, role },

@@ -1,7 +1,21 @@
 import type { Credentials } from "./config.js";
 
+export interface OrgChoice {
+  orgId: string;
+  name: string;
+  slug: string;
+  kind: "main" | "team";
+  role: string;
+}
+
 export class CliApiError extends Error {
-  constructor(public code: string, message: string, public status: number) {
+  constructor(
+    public code: string,
+    message: string,
+    public status: number,
+    /** The parsed error body, e.g. `{ error: { code, message, orgs } }` for `org_required`. */
+    public body?: { error?: { code?: string; message?: string; orgs?: OrgChoice[] } },
+  ) {
     super(message);
   }
 }
@@ -18,9 +32,9 @@ export function makeClient(creds: Credentials) {
         ...options.headers,
       },
     });
-    const body = (await res.json().catch(() => ({}))) as { error?: { code?: string; message?: string } };
+    const body = (await res.json().catch(() => ({}))) as { error?: { code?: string; message?: string; orgs?: OrgChoice[] } };
     if (!res.ok) {
-      throw new CliApiError(body?.error?.code ?? "unknown_error", body?.error?.message ?? res.statusText, res.status);
+      throw new CliApiError(body?.error?.code ?? "unknown_error", body?.error?.message ?? res.statusText, res.status, body);
     }
     return body as T;
   }

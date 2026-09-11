@@ -131,17 +131,21 @@ npx skills add emaxe/open-artifacts -g
 
 Agents can authenticate using either of two methods:
 
-#### Method A: Interactive OAuth Device Flow (Recommended for CLI)
+#### Method A: Personal access (recommended)
 1. Run in terminal or agent session:
    ```bash
    oa login --server http://localhost:3000
    ```
 2. The CLI outputs a verification code (e.g. `ABCD-1234`) and activation URL.
-3. Open `http://localhost:3000/activate?code=ABCD-1234` in the browser, select the target organization, and approve.
-4. Credentials are automatically saved to `~/.config/open-artifacts/credentials.json` (`600` permissions).
+3. Open `http://localhost:3000/activate?code=ABCD-1234` in the browser and approve — no organization to pick here.
+4. This issues a **personal key**, valid across every team the approver belongs to (with their real role in each), saved to `~/.config/open-artifacts/credentials.json` (`600` permissions). Pick a team for a given project with:
+   ```bash
+   oa orgs           # list your teams
+   oa use <team>     # set the default for this project (writes .oa.json, no secrets, safe to commit)
+   ```
 
-#### Method B: Environment Variables
-Create an API key in the web UI under **Team > Agents** (`/t/:orgId/agents`) and pass it to the agent's environment:
+#### Method B: Agent key locked to one team (for CI)
+Run `oa login --agent` (organization selection required at approval time), or create an API key in the web UI under **Team > Agents** (`/t/:orgId/agents`) and pass it to the agent's environment:
 
 ```bash
 export OA_SERVER="http://localhost:3000"
@@ -157,10 +161,13 @@ oa whoami
 
 | Task | Command |
 |---|---|
+| Check token, key type, and selected team | `oa whoami` |
+| List teams your key can act in | `oa orgs` |
+| Set the default team for this project | `oa use <team-slug>` |
 | Publish artifact and generate public share link | `oa push report.html --title "Q3 Summary" --share` |
 | Update an existing artifact (create new version) | `oa push report.html --id <artifact-id> --message "Updated metrics"` |
 | Create expiring link with password protection | `oa share <artifact-id> --password "secret123" --expires 7d` |
-| List all artifacts in active organization | `oa list` |
+| List all artifacts in the active team | `oa list` |
 | Download artifact source | `oa get <artifact-id> -o output.html` |
 | Remove an artifact | `oa rm <artifact-id>` |
 | Revoke a shared link | `oa unshare <share-id>` |
@@ -171,13 +178,13 @@ Supported file formats: `html`, `markdown`, `mermaid`, `svg`. Append `--json` to
 
 ## Model Context Protocol (MCP) Server
 
-Every Open Artifacts instance serves a built-in MCP server at `<APP_ORIGIN>/mcp` via Streamable HTTP. Connect any MCP client by supplying an agent API key in the `Authorization` header:
+Every Open Artifacts instance serves a built-in MCP server at `<APP_ORIGIN>/mcp` via Streamable HTTP. Connect any MCP client by supplying an API key (personal or agent) in the `Authorization` header. A personal key spans every team it belongs to — `?orgId=` in the URL sets the default team for this connection (omit it if the key only has one team):
 
 ```json
 {
   "mcpServers": {
     "open-artifacts": {
-      "url": "http://localhost:3000/mcp",
+      "url": "http://localhost:3000/mcp?orgId=<team-id>",
       "headers": {
         "Authorization": "Bearer oa_live_xxxxxxxxxxxxxxxxxxxxxxxx"
       }
@@ -187,8 +194,9 @@ Every Open Artifacts instance serves a built-in MCP server at `<APP_ORIGIN>/mcp`
 ```
 
 ### Available MCP Tools
-- `whoami`: Check token identity and organization context.
-- `list_artifacts`: Search and retrieve artifacts in your organization.
+- `whoami`: Check token identity, scopes, and team context.
+- `list_orgs`: List the teams this identity can act in.
+- `list_artifacts`: Search and retrieve artifacts in a team.
 - `get_artifact`: Fetch artifact metadata and raw content.
 - `create_artifact`: Create a new artifact (`html`, `markdown`, `mermaid`, `svg`).
 - `update_artifact`: Publish a new version for an existing artifact.
@@ -197,11 +205,25 @@ Every Open Artifacts instance serves a built-in MCP server at `<APP_ORIGIN>/mcp`
 - `list_shares`: View all active shares for an artifact.
 - `revoke_share`: Instantly deactivate a share link.
 
+`list_artifacts` and `create_artifact` take an optional `orgId` argument, overriding the connection's default. With neither set and more than one team to choose from, they return a structured `org_required` error listing the candidates instead of guessing.
+
 ---
 
-## Admin & Instructions Page
+## Agent Instructions Page
 
-An interactive cheatsheet with copyable commands, live instance URLs, and direct links to `/activate` is integrated into the web UI at **Admin > Instructions** (`/admin/instructions`).
+An interactive cheatsheet with copyable commands, live instance URLs, and direct links to `/activate` is integrated into the web UI at **`/help/agents`**, available to every signed-in user — connecting an agent is something any team member does for their own team, not a superadmin-only task.
+
+---
+
+## Teams, invites, and admin
+
+Every user gets an auto-provisioned personal **main workspace** on registration (including when registering through an invite link — they land in both their own workspace and the inviting team). Teams are created explicitly from **Команды** (`/teams`).
+
+Inviting someone to a team (`/t/:orgId/settings`) works for both new and existing accounts:
+- **New email** — you get a one-time link (`/invite/:token`) to send them yourself; there is no email delivery built in.
+- **Existing account** — they see the invite under **Приглашения** (`/invites`) in their own session and accept or decline it explicitly; nothing is added silently.
+
+Superadmins get a dedicated admin area at `/admin` (Overview, Users, Teams, Audit, Instance settings), separate from the agent-connection instructions above.
 
 ---
 
@@ -213,15 +235,16 @@ Configure the application through environment variables (see [`.env.example`](.e
 |---|---|---|
 | `PORT` | HTTP server port | `3000` |
 | `DATABASE_URL` | PostgreSQL connection string | `postgres://postgres:postgres@db:5432/open_artifacts` |
-| `SESSION_SECRET` | Secret key for signed session cookies (min 32 chars) | *Required* |
-| `SUPERADMIN_EMAIL` | Initial superadmin email | `admin@example.com` |
+| `APP_ORIGIN` | Public base URL of the instance (used for share links, invite links, device-flow verification, CORS/CSP) | `http://localhost:3000` |
+| `ARTIFACT_ORIGIN` | Optional separate origin to serve artifact content (`/embed/*`) from, for stronger isolation | unset (serves from `APP_ORIGIN`) |
+| `SESSION_SECRET` | Random string used to sign session cookies (generate with `openssl rand -hex 32`) | *Required* |
+| `IP_HASH_SALT` | Salt used when hashing viewer IPs for analytics | *Required* |
+| `SUPERADMIN_EMAIL` | Initial superadmin email, created on first run if set | `admin@example.com` |
 | `SUPERADMIN_PASSWORD` | Initial superadmin password | *Required in production* |
-| `APP_ORIGIN` | Public base URL of the instance | `http://localhost:3000` |
-| `REGISTRATION_MODE` | User registration: `open`, `invite_only`, or `disabled` | `invite_only` |
-| `DEFAULT_KEY_TTL_DAYS` | Default lifetime for agent API tokens | `90` |
-| `MAX_ARTIFACT_SIZE_BYTES` | Maximum artifact upload size | `2097152` (2 MB) |
+| `DEFAULT_KEY_TTL_DAYS` | Default lifetime for agent API tokens (0 = never expires) | `90` |
+| `DEFAULT_REGISTRATION_MODE` | Who may self-register: `open`, `invite_only`, or `closed` | `invite_only` |
 
-Most operational settings can also be modified at runtime by superadmins in the web UI.
+Most operational settings — registration mode, default key TTL, invite link lifetime, the CDN allowlist, and the maximum artifact size — can also be modified at runtime by superadmins in **Настройки инстанса** (`/admin/settings`); they don't need an environment variable or a restart.
 
 ---
 

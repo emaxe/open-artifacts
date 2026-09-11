@@ -45,7 +45,7 @@ export async function getTopArtifacts(db: Database, orgId: string, limit = 10) {
 
 export interface RecordUsageInput {
   orgId: string;
-  agentId: string;
+  agentId: string | null;
   keyId: string;
   endpoint: string;
   method: string;

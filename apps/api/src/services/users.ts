@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "../db/client.js";
-import { orgMembers, orgs, sessions, users } from "../db/schema.js";
+import { apiKeys, orgMembers, orgs, sessions, users } from "../db/schema.js";
 import { hashSecret, verifySecret } from "./crypto.js";
+import { createMainOrg } from "./orgs.js";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -19,9 +20,13 @@ export class InvalidCredentialsError extends Error {
 
 export interface RegisterResult {
   userId: string;
+  mainOrgId: string;
 }
 
-/** Registers a user. Does not provision any org — a user is not required to belong to one. */
+/**
+ * Registers a user and, in the same transaction, provisions their "main" workspace — every user
+ * gets exactly one, and it's where they land immediately after signing up, invite or not.
+ */
 export async function registerUser(
   db: Database,
   input: { email: string; password: string; name: string; isSuperadmin?: boolean },
@@ -30,16 +35,19 @@ export async function registerUser(
   if (existing) throw new EmailAlreadyRegisteredError();
 
   const passwordHash = await hashSecret(input.password);
-  const [user] = await db
-    .insert(users)
-    .values({
-      email: input.email.toLowerCase(),
-      passwordHash,
-      name: input.name,
-      isSuperadmin: input.isSuperadmin ?? false,
-    })
-    .returning();
-  return { userId: user!.id };
+  return db.transaction(async (tx) => {
+    const [user] = await tx
+      .insert(users)
+      .values({
+        email: input.email.toLowerCase(),
+        passwordHash,
+        name: input.name,
+        isSuperadmin: input.isSuperadmin ?? false,
+      })
+      .returning();
+    const mainOrg = await createMainOrg(tx as unknown as Database, user!.id, "Основное пространство");
+    return { userId: user!.id, mainOrgId: mainOrg.id };
+  });
 }
 
 export class AccountInactiveError extends Error {
@@ -109,10 +117,17 @@ export async function setUserStatus(db: Database, userId: string, status: "activ
     await tx.update(users).set({ status }).where(eq(users.id, userId));
     if (status !== "active") {
       await tx.delete(sessions).where(eq(sessions.userId, userId));
+      // Personal API keys act as the user across every org they're in — block/delete must kill
+      // that access immediately, the same way it kills the session. (verifyApiKeyToken also
+      // re-checks user.status on every request, but that's within the 60s positive-result cache.)
+      await tx.update(apiKeys).set({ revokedAt: new Date() }).where(and(eq(apiKeys.userId, userId), isNull(apiKeys.revokedAt)));
     }
-    if (status === "deleted") {
-      await tx.delete(orgMembers).where(eq(orgMembers.userId, userId));
-    }
+    // Deliberately NOT deleting org_members here (changed from the original behavior). With every
+    // user owning an auto-provisioned "main" workspace, wiping memberships on delete would orphan
+    // that org's artifacts under zero owners. A deleted account can't authenticate — verifyLogin
+    // rejects it and its sessions are purged above — so the rows are already inert; keeping them
+    // preserves ownership and keeps the org's member list auditable. Member-listing queries
+    // exclude deleted users instead (see listOrgMembers / countMembers in services/orgs.ts).
   });
 }
 

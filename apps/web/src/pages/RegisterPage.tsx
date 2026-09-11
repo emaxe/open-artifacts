@@ -1,7 +1,11 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link, Navigate } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Field } from "../components/ui/Field";
 
 export function RegisterPage() {
   const [name, setName] = useState("");
@@ -14,15 +18,19 @@ export function RegisterPage() {
   const [params] = useSearchParams();
   const invite = params.get("invite");
 
+  // Old invite links pointed at /register?invite=TOKEN. /invite/:token is now the canonical
+  // landing page — it knows how to prefill/lock the email and handle every signed-in/out state,
+  // none of which this bare form can do since it never learns the invite's real address.
+  if (invite) return <Navigate to={`/invite/${invite}`} replace />;
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const qs = invite ? `?invite=${encodeURIComponent(invite)}` : "";
-      await api.post(`/auth/register${qs}`, { name, email, password });
+      await api.post("/auth/register", { name, email, password });
       await refresh();
-      navigate("/artifacts");
+      navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Что-то пошло не так");
     } finally {
@@ -31,16 +39,31 @@ export function RegisterPage() {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: "10vh auto" }}>
-      <h2>Регистрация</h2>
-      <form onSubmit={onSubmit} className="stack card">
-        <input placeholder="Имя" value={name} onChange={(e) => setName(e.target.value)} required />
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input type="password" placeholder="Пароль (мин. 8 символов)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
-        {error && <div className="error">{error}</div>}
-        <button className="btn" disabled={busy} type="submit">Создать аккаунт</button>
-      </form>
-      <p className="muted">Уже есть аккаунт? <Link to="/login">Войти</Link></p>
+    <div className="mx-auto mt-[10vh] max-w-sm px-4">
+      <h2 className="mb-4 text-xl font-semibold text-fg">Регистрация</h2>
+      <Card>
+        <form onSubmit={onSubmit} className="flex flex-col gap-3">
+          <Field label="Имя" required>
+            <Input value={name} onChange={(e) => setName(e.target.value)} required />
+          </Field>
+          <Field label="Email" required>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </Field>
+          <Field label="Пароль" hint="Минимум 8 символов" required>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+          </Field>
+          {error && <p className="text-sm text-danger">{error}</p>}
+          <Button type="submit" loading={busy}>
+            Создать аккаунт
+          </Button>
+        </form>
+      </Card>
+      <p className="mt-3 text-sm text-muted">
+        Уже есть аккаунт?{" "}
+        <Link to="/login" className="underline">
+          Войти
+        </Link>
+      </p>
     </div>
   );
 }

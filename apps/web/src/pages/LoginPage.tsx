@@ -1,7 +1,11 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Field } from "../components/ui/Field";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -10,6 +14,8 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const { refresh } = useAuth();
+  const [params] = useSearchParams();
+  const next = params.get("next");
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -18,7 +24,7 @@ export function LoginPage() {
     try {
       await api.post("/auth/login", { email, password });
       await refresh();
-      navigate("/artifacts");
+      navigate(next || "/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Что-то пошло не так");
     } finally {
@@ -27,15 +33,28 @@ export function LoginPage() {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: "10vh auto" }}>
-      <h2>Вход</h2>
-      <form onSubmit={onSubmit} className="stack card">
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input type="password" placeholder="Пароль" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        {error && <div className="error">{error}</div>}
-        <button className="btn" disabled={busy} type="submit">Войти</button>
-      </form>
-      <p className="muted">Нет аккаунта? <Link to="/register">Зарегистрироваться</Link></p>
+    <div className="mx-auto mt-[10vh] max-w-sm px-4">
+      <h2 className="mb-4 text-xl font-semibold text-fg">Вход</h2>
+      <Card>
+        <form onSubmit={onSubmit} className="flex flex-col gap-3">
+          <Field label="Email" required>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </Field>
+          <Field label="Пароль" required>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </Field>
+          {error && <p className="text-sm text-danger">{error}</p>}
+          <Button type="submit" loading={busy}>
+            Войти
+          </Button>
+        </form>
+      </Card>
+      <p className="mt-3 text-sm text-muted">
+        Нет аккаунта?{" "}
+        <Link to="/register" className="underline">
+          Зарегистрироваться
+        </Link>
+      </p>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { getArtifact, getVersionByNumber, resolveAccessForIdentity } from "../se
 import { createShare, listSharesForArtifact, revokeShare } from "../services/shares.js";
 import { recordAudit } from "../services/audit.js";
 import { requiresScope } from "../services/scopes.js";
+import { actingUserId } from "../services/identity.js";
 import { shares } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 
@@ -56,7 +57,7 @@ shareRoutes.post("/artifacts/:id/shares", requireAuth, async (c) => {
     pinnedVersionId = version.id;
   }
 
-  const createdBy = identity.kind === "user" ? identity.userId : identity.agentId;
+  const createdBy = identity.kind === "agent" ? identity.agentId : actingUserId(identity)!;
   const share = await createShare(db, {
     artifactId: artifact.id,
     mode: body.data.mode,

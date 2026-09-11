@@ -86,7 +86,8 @@ agentRoutes.delete("/keys/:id", requireAuth, async (c) => {
   const keyId = c.req.param("id");
   const db = c.get("db");
   const key = await db.query.apiKeys.findFirst({ where: eq(apiKeys.id, keyId) });
-  if (!key) return c.json({ error: { code: "not_found" } }, 404);
+  // Personal keys (key.agentId null) aren't managed here — see DELETE /me/keys/:id.
+  if (!key || !key.agentId) return c.json({ error: { code: "not_found" } }, 404);
   const agent = await db.query.agents.findFirst({ where: eq(agents.id, key.agentId) });
   if (!agent || !(await requireOrgMember(c, agent.orgId))) return c.json({ error: { code: "forbidden" } }, 403);
 

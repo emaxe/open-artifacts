@@ -8,6 +8,8 @@ beforeEach(resetDb);
 describe("GET /orgs", () => {
   it("returns only the caller's orgs, paginated", async () => {
     const app = buildTestApp();
+    // registerAndLogin already leaves the user in two orgs: their auto-provisioned main
+    // workspace, plus the explicit team org the helper creates on top.
     const user = await registerAndLogin(app);
     await app.request("/api/v1/orgs", {
       method: "POST",
@@ -17,7 +19,7 @@ describe("GET /orgs", () => {
 
     const res = await app.request("/api/v1/orgs?page=1&pageSize=1", { headers: { Cookie: `oa_session=${user.sessionCookie}` } });
     const body = (await res.json()) as { orgs: unknown[]; total: number; page: number };
-    expect(body.total).toBe(2);
+    expect(body.total).toBe(3);
     expect(body.orgs).toHaveLength(1);
     expect(body.page).toBe(1);
   });
@@ -37,12 +39,19 @@ describe("GET /orgs", () => {
     const adminOrg = body.orgs.find((o) => o.id === admin.orgId);
     expect(adminOrg).toBeDefined();
     expect(adminOrg?.role).toBe("owner");
+  });
 
-    // Also verify GET /auth/me returns all orgs with names for superadmin
+  it("GET /auth/me returns only the superadmin's own memberships, not every org in the instance", async () => {
+    const app = buildTestApp();
+    const owner = await registerAndLogin(app);
+    const admin = await registerAndLogin(app);
+    await getTestDb().update(users).set({ isSuperadmin: true }).where(eq(users.id, admin.userId));
+
     const meRes = await app.request("/api/v1/auth/me", { headers: { Cookie: `oa_session=${admin.sessionCookie}` } });
-    const meBody = (await meRes.json()) as { orgs: { orgId: string; name: string; role: string | null }[] };
-    expect(meBody.orgs.some((o) => o.orgId === owner.orgId && o.name.includes("workspace"))).toBe(true);
-    expect(meBody.orgs.some((o) => o.orgId === admin.orgId && o.name.includes("workspace"))).toBe(true);
+    const meBody = (await meRes.json()) as { orgs: { orgId: string }[]; mainOrgId: string };
+    expect(meBody.orgs.some((o) => o.orgId === owner.orgId)).toBe(false);
+    expect(meBody.orgs.some((o) => o.orgId === admin.orgId)).toBe(true);
+    expect(meBody.orgs.some((o) => o.orgId === meBody.mainOrgId)).toBe(true);
   });
 });
 

@@ -9,21 +9,36 @@ function statusClass(status: number): "2xx" | "3xx" | "4xx" | "5xx" {
   return "5xx";
 }
 
-/** Records one usage row per agent-authenticated request. Session (human) traffic isn't metered here. */
+/**
+ * Records one usage row per API-key-authenticated request (agent or personal). Session (cookie)
+ * traffic isn't metered here. For personal keys, the org comes from `resolvedOrgId`, set by
+ * `resolveOrgScope` during route handling — if the route never resolved one (e.g. a cross-org
+ * listing), there's no single org to attribute the row to, so metering is skipped for it.
+ */
 export const usageMetering = createMiddleware<AppBindings>(async (c, next) => {
   const startedAt = Date.now();
   await next();
   const identity = c.get("identity");
-  if (identity?.kind !== "agent") return;
+  if (!identity) return;
 
   const db = c.get("db");
-  recordApiUsage(db, {
-    orgId: identity.orgId,
-    agentId: identity.agentId,
-    keyId: identity.keyId,
-    endpoint: c.req.routePath ?? c.req.path,
-    method: c.req.method,
-    statusClass: statusClass(c.res.status),
-    durationMs: Date.now() - startedAt,
-  }).catch((err) => console.error("usage metering failed:", err));
+  const endpoint = c.req.routePath ?? c.req.path;
+  const method = c.req.method;
+  const status = statusClass(c.res.status);
+  const durationMs = Date.now() - startedAt;
+
+  if (identity.kind === "agent") {
+    recordApiUsage(db, { orgId: identity.orgId, agentId: identity.agentId, keyId: identity.keyId, endpoint, method, statusClass: status, durationMs }).catch((err) =>
+      console.error("usage metering failed:", err),
+    );
+    return;
+  }
+
+  if (identity.kind === "user_key") {
+    const orgId = c.get("resolvedOrgId");
+    if (!orgId) return;
+    recordApiUsage(db, { orgId, agentId: null, keyId: identity.keyId, endpoint, method, statusClass: status, durationMs }).catch((err) =>
+      console.error("usage metering failed:", err),
+    );
+  }
 });

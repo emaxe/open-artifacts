@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { eq } from "drizzle-orm";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -7,7 +8,11 @@ import type { AppBindings, Identity } from "../types.js";
 import type { Database } from "../db/client.js";
 import type { Env } from "../env.js";
 import { requiresScope } from "../services/scopes.js";
+import { actingUserId } from "../services/identity.js";
 import { recordAudit } from "../services/audit.js";
+import { resolveOrgScope } from "../services/org-scope.js";
+import { listOrgMembershipsForUser } from "../services/orgs.js";
+import { orgs as orgsTable } from "../db/schema.js";
 import {
   ArtifactTooLargeError,
   QuotaExceededError,
@@ -36,32 +41,90 @@ function toolError(message: string): CallToolResult {
 const artifactKindSchema = z.enum(["html", "markdown", "mermaid", "svg"]);
 const visibilitySchema = z.enum(["private", "org"]);
 
+type OrgResolution = { ok: true; orgId: string } | { ok: false; result: CallToolResult };
+
+/**
+ * Resolves which team an org-scoped tool call acts on, the same way the REST API does (see
+ * services/org-scope.ts). `explicitOrgId` is the tool call's own `orgId` argument; `defaultOrgId`
+ * is the per-connection default carried in the MCP server's URL (see mcpRoutes.all("/mcp") below)
+ * — a project's `.mcp.json` is the one place that can set that, since the server has no other way
+ * to know which project a given MCP client is running in.
+ */
+async function resolveOrgForTool(
+  db: Database,
+  identity: Identity,
+  explicitOrgId: string | undefined,
+  defaultOrgId: string | undefined,
+): Promise<OrgResolution> {
+  const scope = await resolveOrgScope(db, identity, explicitOrgId ?? defaultOrgId);
+  if (scope.ok) return { ok: true, orgId: scope.orgId };
+  if (scope.code === "org_required") {
+    return {
+      ok: false,
+      result: toolError(
+        JSON.stringify({
+          code: "org_required",
+          message: "You belong to multiple teams — ask the user which one to use, then pass its id as orgId.",
+          orgs: scope.orgs,
+        }),
+      ),
+    };
+  }
+  return { ok: false, result: toolError("Forbidden: not a member of that team") };
+}
+
 /**
  * Builds a fresh McpServer per request, with every tool closing over the identity resolved for
  * *that* request. Cheap (just registrations, no I/O), and avoids any risk of one agent's request
  * reusing state left over from a concurrent request on a shared server instance.
  */
-function createMcpServer(db: Database, env: Env, identity: Identity): McpServer {
-  const server = new McpServer({ name: "open-artifacts", version: "0.2.0" });
+function createMcpServer(
+  db: Database,
+  env: Env,
+  identity: Identity,
+  defaultOrgId: string | undefined,
+  onOrgResolved: (orgId: string) => void,
+): McpServer {
+  const server = new McpServer({ name: "open-artifacts", version: "0.3.0" });
 
   server.registerTool(
     "whoami",
-    { description: "Identify the current agent: which org it's acting in and what scopes its key carries." },
+    { description: "Identify the current caller: agent/personal-key identity, its teams, and what scopes it carries." },
     async (): Promise<CallToolResult> => {
-      if (identity.kind !== "agent") return ok({ kind: identity.kind, userId: identity.userId });
-      return ok({ kind: "agent", agentId: identity.agentId, orgId: identity.orgId, scopes: identity.scopes });
+      if (identity.kind === "agent") return ok({ kind: "agent", agentId: identity.agentId, orgId: identity.orgId, scopes: identity.scopes });
+
+      const orgs = await listOrgMembershipsForUser(db, identity.userId);
+      const resolvedDefault = defaultOrgId && orgs.some((o) => o.orgId === defaultOrgId) ? defaultOrgId : orgs.length === 1 ? orgs[0]!.orgId : undefined;
+      if (identity.kind === "user_key") return ok({ kind: "user_key", userId: identity.userId, scopes: identity.scopes, defaultOrgId: resolvedDefault, orgs });
+      return ok({ kind: "user", userId: identity.userId, defaultOrgId: resolvedDefault, orgs });
+    },
+  );
+
+  server.registerTool(
+    "list_orgs",
+    { description: "List the teams this identity can act in — use this to ask the user which team to publish/list in when there's more than one." },
+    async (): Promise<CallToolResult> => {
+      if (identity.kind === "agent") {
+        const org = await db.query.orgs.findFirst({ where: eq(orgsTable.id, identity.orgId) });
+        return ok({ orgs: org ? [{ orgId: org.id, name: org.name, slug: org.slug, kind: org.kind, role: "member" }] : [] });
+      }
+      return ok({ orgs: await listOrgMembershipsForUser(db, identity.userId) });
     },
   );
 
   server.registerTool(
     "list_artifacts",
-    { description: "List artifacts you can read in your organization." },
-    async (): Promise<CallToolResult> => {
+    {
+      description: "List artifacts you can read in a team.",
+      inputSchema: { orgId: z.string().uuid().optional().describe("Team id — omit to use the connection's default team, or when you belong to only one") },
+    },
+    async ({ orgId }): Promise<CallToolResult> => {
       if (!requiresScope(identity, "artifacts:read")) return toolError("Missing scope: artifacts:read");
-      const orgId = identity.kind === "agent" ? identity.orgId : undefined;
-      if (!orgId) return toolError("This tool requires an agent (API key) identity.");
+      const resolved = await resolveOrgForTool(db, identity, orgId, defaultOrgId);
+      if (!resolved.ok) return resolved.result;
+      onOrgResolved(resolved.orgId);
 
-      const all = await listArtifactsForOrg(db, orgId);
+      const all = await listArtifactsForOrg(db, resolved.orgId);
       const visible = [];
       for (const artifact of all) {
         const access = await resolveAccessForIdentity(db, identity, artifact);
@@ -110,16 +173,18 @@ function createMcpServer(db: Database, env: Env, identity: Identity): McpServer 
         content: z.string().min(1).describe("Full content, e.g. a self-contained HTML document"),
         description: z.string().max(2000).optional(),
         visibility: visibilitySchema.default("private").describe("'org' makes it readable by everyone in your org"),
+        orgId: z.string().uuid().optional().describe("Team id to publish into — omit to use the connection's default team, or when you belong to only one"),
       },
     },
-    async ({ title, kind, content, description, visibility }): Promise<CallToolResult> => {
+    async ({ title, kind, content, description, visibility, orgId }): Promise<CallToolResult> => {
       if (!requiresScope(identity, "artifacts:write")) return toolError("Missing scope: artifacts:write");
-      const orgId = identity.kind === "agent" ? identity.orgId : undefined;
-      if (!orgId) return toolError("This tool requires an agent (API key) identity.");
+      const resolved = await resolveOrgForTool(db, identity, orgId, defaultOrgId);
+      if (!resolved.ok) return resolved.result;
+      onOrgResolved(resolved.orgId);
 
       try {
-        const { artifact, version } = await createArtifact(db, { orgId, identity, title, kind, content, description, visibility });
-        await recordAudit(db, { orgId, identity, action: "artifact.create", targetType: "artifact", targetId: artifact.id });
+        const { artifact, version } = await createArtifact(db, { orgId: resolved.orgId, identity, title, kind, content, description, visibility });
+        await recordAudit(db, { orgId: resolved.orgId, identity, action: "artifact.create", targetType: "artifact", targetId: artifact.id });
         return ok({ id: artifact.id, versionNo: version.versionNo });
       } catch (err) {
         if (err instanceof ArtifactTooLargeError || err instanceof QuotaExceededError) return toolError(err.message);
@@ -204,7 +269,7 @@ function createMcpServer(db: Database, env: Env, identity: Identity): McpServer 
         pinnedVersionId = version.id;
       }
 
-      const createdBy = identity.kind === "user" ? identity.userId : identity.agentId;
+      const createdBy = identity.kind === "agent" ? identity.agentId : actingUserId(identity)!;
       const share = await createShare(db, { artifactId, mode, password, expires, pinnedVersionId, createdBy });
       await recordAudit(db, { orgId: artifact.orgId, identity, action: "share.create", targetType: "share", targetId: share.id });
       return ok({ id: share.id, url: `${env.APP_ORIGIN}/s/${share.token}`, mode: share.mode, expiresAt: share.expiresAt });
@@ -254,7 +319,12 @@ function createMcpServer(db: Database, env: Env, identity: Identity): McpServer 
  * dashboard's API-activity stats for free. MCP servers speak agent-to-agent, not browser-to-
  * server, so point any MCP client's remote server config at `<APP_ORIGIN>/mcp` with
  * `Authorization: Bearer oa_live_...` — a session cookie won't do anything useful here, since
- * every tool below expects an agent identity.
+ * every tool below expects an agent or personal-key identity.
+ *
+ * An agent key is already locked to one team. A personal key spans every team its holder belongs
+ * to, so a per-connection default team can be set via `?orgId=<uuid>` (or an `X-OA-Org` header) in
+ * the MCP server URL a project's `.mcp.json` points at — the server has no other way to learn
+ * which project a given MCP client is running in. Individual tools can still override it per call.
  */
 mcpRoutes.all("/mcp", async (c) => {
   const identity = c.get("identity");
@@ -264,7 +334,8 @@ mcpRoutes.all("/mcp", async (c) => {
     return c.json({ error: { code, message: "Authorization: Bearer <api key> is required" } }, 401);
   }
 
-  const server = createMcpServer(c.get("db"), c.get("env"), identity);
+  const defaultOrgId = c.req.query("orgId") || c.req.header("x-oa-org") || undefined;
+  const server = createMcpServer(c.get("db"), c.get("env"), identity, defaultOrgId, (orgId) => c.set("resolvedOrgId", orgId));
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // stateless: no session to track across requests
     enableJsonResponse: true, // plain JSON responses over SSE — every tool call here is quick

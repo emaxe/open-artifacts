@@ -4,16 +4,18 @@ import { isValidScope, API_KEY_SCOPES } from "./scopes.js";
 import { login } from "./commands/login.js";
 import { listCommand, pushCommand, getCommand, rmCommand } from "./commands/artifacts.js";
 import { shareCommand, unshareCommand, whoamiCommand } from "./commands/share.js";
+import { orgsCommand, useCommand } from "./commands/orgs.js";
 
 const program = new Command();
-program.name("oa").description("CLI for Open Artifacts — self-hosted artifact hosting for AI agents").version("0.2.0");
+program.name("oa").description("CLI for Open Artifacts — self-hosted artifact hosting for AI agents").version("0.3.0");
 
 program
   .command("login")
   .description("Authorize this device via OAuth device flow and save credentials")
   .option("--server <url>", "Open Artifacts server URL", "http://localhost:3000")
-  .option("--name <name>", "Name to register this agent as")
+  .option("--name <name>", "Name to register this agent/device as")
   .option("--scopes <scopes>", "Comma-separated scopes to request", "artifacts:read,artifacts:write,shares:write")
+  .option("--agent", "Issue an agent key locked to one team, instead of a personal key spanning all your teams")
   .action(async (opts) => {
     const scopes = String(opts.scopes).split(",").map((s: string) => s.trim());
     for (const scope of scopes) {
@@ -22,15 +24,28 @@ program
         process.exit(1);
       }
     }
-    await login({ server: opts.server, name: opts.name, scopes });
+    await login({ server: opts.server, name: opts.name, scopes, agent: opts.agent });
   });
 
 program.command("whoami").description("Show the current credentials and verify they work").action(whoamiCommand);
 
 program
-  .command("list")
-  .description("List artifacts in your org")
+  .command("orgs")
+  .description("List the teams your key can act in, and which one is currently selected")
   .option("--json", "Output raw JSON")
+  .action(orgsCommand);
+
+program
+  .command("use <team>")
+  .description("Set the default team (by id or slug) for this project, or --global for this machine")
+  .option("--global", "Set the default for this machine instead of writing .oa.json in the project")
+  .action(useCommand);
+
+program
+  .command("list")
+  .description("List artifacts in your team")
+  .option("--json", "Output raw JSON")
+  .option("--org <team>", "Team id or slug (overrides the project/machine default)")
   .action(listCommand);
 
 program
@@ -43,6 +58,7 @@ program
   .option("--password <password>", "Create a password-protected share instead of a public one (implies --share)")
   .option("--message <message>", "Version message")
   .option("--json", "Output raw JSON")
+  .option("--org <team>", "Team id or slug to publish into (overrides the project/machine default)")
   .action((file, opts) => pushCommand(file, { ...opts, share: opts.share || !!opts.password }));
 
 program
