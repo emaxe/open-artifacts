@@ -13,7 +13,8 @@ userRoutes.get("/users", requireAuth, requireSuperadmin, async (c) => {
   const pageSize = Math.min(100, Math.max(1, Number(c.req.query("pageSize") ?? "20")));
 
   const where = search ? ilike(users.email, `%${search}%`) : undefined;
-  const [{ n: total }] = await db.select({ n: sql<number>`count(*)` }).from(users).where(where);
+  const [countRow] = await db.select({ n: sql<number>`count(*)` }).from(users).where(where);
+  const total = countRow?.n ?? 0;
 
   const list = await db.query.users.findMany({
     where,

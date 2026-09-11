@@ -31,10 +31,11 @@ export async function changeMemberRole(
   if (!membership) throw new NotAMemberError();
 
   if (membership.role === "owner" && role !== "owner") {
-    const [{ n: ownerCount }] = await db
+    const [countRow] = await db
       .select({ n: sql<number>`count(*)` })
       .from(orgMembers)
       .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.role, "owner")));
+    const ownerCount = countRow?.n ?? 0;
     if (Number(ownerCount) <= 1) throw new LastOwnerError();
   }
 
@@ -56,13 +57,14 @@ export interface PageOpts {
 }
 
 async function countMembers(db: Database, orgId: string): Promise<number> {
-  const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(orgMembers).where(eq(orgMembers.orgId, orgId));
-  return Number(n);
+  const [countRow] = await db.select({ n: sql<number>`count(*)` }).from(orgMembers).where(eq(orgMembers.orgId, orgId));
+  return Number(countRow?.n ?? 0);
 }
 
 export async function listAllOrgs(db: Database, opts: PageOpts): Promise<{ orgs: OrgListItem[]; total: number }> {
   const where = opts.search ? ilike(orgs.name, `%${opts.search}%`) : undefined;
-  const [{ n: total }] = await db.select({ n: sql<number>`count(*)` }).from(orgs).where(where);
+  const [countRow] = await db.select({ n: sql<number>`count(*)` }).from(orgs).where(where);
+  const total = countRow?.n ?? 0;
   const rows = await db.query.orgs.findMany({
     where,
     orderBy: (o, { desc }) => [desc(o.createdAt)],
@@ -82,7 +84,8 @@ export async function listOrgsForUser(db: Database, userId: string, opts: PageOp
   const roleByOrgId = new Map(memberships.map((m) => [m.orgId, m.role]));
 
   const where = opts.search ? and(inArray(orgs.id, orgIds), ilike(orgs.name, `%${opts.search}%`)) : inArray(orgs.id, orgIds);
-  const [{ n: total }] = await db.select({ n: sql<number>`count(*)` }).from(orgs).where(where);
+  const [countRow] = await db.select({ n: sql<number>`count(*)` }).from(orgs).where(where);
+  const total = countRow?.n ?? 0;
   const rows = await db.query.orgs.findMany({
     where,
     orderBy: (o, { desc }) => [desc(o.createdAt)],
