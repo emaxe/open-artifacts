@@ -11,7 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-13
+
 ### Added
+- **Brand identity**: the Open Artifacts logo now appears on the login/register pages (with a dark-theme wordmark variant), the sidebar rail and mobile header, and as the browser favicon/apple-touch-icon. Generated from a single source image via `scripts/gen-brand-assets.sh` (ImageMagick), checked in alongside it for reproducibility.
 - **S3-compatible file storage for artifacts**: images and other files can now be uploaded and attached to an artifact — `POST /api/v1/artifacts/:id/files` (`multipart/form-data`), `GET .../files` to list, `DELETE .../files/:fileId` to remove, served back through the app at `GET /af/:token` (never a public bucket, no presigned URLs). `oa files upload|ls|rm` on the CLI; `list_artifact_files`/`delete_artifact_file` as MCP tools (uploading itself is CLI/REST-only — MCP tool calls are JSON, not multipart). A file is always attached to exactly one artifact and is deleted with it (explicit delete, expiry, or an org being deleted all queue its object for removal); a file with no artifact cannot exist. `docker-compose.yml` now bundles a MinIO service as the default storage backend; point `S3_ENDPOINT`/`S3_BUCKET`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` at an external S3/R2/Spaces bucket instead, or leave `S3_BUCKET` unset to disable the feature entirely (upload endpoints answer `501`, everything else is unaffected).
 - **Storage quotas, instance- and team-wide**: two new limits — total bytes per team and bytes per single artifact (both counting artifact source text plus uploaded files) — configurable instance-wide in `/admin/settings` and, per team, in its own team settings (the per-artifact one by an owner/admin, the team-wide one by a superadmin, matching the existing permission split for other org-level knobs). A team override can only ever be equal-or-stricter than the instance ceiling, never looser. **Default: unlimited at both levels** (see Changed below).
 - `GET /api/v1/quota` (and the `get_storage_quota` MCP tool / `oa quota` CLI command): lets an agent check remaining quota — team-wide, or narrowed to one artifact — before deciding whether to upload a file, rather than uploading blindly and handling the failure after the fact.
@@ -20,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Breaking**: a team's storage quota now defaults to **unlimited** instead of 1 GiB. Any team whose quota was never explicitly changed by a superadmin (i.e. still sitting at exactly the old 1 GiB default) is migrated to "inherit the instance quota" (itself unlimited by default); a team a superadmin deliberately set to a specific number keeps that number. `orgs.storageQuotaBytes` also changed from a required column to nullable (`null` = inherit) and from `integer` to `bigint`, since it now also counts uploaded file bytes, not just artifact source text.
 - Fixed a latent bug in the instance's own "maximum artifact size" setting (`InstanceSettings.maxArtifactSizeBytes`): it was editable in the admin UI and accepted by `PATCH /admin/settings`, but nothing ever read it back — artifact-size enforcement used a hardcoded 5 MiB constant regardless. It's now a required, resolved parameter on every artifact-creating/updating code path, the same pattern already used for artifact lifetime.
+
+### Fixed
+- Every "copy" button silently did nothing on insecure (plain HTTP) origins, or wherever the browser/embedder denied `navigator.clipboard` — that API is undefined or rejects in those cases without surfacing an error. Added a shared `copyToClipboard()` helper with an `execCommand('copy')` fallback, used by `CopyButton` and the public share page's own inline copy-link script.
 
 ## [0.6.1] - 2026-09-13
 

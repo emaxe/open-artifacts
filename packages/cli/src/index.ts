@@ -8,7 +8,7 @@ import { orgsCommand, useCommand } from "./commands/orgs.js";
 import { quotaCommand, filesUploadCommand, filesListCommand, filesRmCommand } from "./commands/files.js";
 
 const program = new Command();
-program.name("oa").description("CLI for Open Artifacts — self-hosted artifact hosting for AI agents").version("0.6.1");
+program.name("oa").description("CLI for Open Artifacts — self-hosted artifact hosting for AI agents").version("0.7.0");
 
 program
   .command("login")
