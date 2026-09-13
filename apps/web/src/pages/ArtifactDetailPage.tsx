@@ -232,7 +232,7 @@ export function ArtifactDetailPage() {
             key={previewKey}
             title="preview"
             src={`/api/v1/artifacts/${id}/preview`}
-            sandbox="allow-scripts allow-forms allow-popups allow-modals"
+            sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"
             className="h-full w-full border-0"
           />
         </Card>

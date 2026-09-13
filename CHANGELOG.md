@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-13
+
+### Fixed
+- Attached files (images, text, and any other type) embedded inside an artifact's own content (`<img src>`, links, etc.) failed to load or open when viewed through the sandboxed preview/embed iframe (`/api/v1/artifacts/:id/preview`, `/embed/:token`), even though the exact same `/af/:token` URL worked fine opened directly in a browser tab. Two causes: the `assetOrigin` the artifact's Content-Security-Policy needs to allow `media-src`/`font-src` from the file-serving origin was never actually passed by either route, and the sandboxed iframes were missing the `allow-downloads` token, which browsers require before letting a sandboxed frame initiate any file download (every non-image/video/audio/font attachment is always served as `Content-Disposition: attachment`).
+
 ## [0.7.0] - 2026-09-13
 
 ### Added

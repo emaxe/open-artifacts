@@ -10,6 +10,7 @@
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-%3E%3D20-brightgreen?logo=node.js" alt="Node.js"></a>
   <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white" alt="Docker"></a>
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-Server-purple" alt="MCP Server"></a>
+  <a href="#хранилище-файлов-и-квоты"><img src="https://img.shields.io/badge/Storage-S3--compatible-orange?logo=amazons3&logoColor=white" alt="S3-совместимое хранилище"></a>
 </p>
 
 **[English](README.md)** | **[Русский](README.ru.md)** | **[Changelog](CHANGELOG.md)** | **[История изменений](CHANGELOG.ru.md)**
@@ -21,7 +22,7 @@ Self-hosted (автономный) сервис хостинга артефак�
 ---
 
 ### Топики и теги репозитория
-`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `mcp-server` • `model-context-protocol` • `self-hosted` • `docker` • `hono` • `react` • `typescript` • `cli` • `developer-tools` • `open-artifacts` • `llm`
+`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `mcp-server` • `model-context-protocol` • `self-hosted` • `docker` • `hono` • `react` • `typescript` • `cli` • `developer-tools` • `open-artifacts` • `llm` • `s3`
 
 ---
 

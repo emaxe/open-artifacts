@@ -1,6 +1,6 @@
 {
   "name": "@emaxe/oa",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "CLI for Open Artifacts — publish HTML/Markdown/Mermaid/SVG content to a self-hosted artifact host and get back a shareable link.",
   "keywords": [
     "ai-agents",
@@ -12,7 +12,8 @@
     "self-hosted",
     "cli",
     "open-artifacts",
-    "developer-tools"
+    "developer-tools",
+    "s3"
   ],
   "license": "MIT",
   "author": "emaxe",

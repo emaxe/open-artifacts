@@ -141,7 +141,8 @@ artifactRoutes.get("/artifacts/:id/preview", requireAuth, async (c) => {
   if (!version) return c.html("No content available.", 404);
 
   const settings = await getInstanceSettings(db, defaultInstanceSettings(env));
-  c.header("Content-Security-Policy", buildEmbedCsp({ scriptAllowlist: settings.cdnAllowlist, frameAncestor: env.APP_ORIGIN }));
+  const assetOrigin = c.get("storage").enabled ? (env.ARTIFACT_ORIGIN ?? env.APP_ORIGIN) : undefined;
+  c.header("Content-Security-Policy", buildEmbedCsp({ scriptAllowlist: settings.cdnAllowlist, frameAncestor: env.APP_ORIGIN, assetOrigin }));
   c.header("X-Content-Type-Options", "nosniff");
   c.header("Referrer-Policy", "no-referrer");
   return c.html(renderArtifactHtml(artifact.kind, version.content));

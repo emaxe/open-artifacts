@@ -232,7 +232,7 @@ export function renderViewerShell(vm: ViewerShellModel, nonce: string): string {
 <div class="oa-panel-row oa-panel-secondary" id="oa-panel-body"><ul class="oa-meta">${metaItems.join("")}</ul></div>
 ${description}
 </header>
-<iframe class="oa-frame" title="Shared artifact content" src="${escapeHtml(vm.embedSrc)}" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>
+<iframe class="oa-frame" title="Shared artifact content" src="${escapeHtml(vm.embedSrc)}" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"></iframe>
 <script nonce="${nonce}">${PANEL_SCRIPT}</script>`;
 
   return documentShell({ title: escapedTitle, nonce, bodyClass: "oa-viewer", body });

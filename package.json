@@ -1,7 +1,7 @@
 {
   "name": "open-artifacts",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.7.1",
   "keywords": [
     "ai-agents",
     "artifacts",
@@ -12,7 +12,8 @@
     "self-hosted",
     "docker",
     "developer-tools",
-    "open-artifacts"
+    "open-artifacts",
+    "s3"
   ],
   "engines": {
     "node": ">=20"

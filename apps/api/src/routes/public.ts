@@ -164,7 +164,8 @@ publicRoutes.get("/embed/:token", async (c) => {
   // A cross-origin embed of a `team` share fails closed twice over regardless of the checks
   // below: `frame-ancestors` here only ever allows APP_ORIGIN, and even if it didn't, the
   // `oa_session`/unlock cookies are SameSite=Lax so they never ride along on a cross-site load.
-  c.header("Content-Security-Policy", buildEmbedCsp({ scriptAllowlist: settings.cdnAllowlist, frameAncestor: env.APP_ORIGIN }));
+  const assetOrigin = c.get("storage").enabled ? (env.ARTIFACT_ORIGIN ?? env.APP_ORIGIN) : undefined;
+  c.header("Content-Security-Policy", buildEmbedCsp({ scriptAllowlist: settings.cdnAllowlist, frameAncestor: env.APP_ORIGIN, assetOrigin }));
   c.header("X-Content-Type-Options", "nosniff");
   c.header("Referrer-Policy", "no-referrer");
   c.header("Cache-Control", "private, no-store");

@@ -92,7 +92,7 @@ function createMcpServer(
   defaultOrgId: string | undefined,
   onOrgResolved: (orgId: string) => void,
 ): McpServer {
-  const server = new McpServer({ name: "open-artifacts", version: "0.7.0" });
+  const server = new McpServer({ name: "open-artifacts", version: "0.7.1" });
 
   server.registerTool(
     "whoami",
