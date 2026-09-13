@@ -1,38 +1,43 @@
+import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { getCookie } from "hono/cookie";
-import type { AppBindings } from "../types.js";
+import type { AppBindings, AppVariables, Identity } from "../types.js";
 import { getSessionWithUser } from "../services/users.js";
 import { verifyApiKeyToken } from "../services/agents.js";
 
 export const SESSION_COOKIE_NAME = "oa_session";
 
-/** Resolves `identity` from either a Bearer API key or a session cookie. Never throws — routes decide what's required. */
-export const resolveIdentity = createMiddleware<AppBindings>(async (c, next) => {
+/**
+ * Resolves an identity from either a Bearer API key or a session cookie, without touching
+ * context state — the body of `resolveIdentity` below, factored out so routes that need identity
+ * only conditionally (e.g. a `team`-mode share on `/s/:token`) can call it directly instead of
+ * paying for it as middleware on every request. Never throws.
+ */
+export async function resolveIdentityFromRequest(c: Context<AppBindings>): Promise<{ identity: Identity | null; apiKeyError?: AppVariables["apiKeyError"] }> {
   const db = c.get("db");
   const authHeader = c.req.header("authorization");
 
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice("Bearer ".length);
     const result = await verifyApiKeyToken(db, token);
-    if (result.ok) {
-      c.set("identity", result.identity);
-    } else {
-      c.set("identity", null);
-      c.set("apiKeyError", result.error); // surfaced by requireAuth for a precise 401
-    }
-    return next();
+    if (result.ok) return { identity: result.identity };
+    return { identity: null, apiKeyError: result.error };
   }
 
   const sessionId = getCookie(c, SESSION_COOKIE_NAME);
   if (sessionId) {
     const found = await getSessionWithUser(db, sessionId);
-    if (found) {
-      c.set("identity", { kind: "user", userId: found.user.id, isSuperadmin: found.user.isSuperadmin });
-      return next();
-    }
+    if (found) return { identity: { kind: "user", userId: found.user.id, isSuperadmin: found.user.isSuperadmin } };
   }
 
-  c.set("identity", null);
+  return { identity: null };
+}
+
+/** Resolves `identity` from either a Bearer API key or a session cookie. Never throws — routes decide what's required. */
+export const resolveIdentity = createMiddleware<AppBindings>(async (c, next) => {
+  const result = await resolveIdentityFromRequest(c);
+  c.set("identity", result.identity);
+  if (result.apiKeyError) c.set("apiKeyError", result.apiKeyError); // surfaced by requireAuth for a precise 401
   return next();
 });
 

@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-09-13
+
+### Added
+- **Team-Only Share Links (`team` mode)**: A third share mode alongside `public` and `password` — a `/s/:token` link that requires the viewer to be logged in and a member of the artifact's team (any role). No password needed; safe to paste into a team chat. An anonymous visitor is redirected to `/login?next=...`; a logged-in non-member gets a 403 page with a link to log in as someone else.
+- **Team Link Policy**: Team owners/admins (including for their personal main workspace) can now set, in `/t/:orgId/settings`, the **default link mode** (`team` or `public`) used whenever a share is created without naming one, and whether the team **allows `public` links at all**. Disabling public links only blocks new ones — existing public shares keep working until revoked, either one at a time from the artifact page or in bulk (with a confirmation dialog showing the affected count) from team settings.
+- **Instance-Wide Link Policy**: A superadmin sets the same two knobs instance-wide in `/admin/settings`. A team can only be equal-or-stricter than the instance, never looser: it cannot re-enable public links the instance disabled, nor default to `public` while public links are forbidden.
+- New endpoints `GET /orgs/:id/share-policy` (effective policy plus a count of active public shares) and `POST /orgs/:id/shares/revoke-public` (bulk-revoke, idempotent).
+- New CLI flags `--team` and `--public` on `oa push` and `oa share`, alongside the existing `--password`; both `oa push`/`oa share` now print the resolved share mode alongside the URL.
+
+### Changed
+- **Breaking**: `oa push --share` and `oa share <id>` with no mode flag now create a link in the **team's configured default mode** instead of always `public`. Use `--public` to get the old behavior explicitly.
+- **Breaking**: MCP `create_share`'s `mode` argument no longer defaults to `"public"` — omitting it uses the team's configured default, same as the CLI. The tool result always echoes back the mode actually used.
+- **Breaking**: `POST /artifacts/:id/shares`'s `mode` field is now optional (omitting it uses the team default) instead of required; requesting `"public"` when it's disallowed now returns `403 public_shares_forbidden` with `allowedModes` in the body.
+- **Breaking**: `POST /s/:token/unlock` on a non-`password` share now returns `400 not_password_mode` instead of silently `{ok:true}`.
+- The agent skill (`skills/open-artifacts/SKILL.md`) no longer instructs the agent to reason about link privacy (defaulting to no share, generating passwords, asking before going public) — that decision now belongs entirely to the server-side team/instance policy above; the skill only documents the three modes and the new error.
+
+### Fixed
+- A `password`-mode share whose `passwordHash` was `NULL` (a state that should never occur, but wasn't guarded against) was treated as fully public by the shared access-resolution matrix; it now correctly still requires a password.
+- The login page's `?next=` redirect target was unvalidated, an open-redirect risk; it's now restricted to same-origin root-relative paths.
+
 ## [0.4.0] - 2026-09-11
 
 ### Added

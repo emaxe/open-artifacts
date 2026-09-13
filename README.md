@@ -33,7 +33,7 @@ Runs as a lightweight, single-stack Docker Compose deployment.
 - 🤖 **Standard AI Agent Skill**: First-class support for `skills.sh` (`npx skills add emaxe/open-artifacts`) with automatic CLI detection and device-flow authorization.
 - 🔑 **Flexible Authentication**: Interactive OAuth Device Flow (`oa login`) and non-interactive organization API tokens (`OA_TOKEN`).
 - 👥 **Multi-Tenancy & Teams**: Organizations, user management, and fine-grained roles (`superadmin`, `admin`, `member`) with an intuitive Team Switcher.
-- 🔗 **Secure Sharing**: Public links, password-protected links, and automatic link expiration (1 hour, 1 day, 7 days, 30 days).
+- 🔗 **Secure Sharing**: Team-only links, password-protected links, public links, and automatic link expiration (1 hour, 1 day, 7 days, 30 days) — teams and instance admins control the default link mode and can disable public links entirely.
 - 🚀 **One-Command Deployment**: Instant production setup with Docker Compose or the interactive `./run.sh` runner.
 
 ---
@@ -164,9 +164,11 @@ oa whoami
 | Check token, key type, and selected team | `oa whoami` |
 | List teams your key can act in | `oa orgs` |
 | Set the default team for this project | `oa use <team-slug>` |
-| Publish artifact and generate public share link | `oa push report.html --title "Q3 Summary" --share` |
+| Publish artifact and generate a link in the team's default mode | `oa push report.html --title "Q3 Summary" --share` |
 | Update an existing artifact (create new version) | `oa push report.html --id <artifact-id> --message "Updated metrics"` |
+| Create a team-only link (only logged-in team members can open it) | `oa share <artifact-id> --team` |
 | Create expiring link with password protection | `oa share <artifact-id> --password "secret123" --expires 7d` |
+| Create a fully public link (may be disabled by team/instance policy) | `oa share <artifact-id> --public` |
 | List all artifacts in the active team | `oa list` |
 | Download artifact source | `oa get <artifact-id> -o output.html` |
 | Remove an artifact | `oa rm <artifact-id>` |
@@ -201,7 +203,7 @@ Every Open Artifacts instance serves a built-in MCP server at `<APP_ORIGIN>/mcp`
 - `create_artifact`: Create a new artifact (`html`, `markdown`, `mermaid`, `svg`).
 - `update_artifact`: Publish a new version for an existing artifact.
 - `delete_artifact`: Soft-delete an artifact.
-- `create_share`: Create public or password-protected expiring share links.
+- `create_share`: Create a team-only, password-protected, or public expiring share link. Omitting `mode` uses the team's configured default.
 - `list_shares`: View all active shares for an artifact.
 - `revoke_share`: Instantly deactivate a share link.
 
@@ -259,6 +261,21 @@ Once an artifact's lifetime expires its content is **hard-deleted** — the vers
 for good, only a tombstone row remains for audit/analytics. Lowering the maximum re-clamps every
 existing artifact's expiry from its own creation date (`min(current deadline, created_at + new
 max)`); raising it never extends anything already created.
+
+### Link modes and share policy
+
+A share link is `team` (only logged-in members of the artifact's team can open it), `password`
+(anyone with the URL and the password), or `public` (anyone with the URL). Creating one without
+naming a mode — the plain `--share` flag, an omitted `mode` field over the API, or MCP's
+`create_share` with no `mode` argument — uses the team's configured default, not always `public`.
+
+Team owners/admins set two things per team in **Настройки команды** (`/t/:orgId/settings`,
+including for their personal main workspace): the **default link mode** (`team` or `public`) and
+whether **public links are allowed at all**. A superadmin sets the same two knobs instance-wide in
+`/admin/settings`; a team can only be equal-or-stricter than the instance, never looser — it can
+never re-enable public links the instance disabled, nor default to public while public links are
+forbidden. Disabling public links only blocks *new* ones; existing public shares keep working until
+revoked, one by one from the artifact page or in bulk from the team settings page.
 
 ---
 

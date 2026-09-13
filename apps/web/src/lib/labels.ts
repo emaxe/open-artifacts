@@ -50,6 +50,21 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "org.leave": "Выход из команды",
   "agent.create": "Создание агента",
   "device_auth.approve": "Подтверждение входа агента",
+  "share.create": "Создание ссылки",
+  "share.revoke": "Отзыв ссылки",
+  "share.bulk_revoke_public": "Массовый отзыв публичных ссылок",
+  "settings.share_policy_update": "Изменение политики ссылок",
+};
+
+export const SHARE_MODE_LABELS: Record<string, string> = {
+  public: "Публичная",
+  password: "С паролем",
+  team: "Только команда",
+};
+
+export const DEFAULT_SHARE_MODE_LABELS: Record<string, string> = {
+  public: "Любой, у кого есть ссылка",
+  team: "Только участники команды",
 };
 
 /** Falls back to the raw key rather than blanking it out — an untranslated value should degrade, not disappear. */

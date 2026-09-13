@@ -29,6 +29,8 @@ import {
 } from "../services/artifacts.js";
 import { createShare, listSharesForArtifact, revokeShare } from "../services/shares.js";
 import { resolveLifetimeLimitForRequest } from "../services/lifetime.js";
+import { resolveSharePolicyForRequest } from "../services/share-policy.js";
+import { resolveRequestedShareMode, shareModeSchema } from "@open-artifacts/shared";
 
 export const mcpRoutes = new Hono<AppBindings>();
 
@@ -284,10 +286,20 @@ function createMcpServer(
   server.registerTool(
     "create_share",
     {
-      description: "Create a link to an artifact that a human can open in a browser, without needing an account.",
+      description:
+        "Create a link to an artifact that a human can open in a browser. Omit `mode` to use the " +
+        "team's configured default (usually 'team') — that is almost always the right choice; only " +
+        "name a mode when the human asked for that specific kind of link. The response echoes back " +
+        "the mode that was actually used.",
       inputSchema: {
         artifactId: z.string().uuid(),
-        mode: z.enum(["public", "password"]).default("public"),
+        mode: shareModeSchema
+          .optional()
+          .describe(
+            "Omit to use the team's default. 'team' = only logged-in members of the artifact's team can open it, no " +
+              "password needed. 'password' = anyone with the link and the password. 'public' = anyone with the link, " +
+              "no login or password — the team or instance may forbid this, returning public_shares_forbidden.",
+          ),
         password: z.string().min(4).max(200).optional(),
         expires: z.union([z.string(), z.number()]).optional().describe("e.g. '7d', '12h', or omit for never"),
         versionNo: z.number().int().positive().optional().describe("Pin the link to a specific version instead of always showing the latest"),
@@ -299,7 +311,20 @@ function createMcpServer(
       if (!artifact) return toolError("Artifact not found");
       const access = await resolveAccessForIdentity(db, identity, artifact);
       if (!access.write) return toolError("Forbidden: no write access to this artifact");
-      if (mode === "password" && !password) return toolError("password is required when mode is 'password'");
+
+      const policy = await resolveSharePolicyForRequest(db, env, artifact.orgId);
+      const resolved = resolveRequestedShareMode(mode, policy);
+      if (!resolved.ok) {
+        return toolError(
+          JSON.stringify({
+            code: "public_shares_forbidden",
+            message: "Public links are disabled for this team",
+            allowedModes: policy.allowedModes,
+            defaultShareMode: policy.defaultShareMode,
+          }),
+        );
+      }
+      if (resolved.mode === "password" && !password) return toolError("password is required when mode is 'password'");
 
       let pinnedVersionId: string | undefined;
       if (versionNo) {
@@ -309,8 +334,8 @@ function createMcpServer(
       }
 
       const createdBy = identity.kind === "agent" ? identity.agentId : actingUserId(identity)!;
-      const share = await createShare(db, { artifactId, mode, password, expires, pinnedVersionId, createdBy });
-      await recordAudit(db, { orgId: artifact.orgId, identity, action: "share.create", targetType: "share", targetId: share.id });
+      const share = await createShare(db, { artifactId, mode: resolved.mode, password, expires, pinnedVersionId, createdBy });
+      await recordAudit(db, { orgId: artifact.orgId, identity, action: "share.create", targetType: "share", targetId: share.id, meta: { mode: share.mode } });
       return ok({ id: share.id, url: `${env.APP_ORIGIN}/s/${share.token}`, mode: share.mode, expiresAt: share.expiresAt });
     },
   );

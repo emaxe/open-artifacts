@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, ApiError, type OrgDetail, type OrgInvite, type OrgMember } from "../../lib/api";
+import { api, ApiError, type DefaultShareMode, type OrgDetail, type OrgInvite, type OrgMember } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { ORG_ROLE_LABELS, INVITE_STATUS_LABELS, formatDateTime, formatLifetime, label } from "../../lib/labels";
+import { ORG_ROLE_LABELS, INVITE_STATUS_LABELS, DEFAULT_SHARE_MODE_LABELS, formatDateTime, formatLifetime, label } from "../../lib/labels";
 import { Card, CardHeader } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input, Select } from "../../components/ui/Input";
@@ -11,6 +11,7 @@ import { Badge } from "../../components/ui/Badge";
 import { LifetimeSelect } from "../../components/ui/LifetimeSelect";
 import { Table, THead, TBody, TR, TH, TD, TableEmptyRow } from "../../components/ui/Table";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { Dialog } from "../../components/ui/Dialog";
 import { CopyButton } from "../../components/ui/CopyButton";
 import { Spinner } from "../../components/ui/Spinner";
 import { useToast } from "../../components/ui/Toast";
@@ -38,6 +39,8 @@ export function TeamSettingsPage() {
 
   const [confirmRemove, setConfirmRemove] = useState<OrgMember | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
+  const [activePublicShares, setActivePublicShares] = useState(0);
 
   async function load() {
     if (!orgId) return;
@@ -88,6 +91,49 @@ export function TeamSettingsPage() {
       await load();
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Не удалось изменить срок жизни артефактов", "error");
+    }
+  }
+
+  async function handleSaveSharePolicy(patch: { defaultShareMode?: DefaultShareMode | null; allowPublicShares?: boolean }) {
+    if (!orgId) return;
+    try {
+      await api.patch(`/orgs/${orgId}`, patch);
+      toast.show("Настройки ссылок сохранены", "success");
+      await load();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось изменить настройки ссылок", "error");
+    }
+  }
+
+  /** Turning public links off is only a real privacy decision when links already exist — otherwise just save. */
+  async function handleTogglePublicShares(allow: boolean) {
+    if (!orgId) return;
+    if (allow) return handleSaveSharePolicy({ allowPublicShares: true });
+    try {
+      const policy = await api.get<{ activePublicShares: number }>(`/orgs/${orgId}/share-policy`);
+      if (policy.activePublicShares === 0) return handleSaveSharePolicy({ allowPublicShares: false });
+      setActivePublicShares(policy.activePublicShares);
+      setRevokeDialogOpen(true);
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось проверить активные ссылки", "error");
+    }
+  }
+
+  /** Saves the prohibition first so a failed revoke still leaves it in effect (fail-safe, not fail-open). */
+  async function handleForbidAndRevoke(revoke: boolean) {
+    if (!orgId) return;
+    try {
+      await api.patch(`/orgs/${orgId}`, { allowPublicShares: false });
+      if (revoke) {
+        const res = await api.post<{ revoked: number }>(`/orgs/${orgId}/shares/revoke-public`);
+        toast.show(`Отозвано ссылок: ${res.revoked}`, "success");
+      } else {
+        toast.show("Публичные ссылки запрещены для новых", "success");
+      }
+      setRevokeDialogOpen(false);
+      await load();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось изменить настройки ссылок", "error");
     }
   }
 
@@ -225,6 +271,64 @@ export function TeamSettingsPage() {
       </Card>
 
       <Card>
+        <CardHeader
+          title="Ссылки на артефакты"
+          description={`Инстанс ${detail.globalAllowPublicShares ? "разрешает" : "запрещает"} публичные ссылки; настройка по умолчанию на инстансе — «${label(DEFAULT_SHARE_MODE_LABELS, detail.globalDefaultShareMode)}».`}
+        />
+        <div className="flex flex-col gap-4">
+          <div>
+            <p className="mb-2 text-sm font-medium text-fg">Ссылка по умолчанию</p>
+            {detail.defaultShareMode === null ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm text-muted">
+                  Наследуется настройка инстанса: <strong className="text-fg">{label(DEFAULT_SHARE_MODE_LABELS, detail.effectiveDefaultShareMode)}</strong>
+                </p>
+                {canManageTeam && (
+                  <Button variant="secondary" size="sm" onClick={() => handleSaveSharePolicy({ defaultShareMode: detail.globalDefaultShareMode })}>
+                    Задать своё значение
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <Select
+                  value={detail.defaultShareMode}
+                  disabled={!canManageTeam}
+                  onChange={(e) => handleSaveSharePolicy({ defaultShareMode: e.target.value as DefaultShareMode })}
+                  className="h-8 w-64"
+                >
+                  <option value="team">{DEFAULT_SHARE_MODE_LABELS.team}</option>
+                  <option value="public" disabled={!detail.effectiveAllowPublicShares}>
+                    {DEFAULT_SHARE_MODE_LABELS.public}
+                  </option>
+                </Select>
+                {canManageTeam && (
+                  <Button variant="ghost" size="sm" onClick={() => handleSaveSharePolicy({ defaultShareMode: null })}>
+                    Наследовать настройку инстанса
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-medium text-fg">Публичные ссылки</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Select
+                value={detail.allowPublicShares ? "allow" : "forbid"}
+                disabled={!canManageTeam || !detail.globalAllowPublicShares}
+                onChange={(e) => handleTogglePublicShares(e.target.value === "allow")}
+                className="h-8 w-64"
+              >
+                <option value="allow">Разрешены</option>
+                <option value="forbid">Запрещены</option>
+              </Select>
+              {!detail.globalAllowPublicShares && <span className="text-xs text-muted">Запрещено на уровне инстанса</span>}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
         <CardHeader title="Участники" />
         <Table>
           <THead>
@@ -351,6 +455,22 @@ export function TeamSettingsPage() {
         description="Вы потеряете доступ к артефактам и участникам этой команды."
         confirmLabel="Покинуть"
       />
+
+      <Dialog open={revokeDialogOpen} onClose={() => setRevokeDialogOpen(false)} title={`Найдено ${activePublicShares} активных публичных ссылок`}>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted">
+            Запрет действует только на новые ссылки. Уже созданные публичные ссылки продолжат работать, пока их не отозвать.
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="secondary" onClick={() => handleForbidAndRevoke(false)}>
+              Только запретить новые
+            </Button>
+            <Button variant="danger" onClick={() => handleForbidAndRevoke(true)}>
+              Запретить и отозвать все
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

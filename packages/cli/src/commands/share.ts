@@ -1,19 +1,25 @@
 import { requireCredentials } from "../config.js";
 import { makeClient } from "../client.js";
 import { resolveOrg } from "../org.js";
-import { handleError } from "./artifacts.js";
+import { describeShareMode, handleError, resolveShareModeFlag } from "./artifacts.js";
 
-export async function shareCommand(id: string, opts: { password?: string; expires?: string; version?: string }) {
+export async function shareCommand(id: string, opts: { team?: boolean; public?: boolean; password?: string; expires?: string; version?: string }) {
   const creds = requireCredentials();
   const client = makeClient(creds);
   try {
-    const res = await client.post<{ url: string; token: string }>(`/artifacts/${id}/shares`, {
-      mode: opts.password ? "password" : "public",
+    // Omitting `mode` lets the server use the team's configured default — see
+    // resolveShareModeFlag's doc comment.
+    const mode = resolveShareModeFlag(opts);
+    const res = await client.post<{ url: string; token: string; mode: string }>(`/artifacts/${id}/shares`, {
+      mode,
       password: opts.password,
       expires: opts.expires,
       versionNo: opts.version ? Number(opts.version) : undefined,
     });
+    // stdout stays the bare URL — scripts already do `URL=$(oa share <id>)` — the mode hint goes to
+    // stderr so it's still visible interactively without breaking that contract.
     console.log(res.url);
+    console.error(`(mode: ${res.mode} — ${describeShareMode(res.mode)})`);
   } catch (err) {
     handleError(err);
   }

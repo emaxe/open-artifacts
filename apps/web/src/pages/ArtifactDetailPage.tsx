@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, ApiError, type ArtifactSummary, type OrgDetail } from "../lib/api";
-import { formatDateTime, formatBytes, formatExpiry, formatLifetime } from "../lib/labels";
+import { api, ApiError, type ArtifactSummary, type OrgDetail, type ShareMode } from "../lib/api";
+import { formatDateTime, formatBytes, formatExpiry, formatLifetime, label, SHARE_MODE_LABELS } from "../lib/labels";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -27,7 +27,7 @@ interface Version {
 interface Share {
   id: string;
   token: string;
-  mode: "public" | "password";
+  mode: ShareMode;
   expiresAt: string | null;
   viewCount: number;
   revokedAt: string | null;
@@ -94,7 +94,7 @@ export function ArtifactDetailPage() {
     toast.show(`Версия ${versionNo} восстановлена`, "success");
   }
 
-  async function createShare(mode: "public" | "password", password?: string) {
+  async function createShare(mode?: ShareMode, password?: string) {
     try {
       const res = await api.post<{ url: string }>(`/artifacts/${id}/shares`, { mode, password });
       await load();
@@ -190,12 +190,23 @@ export function ArtifactDetailPage() {
 
       <Card className="mb-4">
         <CardHeader title="Шаринг" />
-        <div className="mb-3 flex gap-2">
-          <Button variant="secondary" onClick={() => createShare("public")}>
-            Публичная ссылка
+        <div className="mb-3 flex flex-wrap gap-2">
+          <Button
+            variant={orgDetail?.effectiveDefaultShareMode === "team" ? "primary" : "secondary"}
+            onClick={() => createShare("team")}
+          >
+            Ссылка для команды
           </Button>
           <Button variant="secondary" onClick={() => setPasswordDialogOpen(true)}>
             Ссылка с паролем
+          </Button>
+          <Button
+            variant={orgDetail?.effectiveDefaultShareMode === "public" ? "primary" : "secondary"}
+            onClick={() => createShare("public")}
+            disabled={orgDetail?.effectiveAllowPublicShares === false}
+            title={orgDetail?.effectiveAllowPublicShares === false ? "Публичные ссылки запрещены настройками команды" : undefined}
+          >
+            Публичная ссылка
           </Button>
         </div>
         {lastShareUrl && (
@@ -219,7 +230,7 @@ export function ArtifactDetailPage() {
               .filter((s) => !s.revokedAt)
               .map((s) => (
                 <TR key={s.id}>
-                  <TD>{s.mode === "public" ? "Публичная" : "С паролем"}</TD>
+                  <TD>{label(SHARE_MODE_LABELS, s.mode)}</TD>
                   <TD>{s.viewCount}</TD>
                   <TD className="text-muted">{s.expiresAt ? formatDateTime(s.expiresAt) : "никогда"}</TD>
                   <TD className="text-right">

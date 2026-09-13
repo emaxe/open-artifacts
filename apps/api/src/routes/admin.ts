@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
+import { defaultShareModeSchema } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import { requireAuth, requireSuperadmin } from "../middleware/auth.js";
 import { artifacts, agents, orgs, users } from "../db/schema.js";
@@ -89,6 +90,8 @@ const settingsPatchSchema = z.object({
   inviteTtlDays: z.number().int().positive().optional(),
   // Minutes; 0 = unlimited. Also the default lifetime for newly created artifacts.
   maxArtifactLifetimeMinutes: z.number().int().nonnegative().optional(),
+  allowPublicShares: z.boolean().optional(),
+  defaultShareMode: defaultShareModeSchema.optional(),
 });
 
 adminRoutes.patch("/admin/settings", async (c) => {
@@ -110,6 +113,20 @@ adminRoutes.patch("/admin/settings", async (c) => {
       identity: c.get("identity")!,
       action: "settings.artifact_lifetime_update",
       meta: { maxArtifactLifetimeMinutes: body.data.maxArtifactLifetimeMinutes, shortenedArtifacts },
+    });
+  }
+
+  if (
+    (body.data.allowPublicShares !== undefined && body.data.allowPublicShares !== current.allowPublicShares) ||
+    (body.data.defaultShareMode !== undefined && body.data.defaultShareMode !== current.defaultShareMode)
+  ) {
+    // Deliberately does NOT rewrite `orgs` rows (unlike the lifetime clamp above) — every read of
+    // a team's share policy goes through resolveSharePolicy, so a stored team preference stays
+    // honest and survives this flag being toggled off and back on. See share-policy.ts.
+    await recordAudit(db, {
+      identity: c.get("identity")!,
+      action: "settings.share_policy_update",
+      meta: { allowPublicShares: body.data.allowPublicShares, defaultShareMode: body.data.defaultShareMode },
     });
   }
 

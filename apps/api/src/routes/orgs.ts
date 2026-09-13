@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { createInviteSchema, orgRoleSchema } from "@open-artifacts/shared";
+import { createInviteSchema, defaultShareModeSchema, orgRoleSchema } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import { requireAuth } from "../middleware/auth.js";
 import { orgMembers, orgs } from "../db/schema.js";
@@ -23,6 +23,8 @@ import {
 } from "../services/orgs.js";
 import { defaultInstanceSettings, getInstanceSettings } from "../services/settings.js";
 import { clampArtifactExpirations } from "../services/lifetime.js";
+import { resolveOrgSharePolicy } from "../services/share-policy.js";
+import { countActivePublicShares, revokeActivePublicSharesForOrg } from "../services/shares.js";
 import {
   createOrReissueInvite,
   listOrgInvites,
@@ -61,7 +63,11 @@ orgRoutes.get("/orgs/:id", requireAuth, async (c) => {
   const db = c.get("db");
 
   const instanceSettings = await getInstanceSettings(db, defaultInstanceSettings(c.get("env")));
-  const detail = await getOrgDetail(db, orgId, instanceSettings.maxArtifactLifetimeMinutes);
+  const detail = await getOrgDetail(db, orgId, {
+    maxArtifactLifetimeMinutes: instanceSettings.maxArtifactLifetimeMinutes,
+    allowPublicShares: instanceSettings.allowPublicShares,
+    defaultShareMode: instanceSettings.defaultShareMode,
+  });
   if (!detail) return c.json({ error: { code: "not_found" } }, 404);
 
   const myRole = await getOrgRole(db, orgId, identity.userId);
@@ -77,6 +83,9 @@ const updateOrgSchema = z.object({
   // to inheriting the instance max. `0` is rejected — "explicitly unlimited" is meaningless once
   // a finite instance max exists, and would be indistinguishable from "inherit" in the UI.
   maxArtifactLifetimeMinutes: z.number().int().positive().nullable().optional(),
+  // `null` reverts to inheriting the instance default. `"password"` is not a legal default mode.
+  defaultShareMode: defaultShareModeSchema.nullable().optional(),
+  allowPublicShares: z.boolean().optional(),
 });
 
 orgRoutes.patch("/orgs/:id", requireAuth, async (c) => {
@@ -110,6 +119,27 @@ orgRoutes.patch("/orgs/:id", requireAuth, async (c) => {
     }
   }
 
+  // Same "team may only be equal-or-stricter" rule for the share policy: a team can never
+  // re-enable public links the instance forbade, nor default to public while public is forbidden.
+  if (body.data.allowPublicShares === true || body.data.defaultShareMode === "public") {
+    const instanceSettings = await getInstanceSettings(db, defaultInstanceSettings(c.get("env")));
+    if (body.data.allowPublicShares === true && !instanceSettings.allowPublicShares) {
+      return c.json(
+        { error: { code: "public_shares_forbidden_by_instance", message: "Public links are disabled instance-wide; a team cannot re-enable them" } },
+        400,
+      );
+    }
+    if (body.data.defaultShareMode === "public") {
+      const effectiveAllowPublic = body.data.allowPublicShares ?? (await resolveOrgSharePolicy(db, orgId, instanceSettings)).allowPublicShares;
+      if (!effectiveAllowPublic) {
+        return c.json(
+          { error: { code: "default_share_mode_forbidden", message: "Cannot default to public links while public links are disabled" } },
+          400,
+        );
+      }
+    }
+  }
+
   const updated = await updateOrg(db, orgId, body.data);
   if (!updated) return c.json({ error: { code: "not_found" } }, 404);
   await recordAudit(db, { orgId, identity, action: "org.update", targetType: "org", targetId: orgId, meta: body.data });
@@ -128,7 +158,45 @@ orgRoutes.patch("/orgs/:id", requireAuth, async (c) => {
     slug: updated.slug,
     storageQuotaBytes: updated.storageQuotaBytes,
     maxArtifactLifetimeMinutes: updated.maxArtifactLifetimeMinutes,
+    defaultShareMode: updated.defaultShareMode,
+    allowPublicShares: updated.allowPublicShares,
   });
+});
+
+orgRoutes.get("/orgs/:id/share-policy", requireAuth, async (c) => {
+  const orgId = c.req.param("id");
+  const role = await requireOrgRole(c, orgId, ["owner", "admin"]);
+  if (!role) return c.json({ error: { code: "forbidden" } }, 403);
+
+  const db = c.get("db");
+  const instanceSettings = await getInstanceSettings(db, defaultInstanceSettings(c.get("env")));
+  const org = await db.query.orgs.findFirst({ where: eq(orgs.id, orgId) });
+  if (!org) return c.json({ error: { code: "not_found" } }, 404);
+
+  const effective = await resolveOrgSharePolicy(db, orgId, {
+    allowPublicShares: instanceSettings.allowPublicShares,
+    defaultShareMode: instanceSettings.defaultShareMode,
+  });
+  const activePublicShares = await countActivePublicShares(db, orgId);
+
+  return c.json({
+    instance: { allowPublicShares: instanceSettings.allowPublicShares, defaultShareMode: instanceSettings.defaultShareMode },
+    org: { allowPublicShares: org.allowPublicShares, defaultShareMode: org.defaultShareMode },
+    effective,
+    activePublicShares,
+  });
+});
+
+orgRoutes.post("/orgs/:id/shares/revoke-public", requireAuth, async (c) => {
+  const orgId = c.req.param("id");
+  const identity = c.get("identity")!;
+  const role = await requireOrgRole(c, orgId, ["owner", "admin"]);
+  if (!role) return c.json({ error: { code: "forbidden" } }, 403);
+
+  const db = c.get("db");
+  const revoked = await revokeActivePublicSharesForOrg(db, orgId);
+  await recordAudit(db, { orgId, identity, action: "share.bulk_revoke_public", targetType: "org", targetId: orgId, meta: { revoked } });
+  return c.json({ revoked });
 });
 
 orgRoutes.post("/orgs", requireAuth, async (c) => {

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { DEFAULT_CDN_ALLOWLIST } from "@open-artifacts/shared";
+import { DEFAULT_CDN_ALLOWLIST, type DefaultShareMode } from "@open-artifacts/shared";
 import type { Database } from "../db/client.js";
 import { settings } from "../db/schema.js";
 
@@ -17,6 +17,15 @@ export interface InstanceSettings {
    * looser than this. See `services/lifetime.ts`.
    */
   maxArtifactLifetimeMinutes: number;
+  /** Instance-wide kill switch for `public` share links. A team may be stricter, never looser — see `services/share-policy.ts`. */
+  allowPublicShares: boolean;
+  /**
+   * Link mode used when a caller creates a share without naming one. Teams may override this per
+   * team (`orgs.defaultShareMode`); this is only the inherited value, NOT a floor — see
+   * `packages/shared/src/share-policy.ts` for why the two knobs (this one and `allowPublicShares`)
+   * play different roles.
+   */
+  defaultShareMode: DefaultShareMode;
 }
 
 export function defaultInstanceSettings(env: { DEFAULT_REGISTRATION_MODE: string; DEFAULT_KEY_TTL_DAYS: number }): InstanceSettings {
@@ -28,6 +37,8 @@ export function defaultInstanceSettings(env: { DEFAULT_REGISTRATION_MODE: string
     maxArtifactSizeBytes: 5 * 1024 * 1024,
     inviteTtlDays: 7,
     maxArtifactLifetimeMinutes: 0,
+    allowPublicShares: true,
+    defaultShareMode: "team",
   };
 }
 

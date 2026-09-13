@@ -217,6 +217,34 @@ describe("MCP server", () => {
     await client.close();
   });
 
+  it("create_share defaults to the team's configured mode and can be refused by policy", async () => {
+    const app = buildTestApp();
+    const { orgId, sessionCookie } = await registerAndLogin(app);
+    const apiKey = await issueKey(app, orgId, sessionCookie, ["artifacts:read", "artifacts:write", "shares:write"]);
+
+    const port = await startServer();
+    const client = await connectClient(port, apiKey);
+
+    const created = toolJson(await client.callTool({ name: "create_artifact", arguments: { title: "mcp share", kind: "html", content: "<p>x</p>" } }));
+
+    const defaulted = toolJson(await client.callTool({ name: "create_share", arguments: { artifactId: created.id } }));
+    expect(defaulted.mode).toBe("team");
+
+    await app.request(`/api/v1/orgs/${orgId}`, {
+      method: "PATCH",
+      headers: authedHeaders(sessionCookie),
+      body: JSON.stringify({ allowPublicShares: false }),
+    });
+
+    const forbidden = await client.callTool({ name: "create_share", arguments: { artifactId: created.id, mode: "public" } });
+    expect(forbidden.isError).toBe(true);
+    const forbiddenBody = JSON.parse((forbidden.content as Array<{ text: string }>)[0]!.text);
+    expect(forbiddenBody.code).toBe("public_shares_forbidden");
+    expect(forbiddenBody.allowedModes).toEqual(["team", "password"]);
+
+    await client.close();
+  });
+
   it("hides an expired artifact from get_artifact and list_artifacts", async () => {
     const app = buildTestApp();
     const { orgId, sessionCookie } = await registerAndLogin(app);

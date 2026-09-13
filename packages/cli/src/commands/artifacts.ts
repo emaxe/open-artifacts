@@ -27,6 +27,28 @@ function die(message: string): never {
   process.exit(1);
 }
 
+/** Human-readable one-liner shown alongside a share URL so a script author can see what they actually got. */
+export function describeShareMode(mode: string): string {
+  if (mode === "team") return "only logged-in members of this team can open it";
+  if (mode === "password") return "anyone with the link and the password";
+  if (mode === "public") return "anyone with the link";
+  return mode;
+}
+
+/**
+ * Resolves the `--team` / `--public` / `--password` flags (mutually exclusive) into an explicit
+ * share mode, or `undefined` to let the server use the team's configured default. `--share` alone
+ * carries no mode of its own — it just means "yes, create a link" — so it isn't handled here.
+ */
+export function resolveShareModeFlag(opts: { team?: boolean; public?: boolean; password?: string }): "team" | "public" | "password" | undefined {
+  const named = [opts.team && "team", opts.public && "public", opts.password && "password"].filter(Boolean) as string[];
+  if (named.length > 1) die("Pick one of --team, --public, --password.");
+  if (opts.team) return "team";
+  if (opts.public) return "public";
+  if (opts.password) return "password";
+  return undefined;
+}
+
 export async function listCommand(opts: { json?: boolean; org?: string }) {
   const creds = requireCredentials();
   const client = makeClient(creds);
@@ -53,6 +75,8 @@ export async function pushCommand(
     kind?: ArtifactKind;
     id?: string;
     share?: boolean;
+    team?: boolean;
+    public?: boolean;
     password?: string;
     message?: string;
     json?: boolean;
@@ -93,11 +117,15 @@ export async function pushCommand(
     const result: Record<string, unknown> = { artifactId, expiresAt };
 
     if (opts.share) {
-      const shareRes = await client.post<{ url: string }>(`/artifacts/${artifactId}/shares`, {
-        mode: opts.password ? "password" : "public",
+      // Omitting `mode` (the plain `--share` case) lets the server pick the team's configured
+      // default — see resolveShareModeFlag's doc comment for why `--share` itself carries no mode.
+      const mode = resolveShareModeFlag(opts);
+      const shareRes = await client.post<{ url: string; mode: string }>(`/artifacts/${artifactId}/shares`, {
+        mode,
         password: opts.password,
       });
       result.shareUrl = shareRes.url;
+      result.shareMode = shareRes.mode;
     }
 
     if (opts.json) {
@@ -105,7 +133,7 @@ export async function pushCommand(
     } else {
       console.log(`Artifact: ${artifactId}`);
       console.log(expiresAt ? `Expires: ${expiresAt}` : "Expires: never");
-      if (result.shareUrl) console.log(`Share URL: ${result.shareUrl}`);
+      if (result.shareUrl) console.log(`Share URL: ${result.shareUrl}  (mode: ${result.shareMode} — ${describeShareMode(result.shareMode as string)})`);
     }
   } catch (err) {
     handleError(err);
@@ -161,6 +189,10 @@ export function handleError(err: unknown): never {
     if (err.code === "org_required") {
       const orgs = err.body?.error?.orgs ?? [];
       die(`Not sure which team to publish to — you belong to several:\n${formatOrgChoices(orgs)}\n\nRun \`oa use <slug>\` to set a default for this project, or pass --org <slug>.`);
+    }
+    if (err.code === "public_shares_forbidden") {
+      const allowed = err.body?.error?.allowedModes ?? [];
+      die(`Public links are disabled for this team. Allowed: ${allowed.join(", ") || "team, password"}. Retry with --team or --password <pw>, or omit the mode flag to use the team default.`);
     }
     die(`Error (${err.code}): ${err.message}`);
   }

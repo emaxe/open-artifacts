@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, ApiError } from "../../lib/api";
-import { REGISTRATION_MODE_LABELS, formatLifetime } from "../../lib/labels";
+import { api, ApiError, type DefaultShareMode } from "../../lib/api";
+import { REGISTRATION_MODE_LABELS, DEFAULT_SHARE_MODE_LABELS, formatLifetime } from "../../lib/labels";
 import { Card, CardHeader } from "../../components/ui/Card";
 import { Field } from "../../components/ui/Field";
 import { Select, Input } from "../../components/ui/Input";
@@ -20,6 +20,10 @@ interface InstanceSettings {
   inviteTtlDays: number;
   /** Minutes; 0 = unlimited. Also the default lifetime for newly created artifacts. */
   maxArtifactLifetimeMinutes: number;
+  /** Instance-wide kill switch for `public` share links. A team may be stricter, never looser. */
+  allowPublicShares: boolean;
+  /** Link mode used when a share is created without naming one, unless a team overrides it. */
+  defaultShareMode: DefaultShareMode;
 }
 
 export function AdminSettingsPage() {
@@ -28,6 +32,7 @@ export function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [newCdnUrl, setNewCdnUrl] = useState("");
   const [pendingMaxLifetime, setPendingMaxLifetime] = useState<number | null>(null);
+  const [pendingForbidPublicShares, setPendingForbidPublicShares] = useState(false);
 
   useEffect(() => {
     api.get<{ settings: InstanceSettings }>("/admin/settings").then((r) => setSettings(r.settings));
@@ -169,6 +174,36 @@ export function AdminSettingsPage() {
       </Card>
 
       <Card>
+        <CardHeader title="Ссылки и доступ" description="Команды могут быть только строже этих настроек — разрешить то, что запрещено здесь, они не смогут." />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
+          <Field label="Режим ссылки по умолчанию" className="max-w-xs">
+            <Select
+              value={settings.defaultShareMode}
+              onChange={(e) => save({ defaultShareMode: e.target.value as DefaultShareMode })}
+            >
+              {Object.entries(DEFAULT_SHARE_MODE_LABELS).map(([value, text]) => (
+                <option key={value} value={value}>
+                  {text}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Публичные ссылки" className="max-w-xs">
+            <Select
+              value={settings.allowPublicShares ? "allow" : "forbid"}
+              onChange={(e) => {
+                if (e.target.value === "allow") save({ allowPublicShares: true });
+                else setPendingForbidPublicShares(true);
+              }}
+            >
+              <option value="allow">Разрешены на всём инстансе</option>
+              <option value="forbid">Запрещены на всём инстансе</option>
+            </Select>
+          </Field>
+        </div>
+      </Card>
+
+      <Card>
         <CardHeader title="Хранение статистики просмотров" description="Пока не применяется — ничего в коде инстанса ещё не удаляет старые записи по этому сроку." />
         <Field label="Хранить дней" className="max-w-40">
           <NumberField value={settings.viewRetentionDays} onSave={(n) => save({ viewRetentionDays: n })} />
@@ -192,6 +227,18 @@ export function AdminSettingsPage() {
             : undefined
         }
         confirmLabel="Уменьшить"
+      />
+
+      <ConfirmDialog
+        open={pendingForbidPublicShares}
+        onClose={() => setPendingForbidPublicShares(false)}
+        onConfirm={() => {
+          setPendingForbidPublicShares(false);
+          save({ allowPublicShares: false });
+        }}
+        title="Запретить публичные ссылки на всём инстансе?"
+        description="Уже созданные публичные ссылки продолжат работать — отзывать их нужно в настройках каждой команды. Команды не смогут включить публичные ссылки обратно, пока это запрещено здесь."
+        confirmLabel="Запретить"
       />
     </div>
   );

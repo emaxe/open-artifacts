@@ -90,20 +90,29 @@ the moment of this update.
 
 ## Create a share link
 
+`mode` is optional — omit it to get the team's configured default (usually `"team"`); that's the
+right choice unless a human asked for a specific kind of link (see "Link modes" in `SKILL.md`):
+
 ```bash
 curl -sX POST "$OA_SERVER/api/v1/artifacts/$ARTIFACT_ID/shares" \
   -H "Authorization: Bearer $OA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"mode":"public"}'
-# -> {"id":"...","token":"...","url":"https://.../s/...","mode":"public","expiresAt":null}
+  -d '{}'
+# -> {"id":"...","token":"...","url":"https://.../s/...","mode":"team","expiresAt":null}
 ```
 
-For a password-protected or expiring link:
-```bash
--d '{"mode":"password","password":"correct horse","expires":"7d"}'
-```
+The three legal values for `mode`:
+- `"team"` — only a logged-in member of the artifact's team can open the URL.
+- `"password"` — anyone with the URL and the password (`-d '{"mode":"password","password":"correct horse","expires":"7d"}'`).
+- `"public"` — anyone with the URL, no login or password (`-d '{"mode":"public"}'`).
 
-The returned `url` is what you hand to a human — it renders in their browser, no auth needed
-(a password prompt appears automatically for password-mode shares).
+An explicit `"public"` request can fail with `403 public_shares_forbidden` if the team or instance
+disallows public links — the body carries `"allowedModes"` (e.g. `["team","password"]"`) so you
+know what's still available. Retry with one of those, or omit `mode` for the team default.
+
+The returned `url` is what you hand to a human — it renders in their browser. A `public` or
+`password` link needs no login (a password prompt appears automatically for password-mode shares);
+a `team` link redirects an anonymous visitor to `/login` and then requires they be a member of the
+artifact's team, so it's only useful to hand to people already on that team.
 
 ## List / fetch / delete
 
@@ -127,5 +136,6 @@ curl -sX DELETE "$OA_SERVER/api/v1/me/keys/$KEY_ID" -H "Cookie: oa_session=$SESS
 
 Every error response is `{"error": {"code": "...", "message": "..."}}` with an appropriate HTTP
 status. `org_required` additionally carries `"orgs": [...]` — the same shape as `GET /me/orgs`'
-`orgs` array — so you can show the human the choice without a second request. See the table in
+`orgs` array — so you can show the human the choice without a second request. `public_shares_forbidden`
+carries `"allowedModes": [...]` and `"defaultShareMode"` for the same reason. See the table in
 `SKILL.md` for the codes you're likely to hit and what they mean.

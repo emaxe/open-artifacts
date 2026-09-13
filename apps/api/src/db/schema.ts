@@ -18,7 +18,7 @@ export const orgRoleEnum = pgEnum("org_role", ["owner", "admin", "member", "view
 export const artifactKindEnum = pgEnum("artifact_kind", ["html", "markdown", "mermaid", "svg"]);
 export const artifactVisibilityEnum = pgEnum("artifact_visibility", ["private", "org"]);
 export const ownerTypeEnum = pgEnum("owner_type", ["user", "agent"]);
-export const shareModeEnum = pgEnum("share_mode", ["public", "password"]);
+export const shareModeEnum = pgEnum("share_mode", ["public", "password", "team"]);
 export const deviceAuthStatusEnum = pgEnum("device_auth_status", [
   "pending",
   "approved",
@@ -57,6 +57,14 @@ export const orgs = pgTable("orgs", {
   storageQuotaBytes: integer("storage_quota_bytes").notNull().default(1_073_741_824), // 1 GiB
   // NULL = inherit the instance-wide max artifact lifetime; superadmin-controlled bound applies regardless.
   maxArtifactLifetimeMinutes: integer("max_artifact_lifetime_minutes"),
+  // NULL = inherit the instance-wide default link mode. Never 'password': a default-mode create
+  // request carries no password, and a password share with a NULL hash is a dead link (see the
+  // orgs_default_share_mode_check constraint below). See packages/shared/src/share-policy.ts.
+  defaultShareMode: shareModeEnum("default_share_mode"),
+  // A team may only ever be equal-or-stricter than the instance-wide flag; the effective value is
+  // the AND of the two (resolveSharePolicy). Stored separately from the instance flag so
+  // re-enabling public shares instance-wide restores each team's own prior preference.
+  allowPublicShares: boolean("allow_public_shares").notNull().default(true),
   kind: orgKindEnum("kind").notNull().default("team"),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -65,6 +73,7 @@ export const orgs = pgTable("orgs", {
   index("orgs_kind_idx").on(table.kind),
   // At most one "main" (auto-provisioned personal) workspace per user.
   uniqueIndex("orgs_main_owner_idx").on(table.createdBy).where(sql`kind = 'main'`),
+  check("orgs_default_share_mode_check", sql`${table.defaultShareMode} is null or ${table.defaultShareMode} <> 'password'`),
 ]);
 
 export const orgMembers = pgTable("org_members", {

@@ -1,3 +1,11 @@
+// Hand-declared rather than imported from @open-artifacts/shared: that package's "types" field
+// points straight at its TS source (see its package.json), and pulling it into web's type-check
+// graph drags in server-only modules (e.g. content-hash.ts's `node:crypto`) that web's tsconfig
+// has no ambient Node types for. Every other server-shaped type on this page (OrgDetail,
+// ArtifactSummary, ...) is declared the same way, for the same reason.
+export type ShareMode = "public" | "password" | "team";
+export type DefaultShareMode = "public" | "team";
+
 const BASE = "/api/v1";
 
 export class ApiError extends Error {
@@ -72,6 +80,18 @@ export interface OrgDetail {
   globalMaxArtifactLifetimeMinutes: number | null;
   /** The stricter of the two above — what new artifacts in this team actually get. `null` = unlimited. */
   effectiveMaxArtifactLifetimeMinutes: number | null;
+  /** This team's own default link mode. `null` = inherits the instance default. */
+  defaultShareMode: DefaultShareMode | null;
+  /** Whether this team itself allows `public` links (it may still be overridden by the instance — see effectiveAllowPublicShares). */
+  allowPublicShares: boolean;
+  /** The instance-wide default link mode. */
+  globalDefaultShareMode: DefaultShareMode;
+  /** Whether the instance allows `public` links at all. */
+  globalAllowPublicShares: boolean;
+  /** The mode actually used when a share is created without naming one. */
+  effectiveDefaultShareMode: DefaultShareMode;
+  /** Whether a `public` link can actually be created right now (team AND instance both allow it). */
+  effectiveAllowPublicShares: boolean;
   createdAt: string;
   memberCount: number;
   artifactCount: number;

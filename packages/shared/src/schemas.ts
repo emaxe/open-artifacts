@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { API_KEY_SCOPES } from "./scopes.js";
+import { DEFAULT_SHARE_MODES, SHARE_MODES } from "./share-policy.js";
 
 export const artifactKindSchema = z.enum(["html", "markdown", "mermaid", "svg"]);
 export type ArtifactKind = z.infer<typeof artifactKindSchema>;
@@ -38,8 +39,17 @@ export const updateArtifactSchema = z.object({
 });
 export type UpdateArtifactInput = z.infer<typeof updateArtifactSchema>;
 
+export const shareModeSchema = z.enum(SHARE_MODES);
+export type ShareModeSchema = z.infer<typeof shareModeSchema>;
+
+export const defaultShareModeSchema = z.enum(DEFAULT_SHARE_MODES);
+export type DefaultShareModeSchema = z.infer<typeof defaultShareModeSchema>;
+
 export const createShareSchema = z.object({
-  mode: z.enum(["public", "password"]),
+  // Optional: omitting it means "use the team's configured default link mode" — see
+  // resolveRequestedShareMode in ./share-policy.ts. `mode` used to be required, so no existing
+  // caller omits it; this is purely additive.
+  mode: shareModeSchema.optional(),
   password: z.string().min(4).max(200).optional(),
   expires: z.union([z.string(), z.number()]).optional(),
   versionNo: z.number().int().positive().optional(),

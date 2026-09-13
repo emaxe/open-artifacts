@@ -1,6 +1,6 @@
 ---
 name: open-artifacts
-description: Publish HTML/Markdown/Mermaid/SVG content to a self-hosted Open Artifacts instance and get back a shareable link. Use when you've generated a report, dashboard, diagram, or any standalone document and need to hand a human a URL instead of pasting raw content into chat.
+description: Publish HTML/Markdown/Mermaid/SVG content to a self-hosted Open Artifacts instance and get back a shareable link, in the team's configured default mode. Use when you've generated a report, dashboard, diagram, or any standalone document and need to hand a human a URL instead of pasting raw content into chat.
 ---
 
 # Open Artifacts
@@ -9,6 +9,24 @@ Open Artifacts is a self-hosted alternative to Claude Artifacts: any AI agent ca
 Markdown, Mermaid, or SVG content to it and get back a URL a human can open in a browser. Content
 renders in a sandboxed iframe (no access to the host page, no network access out), so it's safe to
 publish agent-generated content without a security review.
+
+## Link modes
+
+A share link comes in one of three modes. Which one you get when you don't ask for a specific one
+is decided by the team's own settings, not by you — see below.
+
+- **`team`** — only someone logged in and a member of the artifact's team can open it. No password
+  needed; the URL alone is safe to paste into a team chat.
+- **`password`** — anyone with the URL *and* the password can open it, logged in or not.
+- **`public`** — anyone with the URL can open it, no login or password. A team or the instance may
+  disable this mode entirely, in which case creating one fails with `public_shares_forbidden`.
+
+**If you don't name a mode, the server picks the team's configured default** — that is correct
+behavior in almost every case; don't second-guess it or try to work around it. Only name a specific
+mode when the human asked for that kind of link — "send this to someone outside the team", "make it
+public", "put a password on it", or similar. If a `public` request comes back
+`public_shares_forbidden`, that's team/instance policy working as intended: relay it to the human
+and offer a `team` or `password` link instead, rather than treating it as a bug to route around.
 
 ## Setup
 
@@ -72,10 +90,11 @@ the saved default.
 
 ## Recipes
 
-**Publish something new and share it:**
+**Publish something new and share it (link mode: the team's default — see "Link modes" above):**
 ```bash
 oa push report.html --title "Q3 Revenue Report" --share
-# -> prints the artifact id and a share URL; hand the URL to the user
+# -> prints the artifact id and a share URL, e.g.:
+# Share URL: https://.../s/abc123  (mode: team — only logged-in team members can open it)
 ```
 
 **Update something you already published** (creates a new version, doesn't overwrite history):
@@ -83,10 +102,15 @@ oa push report.html --title "Q3 Revenue Report" --share
 oa push report.html --id <artifact-id> --message "Fixed the Q3 numbers"
 ```
 
-**Share with a password or an expiry, instead of a bare public link:**
+**The human asked for a specific kind of link instead of the default:**
 ```bash
-oa share <artifact-id> --password "correct horse" --expires 7d
+oa share <artifact-id> --team                        # only logged-in team members
+oa share <artifact-id> --password "correct horse" --expires 7d   # anyone with URL + password
+oa share <artifact-id> --public                       # anyone with the URL — only if explicitly asked
 ```
+`--team`/`--public`/`--password` also work on `oa push` (e.g. `oa push report.html --public`).
+A `public` request can be refused with `public_shares_forbidden` if the team or instance disallows
+it — see "Link modes" above for what to do then.
 
 **Publish with a lifetime shorter than the team default** (the content is hard-deleted once it
 expires — there's no undo):
@@ -176,6 +200,7 @@ not an ESM one.
 | `artifact_too_large` (413) | A single artifact exceeds the size cap (default 5 MiB) | Split the content or reduce it — there's no per-artifact override |
 | `version_conflict` (409) | Someone else changed this artifact since you last read it | `oa get <id>` to see the latest, merge your change, retry |
 | `lifetime_exceeds_max` (400) | The requested `--lifetime`/`lifetime` is longer than the instance/team maximum | The error body carries `maxLifetimeMinutes` — retry within that bound, or omit `--lifetime` to get the default (which is also the max) |
+| `public_shares_forbidden` (403) | A `public` link was requested but the team or instance disallows public links | The error carries `allowedModes` — retry with `--team`/`--password`, or omit the mode flag to use the team default. Tell the human why, don't route around it. |
 
 If you don't have the CLI available (no Node/npm), see `references/api.md` for raw HTTP/curl
 examples covering the same operations.
@@ -189,6 +214,13 @@ HTTP) with the same API key as a Bearer token, and use its tools instead of shel
 semantics as the table above — just called as MCP tools rather than CLI commands.
 `create_artifact`/`update_artifact` take an optional `lifetime` argument (minutes, or a duration
 like `"12h"`/`"7d"`) mirroring `oa push --lifetime`; omit it to get the team's default/maximum.
+
+`create_share`'s `mode` argument is optional, same rule as the CLI's `--share` with no mode flag:
+omit it to get the team's configured default (usually `team`), and only pass `"team"`, `"password"`,
+or `"public"` when the human asked for that specific kind of link. The result echoes back the mode
+that was actually used — check it rather than assuming. A `"public"` request can come back as the
+tool error `public_shares_forbidden` (with `allowedModes` in the body) if that's disallowed; relay
+it to the human instead of retrying with a different mode on your own judgment.
 
 A personal key spans every team it belongs to, same as with the CLI. `list_artifacts` and
 `create_artifact` take an optional `orgId` argument; omit it and the connection's default (set via

@@ -65,6 +65,9 @@ async function setupMaliciousShare(baseURL: string): Promise<string> {
   if (!createRes.ok) throw new Error(`create failed: ${createRes.status} ${await createRes.text()}`);
   const created = (await createRes.json()) as { artifact: { id: string } };
 
+  // `mode: "public"` must stay explicit here: this spec exercises the fully-anonymous embed path
+  // (no cookies at all on the /embed/:token request below), and the team's default share mode is
+  // "team" — which would require a logged-in member and defeat the point of this test.
   const shareRes = await fetch(`${baseURL}/api/v1/artifacts/${created.artifact.id}/shares`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: `oa_session=${sessionCookie}` },

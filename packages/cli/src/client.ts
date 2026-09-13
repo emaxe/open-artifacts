@@ -14,7 +14,17 @@ export class CliApiError extends Error {
     message: string,
     public status: number,
     /** The parsed error body, e.g. `{ error: { code, message, orgs } }` for `org_required`. */
-    public body?: { error?: { code?: string; message?: string; orgs?: OrgChoice[]; maxLifetimeMinutes?: number } },
+    public body?: {
+      error?: {
+        code?: string;
+        message?: string;
+        orgs?: OrgChoice[];
+        maxLifetimeMinutes?: number;
+        // public_shares_forbidden
+        allowedModes?: string[];
+        defaultShareMode?: string;
+      };
+    },
   ) {
     super(message);
   }

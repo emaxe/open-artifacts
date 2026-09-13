@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { createShareSchema } from "@open-artifacts/shared";
+import { createShareSchema, resolveRequestedShareMode } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getArtifact, getVersionByNumber, resolveAccessForIdentity } from "../services/artifacts.js";
 import { createShare, listSharesForArtifact, revokeShare } from "../services/shares.js";
+import { resolveSharePolicyForRequest } from "../services/share-policy.js";
 import { recordAudit } from "../services/audit.js";
 import { requiresScope } from "../services/scopes.js";
 import { actingUserId } from "../services/identity.js";
@@ -46,7 +47,23 @@ shareRoutes.post("/artifacts/:id/shares", requireAuth, async (c) => {
 
   const body = createShareSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
-  if (body.data.mode === "password" && !body.data.password) {
+
+  const policy = await resolveSharePolicyForRequest(db, c.get("env"), artifact.orgId);
+  const resolved = resolveRequestedShareMode(body.data.mode, policy);
+  if (!resolved.ok) {
+    return c.json(
+      {
+        error: {
+          code: "public_shares_forbidden",
+          message: "Public links are disabled for this team",
+          allowedModes: policy.allowedModes,
+          defaultShareMode: policy.defaultShareMode,
+        },
+      },
+      403,
+    );
+  }
+  if (resolved.mode === "password" && !body.data.password) {
     return c.json({ error: { code: "invalid_input", message: "password is required when mode is 'password'" } }, 400);
   }
 
@@ -60,14 +77,14 @@ shareRoutes.post("/artifacts/:id/shares", requireAuth, async (c) => {
   const createdBy = identity.kind === "agent" ? identity.agentId : actingUserId(identity)!;
   const share = await createShare(db, {
     artifactId: artifact.id,
-    mode: body.data.mode,
+    mode: resolved.mode,
     password: body.data.password,
     expires: body.data.expires,
     pinnedVersionId,
     createdBy,
   });
 
-  await recordAudit(db, { orgId: artifact.orgId, identity, action: "share.create", targetType: "share", targetId: share.id });
+  await recordAudit(db, { orgId: artifact.orgId, identity, action: "share.create", targetType: "share", targetId: share.id, meta: { mode: share.mode } });
   const env = c.get("env");
   return c.json({ id: share.id, token: share.token, url: `${env.APP_ORIGIN}/s/${share.token}`, mode: share.mode, expiresAt: share.expiresAt }, 201);
 });
