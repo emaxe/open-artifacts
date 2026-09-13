@@ -1,16 +1,20 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { setCookie, getCookie } from "hono/cookie";
 import { nanoid } from "nanoid";
-import { buildEmbedCsp } from "@open-artifacts/shared";
+import { buildEmbedCsp, buildViewerShellCsp } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
-import { getShareByToken, incrementShareViewCount, checkShareAccess, resolveShareViewer } from "../services/shares.js";
-import { resolveIdentityFromRequest } from "../middleware/auth.js";
+import { getShareByToken, incrementShareViewCount, checkShareAccess } from "../services/shares.js";
 import { verifySecret } from "../services/crypto.js";
-import { getArtifactWithLiveness, getCurrentVersion } from "../services/artifacts.js";
+import { getArtifactWithLiveness } from "../services/artifacts.js";
 import { renderArtifactHtml } from "../services/render.js";
 import { recordArtifactView } from "../services/analytics.js";
 import { hashIp } from "../services/audit.js";
 import { getInstanceSettings, defaultInstanceSettings } from "../services/settings.js";
+import { resolveViewerContext } from "../services/viewer-context.js";
+import { parseVersionParam, resolveDisplayVersion } from "../services/viewer-version.js";
+import { buildViewerModel } from "../services/viewer-panel.js";
+import { contentDispositionValue } from "../services/download-name.js";
+import { renderViewerShell, renderPasswordFormPage, renderRestrictedPage, renderErrorPage } from "../views/viewer-shell.js";
 
 export const publicRoutes = new Hono<AppBindings>();
 
@@ -25,46 +29,100 @@ function unlockCookieName(token: string) {
   return `oa_unlock_${token}`;
 }
 
-function errorPage(message: string): string {
+function isUnlocked(token: string, cookieValue: string | undefined): boolean {
+  if (!cookieValue) return false;
+  const entry = unlockSessions.get(token);
+  if (!entry) return false;
+  if (entry.expiresAtMs <= Date.now()) {
+    unlockSessions.delete(token);
+    return false;
+  }
+  return entry.secret === cookieValue;
+}
+
+/** Minimal, dependency-free error page for `/embed/:token` — deliberately NOT the viewer-shell
+ *  template: this response is served under `buildEmbedCsp`'s policy (meant for artifact content,
+ *  not for the app's own chrome) and is only ever meant to be seen inside the `/s/:token` iframe. */
+function embedErrorPage(message: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Unavailable</title></head><body style="font-family:sans-serif;padding:2rem;color:#444;">${message}</body></html>`;
 }
 
-publicRoutes.get("/s/:token", async (c) => {
+/**
+ * Bundles the two checks every `/s/:token` route needs before it can decide what to show: does
+ * this viewer pass the share's own access matrix (mode/password/team-membership — independent of
+ * anything below), and separately, how much can they manage (gates the viewer panel's detail level
+ * and whether `?v=` is honored). Kept together only because every route below needs both; they
+ * never influence each other — see `services/viewer-context.ts`.
+ */
+async function resolveShareAndAccess(c: Context<AppBindings>, token: string) {
   const db = c.get("db");
-  const token = c.req.param("token");
   const share = await getShareByToken(db, token);
-  if (!share) return c.html(errorPage("This link does not exist."), 404);
+  if (!share) return { share: null };
 
-  // The shell page below only renders an iframe pointed at /embed/:token — without this check it
-  // would render fine even for an expired artifact, and only the inner frame would 410.
   const { artifact, liveness } = await getArtifactWithLiveness(db, share.artifactId);
-  if (liveness === "missing" || !artifact) return c.html(errorPage("This link does not exist."), 404);
-  if (liveness !== "live") return c.html(errorPage("This link is no longer available."), 410);
+  if (liveness === "missing" || !artifact) return { share, artifact: null, liveness };
+  if (liveness !== "live") return { share, artifact, liveness };
 
+  const ctx = await resolveViewerContext(c, artifact);
   const unlocked = share.mode === "password" ? isUnlocked(share.token, getCookie(c, unlockCookieName(share.token))) : false;
-  const viewer =
-    share.mode === "team" ? await resolveShareViewer(db, (await resolveIdentityFromRequest(c)).identity, artifact.orgId) : undefined;
-  const access = await checkShareAccess(share, { unlocked, viewer });
+  const access = await checkShareAccess(share, { unlocked, viewer: ctx.viewer });
+  return { share, artifact, liveness, ctx, access };
+}
+
+publicRoutes.get("/s/:token", async (c) => {
+  const token = c.req.param("token");
+  const nonce = nanoid(16);
+  c.header("Cache-Control", "private, no-store");
+  c.header("Vary", "Cookie");
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("Referrer-Policy", "no-referrer");
+
+  const result = await resolveShareAndAccess(c, token);
+  if (!result.share) {
+    c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
+    return c.html(renderErrorPage("This link does not exist.", nonce), 404);
+  }
+  if (!result.artifact) {
+    c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
+    return c.html(renderErrorPage("This link does not exist.", nonce), 404);
+  }
+  if (result.liveness !== "live") {
+    c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
+    return c.html(renderErrorPage("This link is no longer available.", nonce), 410);
+  }
+  const { share, artifact, ctx, access } = result;
 
   if (!access.allowed) {
     switch (access.reason) {
       case "revoked":
       case "expired":
-        return c.html(errorPage("This link is no longer available."), 410);
+        c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
+        return c.html(renderErrorPage("This link is no longer available.", nonce), 410);
       case "password_required":
       case "password_incorrect":
-        return c.html(passwordFormPage(share.token));
+        c.header("Content-Security-Policy", buildViewerShellCsp({ nonce, allowConnectSelf: true }));
+        return c.html(renderPasswordFormPage(nonce));
       case "login_required": {
         const wantsHtml = (c.req.header("accept") ?? "").includes("text/html");
         if (!wantsHtml) return c.json({ error: { code: "login_required" } }, 401);
         return c.redirect(`/login?next=${encodeURIComponent(`/s/${token}`)}`, 302);
       }
-      case "not_a_member":
-        return c.html(restrictedPage(token), 403);
+      case "not_a_member": {
+        c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
+        const loginUrl = `/login?next=${encodeURIComponent(`/s/${token}`)}`;
+        return c.html(renderRestrictedPage(loginUrl, nonce), 403);
+      }
     }
   }
 
-  return c.html(viewerShellPage(share.token));
+  const db = c.get("db");
+  const requested = parseVersionParam(c.req.query("v"));
+  const resolved = await resolveDisplayVersion(db, artifact, share, requested, ctx.canManage);
+  c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
+  if (!resolved) return c.html(renderErrorPage("No content available.", nonce), 404);
+
+  const vm = await buildViewerModel(db, { token, share, artifact, resolved, ctx });
+  return c.html(renderViewerShell(vm, nonce));
 });
 
 publicRoutes.post("/s/:token/unlock", async (c) => {
@@ -97,22 +155,10 @@ publicRoutes.post("/s/:token/unlock", async (c) => {
   return c.json({ ok: true });
 });
 
-function isUnlocked(token: string, cookieValue: string | undefined): boolean {
-  if (!cookieValue) return false;
-  const entry = unlockSessions.get(token);
-  if (!entry) return false;
-  if (entry.expiresAtMs <= Date.now()) {
-    unlockSessions.delete(token);
-    return false;
-  }
-  return entry.secret === cookieValue;
-}
-
 publicRoutes.get("/embed/:token", async (c) => {
   const db = c.get("db");
   const env = c.get("env");
   const token = c.req.param("token");
-  const share = await getShareByToken(db, token);
 
   const settings = await getInstanceSettings(db, defaultInstanceSettings(env));
   // A cross-origin embed of a `team` share fails closed twice over regardless of the checks
@@ -121,90 +167,82 @@ publicRoutes.get("/embed/:token", async (c) => {
   c.header("Content-Security-Policy", buildEmbedCsp({ scriptAllowlist: settings.cdnAllowlist, frameAncestor: env.APP_ORIGIN }));
   c.header("X-Content-Type-Options", "nosniff");
   c.header("Referrer-Policy", "no-referrer");
+  c.header("Cache-Control", "private, no-store");
+  c.header("Vary", "Cookie");
 
-  if (!share) return c.html(errorPage("Not found."), 404);
-
-  const { artifact, liveness } = await getArtifactWithLiveness(db, share.artifactId);
-  if (liveness === "missing" || !artifact) return c.html(errorPage("Not found."), 404);
-  if (liveness !== "live") return c.html(errorPage("This link is no longer available."), 410);
-
-  const unlocked = share.mode === "password" ? isUnlocked(token, getCookie(c, unlockCookieName(token))) : false;
-  const viewer =
-    share.mode === "team" ? await resolveShareViewer(db, (await resolveIdentityFromRequest(c)).identity, artifact.orgId) : undefined;
-  const access = await checkShareAccess(share, { unlocked, viewer });
+  const result = await resolveShareAndAccess(c, token);
+  if (!result.share) return c.html(embedErrorPage("Not found."), 404);
+  if (!result.artifact) return c.html(embedErrorPage("Not found."), 404);
+  if (result.liveness !== "live") return c.html(embedErrorPage("This link is no longer available."), 410);
+  const { share, artifact, ctx, access } = result;
 
   if (!access.allowed) {
-    if (access.reason === "revoked" || access.reason === "expired") return c.html(errorPage("This link is no longer available."), 410);
+    if (access.reason === "revoked" || access.reason === "expired") return c.html(embedErrorPage("This link is no longer available."), 410);
     // /embed/:token is only ever loaded inside the /s/:token iframe, never navigated to directly —
     // there is no sensible redirect target here for `login_required`, so it's a flat 403 too.
-    return c.html(errorPage("Access denied."), 403);
+    return c.html(embedErrorPage("Access denied."), 403);
   }
 
-  const version = share.pinnedVersionId
-    ? await db.query.artifactVersions.findFirst({ where: (v, { eq }) => eq(v.id, share.pinnedVersionId!) })
-    : await getCurrentVersion(db, artifact);
-  if (!version) return c.html(errorPage("No content available."), 404);
+  const requested = parseVersionParam(c.req.query("v"));
+  const resolved = await resolveDisplayVersion(db, artifact, share, requested, ctx.canManage);
+  if (!resolved) return c.html(embedErrorPage("No content available."), 404);
 
-  const ip = c.req.header("x-forwarded-for");
-  recordArtifactView(db, {
-    artifactId: artifact.id,
-    shareId: share.id,
-    ipHash: ip ? hashIp(ip, env.IP_HASH_SALT) : undefined,
-    uaHash: c.req.header("user-agent") ? hashIp(c.req.header("user-agent")!, env.IP_HASH_SALT) : undefined,
-    referer: c.req.header("referer"),
-  }).catch((err) => console.error("failed to record view:", err));
-  incrementShareViewCount(db, share.id).catch((err) => console.error("failed to bump view count:", err));
+  // A manager (owner/team admin/superadmin) browsing their own versions shouldn't inflate the
+  // view count they're the one reading — see the "Changed" note in CHANGELOG.
+  if (!ctx.canManage) {
+    const ip = c.req.header("x-forwarded-for");
+    recordArtifactView(db, {
+      artifactId: artifact.id,
+      shareId: share.id,
+      ipHash: ip ? hashIp(ip, env.IP_HASH_SALT) : undefined,
+      uaHash: c.req.header("user-agent") ? hashIp(c.req.header("user-agent")!, env.IP_HASH_SALT) : undefined,
+      referer: c.req.header("referer"),
+    }).catch((err) => console.error("failed to record view:", err));
+    incrementShareViewCount(db, share.id).catch((err) => console.error("failed to bump view count:", err));
+  }
 
-  return c.html(renderArtifactHtml(artifact.kind, version.content));
+  return c.html(renderArtifactHtml(artifact.kind, resolved.version.content));
 });
 
-function viewerShellPage(token: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Shared artifact</title>
-<style>html,body{margin:0;height:100%;} iframe{border:0;width:100%;height:100%;display:block;}</style>
-</head><body>
-<iframe src="/embed/${token}" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>
-</body></html>`;
-}
+/**
+ * "Download source" — deliberately available to every audience, including anonymous visitors: for
+ * `html`/`svg` this is exactly the bytes already visible via "view source" on the rendered
+ * `/embed/:token` frame, so restricting it would be theater, not a real barrier.
+ *
+ * Every `kind` is served as `text/plain`, never as `text/html` or `image/svg+xml` — an artifact's
+ * `kind: "html"` content is arbitrary author-supplied script; serving it back as `text/html` from
+ * this app's own origin would execute it there, with access to `oa_session` via
+ * `fetch(..., {credentials:'include'})`. That's exactly what the sandboxed `/embed` iframe and its
+ * CSP exist to prevent (see `apps/api/e2e/sandbox-security.spec.ts`) — this route must not
+ * reintroduce the same hole through a different door.
+ */
+publicRoutes.get("/s/:token/download", async (c) => {
+  const token = c.req.param("token");
+  const result = await resolveShareAndAccess(c, token);
+  if (!result.share) return c.text("Not found.", 404);
+  if (!result.artifact) return c.text("Not found.", 404);
+  if (result.liveness !== "live") return c.text("This link is no longer available.", 410);
+  const { share, artifact, ctx, access } = result;
 
-function passwordFormPage(token: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Password required</title>
-<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#fafafa;}
-form{background:#fff;padding:2rem;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.1);width:280px;}
-input{width:100%;padding:.5rem;margin:.5rem 0;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;}
-button{width:100%;padding:.5rem;background:#111;color:#fff;border:0;border-radius:6px;cursor:pointer;}
-p.err{color:#c00;font-size:.85rem;display:none;}</style>
-</head><body>
-<form id="f"><h3>This artifact is password-protected</h3>
-<input type="password" id="pw" placeholder="Password" autofocus />
-<button type="submit">Unlock</button>
-<p class="err" id="err">Incorrect password.</p>
-</form>
-<script>
-document.getElementById('f').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const password = document.getElementById('pw').value;
-  const res = await fetch(window.location.pathname + '/unlock', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }),
+  if (!access.allowed) {
+    if (access.reason === "revoked" || access.reason === "expired") return c.text("This link is no longer available.", 410);
+    if (access.reason === "password_required" || access.reason === "password_incorrect") return c.text("Password required.", 403);
+    if (access.reason === "login_required") return c.text("Login required.", 401);
+    return c.text("Access denied.", 403);
+  }
+
+  const db = c.get("db");
+  const requested = parseVersionParam(c.req.query("v"));
+  const resolved = await resolveDisplayVersion(db, artifact, share, requested, ctx.canManage);
+  if (!resolved) return c.text("No content available.", 404);
+
+  return c.body(resolved.version.content, 200, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Content-Disposition": contentDispositionValue(artifact.title, artifact.kind, resolved.version.versionNo),
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; sandbox",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "private, no-store",
+    Vary: "Cookie",
   });
-  if (res.ok) { window.location.reload(); } else { document.getElementById('err').style.display = 'block'; }
 });
-</script>
-</body></html>`;
-}
-
-function restrictedPage(token: string): string {
-  const loginUrl = `/login?next=${encodeURIComponent(`/s/${token}`)}`;
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Restricted</title>
-<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#fafafa;color:#444;text-align:center;padding:1rem;}
-a{color:#111;}</style>
-</head><body>
-<div>
-  <h3>This link is only available to members of that team</h3>
-  <p>Ask the person who shared it to invite you, <a href="${loginUrl}">log in with a different account</a>,
-  or <a href="/">go to your dashboard</a>.</p>
-</div>
-</body></html>`;
-}

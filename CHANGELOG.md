@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Viewer panel on the public share page (`/s/:token`)**: a header above the embedded artifact shows its title, type, displayed version number, and last-updated date to every visitor. A logged-in member of the artifact's team additionally sees the author and team name; the artifact's owner, a team owner/admin, or a superadmin gets the full panel — description, size, expiry, the share's view count, the version's commit message, and a version picker to browse older versions (view-only, via `?v=N`; never writes to the database, and never affects what any other visitor of the same link sees). The panel is collapsible (state remembered per-browser) and hidden when printing. "Copy link" (always copies the canonical URL, without `?v=`) and "Download source" are available to everyone, including anonymous visitors; "Open in workspace" is shown once the viewer has read access to the artifact.
+- New `GET /s/:token/download` endpoint — the artifact's raw source, served as `text/plain` (never as `text/html` or `image/svg+xml`, regardless of the artifact's own `kind`) with `Content-Disposition: attachment`, so an `html`/`svg` artifact's own script can never execute in this app's origin.
+- **Design templates for `html` artifacts**: four theme-specific design systems (`references/design/DESIGN-data.md`, `DESIGN-document.md`, `DESIGN-promo.md`, `DESIGN-diagram.md`) plus a shared `DESIGN-core.md` foundation (tokens, light/dark theming, responsive/print/accessibility rules, self-review checklist), shipped inside `skills/open-artifacts/`. `SKILL.md` now routes an agent to the matching template before it writes any markup.
+
+### Changed
+- **Breaking**: a view of `/embed/:token` by someone who can manage the artifact (its owner, a team owner/admin, or a superadmin) no longer increments the share's view count — browsing your own version history no longer inflates the metric that's supposed to measure your audience. Anonymous and other logged-in visitors are counted exactly as before.
+- `/s/:token` now sends `Cache-Control: private, no-store` and `Vary: Cookie` — its response now depends on who's asking (the viewer panel differs by audience), so it must never be served from a shared cache to the wrong visitor.
+- The public share page now discloses the artifact's title, type, currently-shown version number, and that version's date to anyone with the link — previously the page carried no metadata of any kind, just the embedded content itself.
+- Server-rendered `markdown`/`mermaid`/`svg` artifacts now use a real stylesheet (`apps/api/src/views/artifact-styles.ts`) instead of a five-line placeholder: full typography scale, tables, code blocks, blockquotes, light/dark theming via `prefers-color-scheme`, and print styles. `mermaid` diagrams now pick their theme (`dark`/`default`) from the same signal instead of always rendering light.
+
 ## [0.5.0] - 2026-09-13
 
 ### Added

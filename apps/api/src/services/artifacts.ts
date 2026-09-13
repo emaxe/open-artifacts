@@ -198,6 +198,30 @@ export async function listVersions(db: Database, artifactId: string) {
   });
 }
 
+/**
+ * Like `listVersions`, but projects out `content` and `contentHash` — a public-viewer panel needs
+ * only the metadata to render a version picker, and `listVersions`'s full `findMany` would pull
+ * every version's full content into memory (an artifact with 50 versions at the 5 MiB cap is
+ * 250 MiB per page view). `limit` caps how many of the most recent versions come back; the caller
+ * decides whether to say "and N more" when the true count exceeds it.
+ */
+export async function listVersionSummaries(db: Database, artifactId: string, limit?: number) {
+  return db.query.artifactVersions.findMany({
+    where: eq(artifactVersions.artifactId, artifactId),
+    orderBy: (v, { desc }) => [desc(v.versionNo)],
+    limit,
+    columns: {
+      id: true,
+      versionNo: true,
+      sizeBytes: true,
+      message: true,
+      createdAt: true,
+      createdByType: true,
+      createdById: true,
+    },
+  });
+}
+
 export async function listArtifactsForOrg(db: Database, orgId: string) {
   return db.query.artifacts.findMany({
     where: and(eq(artifacts.orgId, orgId), liveArtifactWhere()),

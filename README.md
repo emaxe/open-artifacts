@@ -33,7 +33,7 @@ Runs as a lightweight, single-stack Docker Compose deployment.
 - 🤖 **Standard AI Agent Skill**: First-class support for `skills.sh` (`npx skills add emaxe/open-artifacts`) with automatic CLI detection and device-flow authorization.
 - 🔑 **Flexible Authentication**: Interactive OAuth Device Flow (`oa login`) and non-interactive organization API tokens (`OA_TOKEN`).
 - 👥 **Multi-Tenancy & Teams**: Organizations, user management, and fine-grained roles (`superadmin`, `admin`, `member`) with an intuitive Team Switcher.
-- 🔗 **Secure Sharing**: Team-only links, password-protected links, public links, and automatic link expiration (1 hour, 1 day, 7 days, 30 days) — teams and instance admins control the default link mode and can disable public links entirely.
+- 🔗 **Secure Sharing**: Team-only links, password-protected links, public links, and automatic link expiration (1 hour, 1 day, 7 days, 30 days) — teams and instance admins control the default link mode and can disable public links entirely. Every share page shows a viewer panel (title, type, version) that expands with author, team, and a view-only version picker for anyone who can manage the artifact.
 - 🚀 **One-Command Deployment**: Instant production setup with Docker Compose or the interactive `./run.sh` runner.
 
 ---
@@ -66,7 +66,7 @@ apps/api/              Hono REST API + MCP server + Postgres (Drizzle) + Static 
 apps/web/              React SPA (Vite) — Admin & User interface
 packages/shared/       Zod schemas + shared validation rules (access control, CSP, TTL parsing)
 packages/cli/          `oa` CLI for AI agents (published on npm as @emaxe/oa)
-skills/open-artifacts/ Agent skill specification (SKILL.md) compatible with skills.sh
+skills/open-artifacts/ Agent skill (SKILL.md) + design templates (references/design/) compatible with skills.sh
 docker/                Multi-stage Dockerfile for containerized deployment
 run.sh                 Interactive terminal management script
 ```
@@ -115,7 +115,7 @@ cd apps/api && pnpm run test:e2e                              # End-to-end secur
 
 ## AI Agent Skill (for Claude, Cursor, Windsurf, etc.)
 
-Open Artifacts ships with an agent skill compliant with the [skills.sh](https://skills.sh/emaxe/open-artifacts) standard. It instructs AI assistants how to automatically install `@emaxe/oa`, authenticate, publish generated artifacts, and present clean preview URLs in chat.
+Open Artifacts ships with an agent skill compliant with the [skills.sh](https://skills.sh/emaxe/open-artifacts) standard. It instructs AI assistants how to automatically install `@emaxe/oa`, authenticate, publish generated artifacts, and present clean preview URLs in chat. It also ships four ready-made design systems — dashboards, reports, promo/decks, and diagrams — plus a shared foundation, which the agent picks between before writing an `html` artifact, so published artifacts look consistent regardless of which agent or session produced them.
 
 ### 1. Install via skills.sh
 
