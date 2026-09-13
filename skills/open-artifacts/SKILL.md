@@ -143,7 +143,30 @@ rather than show it to a human.
 `oa push` infers the kind from the file extension (`.html`, `.md`, `.mmd`/`.mermaid`, `.svg`);
 override with `--kind` if the extension doesn't match.
 
-## Using Tailwind and JS libraries inside an `html` artifact
+## Design: read a template before you write
+
+Published artifacts are read by humans in a browser, so the design is part of the deliverable, not
+a polish pass. **Before you write the first line of markup, open and read the matching files below
+— they are plain Markdown files in this skill's own directory, next to this `SKILL.md`.** Read
+`references/design/DESIGN-core.md` first (tokens, theming, responsive/print/accessibility rules,
+the pre-publish checklist), then the one theme file from the table that matches what you're about
+to publish. Don't write the page and restyle it afterwards — the template decides the page's
+structure, not just its colors. If you already read them earlier in this session, don't re-read.
+
+If your tool resolves relative paths from somewhere other than this file's directory, locate them
+once with: `find . ~/.claude ~/.config ~/.cursor -path '*open-artifacts/references/design/*.md' 2>/dev/null | head`
+
+| What you're about to publish | Read (after `DESIGN-core.md`) |
+|---|---|
+| KPI tiles, metrics, charts, dense or sortable tables, an analytics summary | `references/design/DESIGN-data.md` |
+| Long-form prose: research note, post-mortem, RFC, spec, runbook, API reference | `references/design/DESIGN-document.md` |
+| Landing or launch page, feature announcement, pitch, slide deck | `references/design/DESIGN-promo.md` |
+| Architecture, flow, sequence or ER diagram — and every `mermaid` or `svg` artifact | `references/design/DESIGN-diagram.md` |
+| A mix (e.g. a report with a dashboard section) | the dominant one, then borrow the chart component from `DESIGN-data.md` |
+| `kind: markdown` | nothing — the server styles it. Write good structure (headings, tables, fenced code) and stop. |
+| A throwaway snippet nobody will read twice | `DESIGN-core.md` alone is enough |
+
+## What can run inside an html artifact (CSP)
 
 `html` artifacts render in an iframe with a strict Content-Security-Policy — not a normal page.
 Two rules decide what works:
@@ -169,13 +192,18 @@ library exists on the CDN — if you're not sure of the exact path/version, don'
 
 - **Tailwind CSS**: `<script src="https://cdn.tailwindcss.com"></script>` (the Play CDN — it
   injects its own `<style>`, no separate stylesheet needed). Optional config before you use
-  classes: `<script>tailwind.config = { theme: { extend: { /* ... */ } } }</script>`.
+  classes: `<script>tailwind.config = { theme: { extend: { /* ... */ } } }</script>`. Prefer the
+  plain-CSS token system in `references/design/DESIGN-core.md` instead: the Play CDN is a
+  runtime JIT compiler, so it costs a visible flash-of-unstyled-content and turns a share link that
+  should work for months into one more dependent on a CDN being reachable. Reach for it only when
+  the human explicitly asks for Tailwind, or you're porting markup that already uses it.
 - **Charts**: Chart.js (`cdnjs.cloudflare.com/ajax/libs/Chart.js/<version>/chart.umd.min.js`), D3
   (`.../d3/<version>/d3.min.js`), or ECharts (`.../echarts/<version>/echarts.min.js`) — all ship a
   CSS-free UMD build, so no stylesheet problem.
-- **Tables**: prefer a plain `<table>` styled with Tailwind utility classes — it sidesteps the
-  external-CSS restriction entirely. If a grid library is genuinely needed (e.g. Grid.js), its
-  companion CSS file must be inlined into a `<style>` tag by hand; don't link it from the CDN.
+- **Tables**: prefer a plain `<table>` styled with the token-based CSS from
+  `references/design/DESIGN-core.md`/`DESIGN-data.md` — it sidesteps the external-CSS restriction
+  entirely. If a grid library is genuinely needed (e.g. Grid.js), its companion CSS file must be
+  inlined into a `<style>` tag by hand; don't link it from the CDN.
 - **Diagrams**: if the whole artifact *is* a diagram, publish it as `kind: "mermaid"` instead (the
   server renders it, no CSP concerns). To mix a diagram into a larger `html` page, load
   `mermaid.js` as a UMD script from cdnjs/jsdelivr and call `mermaid.initialize({ startOnLoad:

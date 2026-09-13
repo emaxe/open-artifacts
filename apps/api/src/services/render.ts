@@ -1,15 +1,10 @@
 import sanitizeHtml from "sanitize-html";
 import MarkdownIt from "markdown-it";
 import type { ArtifactKind } from "@open-artifacts/shared";
+import { escapeHtml } from "./html.js";
+import { ARTIFACT_BASE_CSS, ARTIFACT_SVG_CSS } from "../views/artifact-styles.js";
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
-
-const BASE_STYLES = `
-  body { font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 24px; color: #1a1a1a; background: #fff; }
-  img { max-width: 100%; }
-  pre { background: #f5f5f5; padding: 12px; overflow-x: auto; border-radius: 6px; }
-  code { font-family: ui-monospace, monospace; }
-`;
 
 const MARKDOWN_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2"]),
@@ -57,28 +52,34 @@ export function renderArtifactHtml(kind: ArtifactKind, content: string): string 
     case "markdown": {
       const rawHtml = md.render(content);
       const safeHtml = sanitizeHtml(rawHtml, MARKDOWN_SANITIZE_OPTIONS);
-      return wrapDocument(safeHtml, BASE_STYLES);
+      return wrapDocument(safeHtml, ARTIFACT_BASE_CSS);
     }
     case "svg": {
       const safeSvg = sanitizeHtml(content, SVG_SANITIZE_OPTIONS);
-      return wrapDocument(safeSvg, "body { margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }");
+      // Wrapped in a fixed light "paper" card — see the doc comment on ARTIFACT_SVG_CSS for why
+      // the SVG itself doesn't follow the page's dark-mode background.
+      return wrapDocument(`<div class="oa-svg-card">${safeSvg}</div>`, ARTIFACT_SVG_CSS);
     }
     case "mermaid": {
       const safeSource = sanitizeHtml(content, { allowedTags: [], allowedAttributes: {} });
+      // Theme comes from `matchMedia` at load time, same signal the iframe gets for everything
+      // else (see DESIGN-core.md's "Theming inside the iframe"). The diagram source is never
+      // interpolated into this script — it only ever appears HTML-escaped inside the <pre> above,
+      // which is what makes that escaping sufficient; moving it into a JS string literal here
+      // would need a different (and easy to get wrong) escaping scheme for no benefit.
       return wrapDocument(
         `<pre class="mermaid">${escapeHtml(safeSource)}</pre>
          <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-         <script>mermaid.initialize({ startOnLoad: true });</script>`,
-        BASE_STYLES,
+         <script>
+           var oaDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+           mermaid.initialize({ startOnLoad: true, theme: oaDark ? "dark" : "default" });
+         </script>`,
+        ARTIFACT_BASE_CSS,
       );
     }
   }
 }
 
 function wrapDocument(body: string, style: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${style}</style></head><body>${body}</body></html>`;
-}
-
-function escapeHtml(input: string): string {
-  return input.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><style>${style}</style></head><body>${body}</body></html>`;
 }

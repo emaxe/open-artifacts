@@ -34,6 +34,8 @@ export function AgentInstructionsPage() {
           <p className="mb-3 text-sm text-muted">
             Скилл обучает любого ИИ-агента (Claude Code, Cursor, Codex, Windsurf, Antigravity и др.) работать с вашим
             инстансом Open Artifacts: устанавливать CLI <code>@emaxe/oa</code>, входить, публиковать артефакты и возвращать ссылки в чат.
+            Вместе со скиллом идут четыре готовые дизайн-системы (дашборды, отчёты, промо/презентации, диаграммы) — агент
+            сам выбирает подходящую перед публикацией, поэтому артефакты выглядят единообразно.
           </p>
 
           <div className="mb-3.5">
