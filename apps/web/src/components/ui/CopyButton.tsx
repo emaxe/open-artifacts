@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cn } from "../../lib/cn";
+import { copyToClipboard } from "../../lib/clipboard";
 import { CheckIcon, CopyIcon } from "./icons";
 
 export interface CopyButtonProps {
@@ -14,11 +15,10 @@ export function CopyButton({ value, label = "Копировать", copiedLabel 
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      // Clipboard access can be denied (permissions, insecure context) — fail silently, the
-      // value is still visible/selectable on the page for a manual copy.
+    const ok = await copyToClipboard(value);
+    if (!ok) {
+      // Clipboard access can be denied outright (permissions, hostile embedder) — fail silently,
+      // the value is still visible/selectable on the page for a manual copy.
       return;
     }
     setCopied(true);

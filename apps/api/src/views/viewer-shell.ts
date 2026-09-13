@@ -128,17 +128,41 @@ const PANEL_SCRIPT = `(function(){
       sync();
     });
   }
+  function legacyCopy(text){
+    var ta=document.createElement('textarea');
+    ta.value=text;
+    ta.style.position='fixed';
+    ta.style.opacity='0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    var ok=false;
+    try{ok=document.execCommand('copy');}catch(e){ok=false;}
+    document.body.removeChild(ta);
+    return ok;
+  }
   var copyBtn=document.getElementById('oa-copy');
-  if(copyBtn&&navigator.clipboard){
+  if(copyBtn){
     copyBtn.addEventListener('click',function(e){
-      e.preventDefault();
       var url=new URL(window.location.href);
       url.search='';
-      navigator.clipboard.writeText(url.toString()).then(function(){
+      var text=url.toString();
+      function onCopied(){
+        e.preventDefault();
         var original=copyBtn.textContent;
         copyBtn.textContent='Copied!';
         setTimeout(function(){copyBtn.textContent=original;},1500);
-      }).catch(function(){});
+      }
+      // navigator.clipboard is unavailable on insecure origins (plain HTTP) and its write can
+      // also be denied by the browser/embedder — neither surfaces an error, so fall back to
+      // execCommand('copy'), and only let the link's own default navigation through if both fail.
+      if(navigator.clipboard&&window.isSecureContext){
+        navigator.clipboard.writeText(text).then(onCopied).catch(function(){
+          if(legacyCopy(text)){onCopied();}
+        });
+      }else if(legacyCopy(text)){
+        onCopied();
+      }
     });
   }
 })();`;
