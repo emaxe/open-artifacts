@@ -31,6 +31,7 @@ Runs as a lightweight, single-stack Docker Compose deployment.
 - 📦 **Multi-Format Support**: Interactive HTML applications, GitHub-flavored Markdown, responsive Mermaid diagrams, and raw vector SVG graphics.
 - ⚡ **Built-in MCP Server**: Ready-to-use Model Context Protocol endpoint at `/mcp` (Streamable HTTP) for immediate integration with Cursor, Claude Desktop, and Claude Code.
 - 🤖 **Standard AI Agent Skill**: First-class support for `skills.sh` (`npx skills add emaxe/open-artifacts`) with automatic CLI detection and device-flow authorization.
+- 🎨 **Built-in Design Systems**: Four ready-made design templates (dashboards, documents, promo/decks, diagrams) ship with the skill so an agent picks the right one before publishing, keeping artifacts visually consistent.
 - 🔑 **Flexible Authentication**: Interactive OAuth Device Flow (`oa login`) and non-interactive organization API tokens (`OA_TOKEN`).
 - 👥 **Multi-Tenancy & Teams**: Organizations, user management, and fine-grained roles (`superadmin`, `admin`, `member`) with an intuitive Team Switcher.
 - 🔗 **Secure Sharing**: Team-only links, password-protected links, public links, and automatic link expiration (1 hour, 1 day, 7 days, 30 days) — teams and instance admins control the default link mode and can disable public links entirely. Every share page shows a viewer panel (title, type, version) that expands with author, team, and a view-only version picker for anyone who can manage the artifact.

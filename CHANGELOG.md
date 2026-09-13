@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-13
+
 ### Added
 - **Viewer panel on the public share page (`/s/:token`)**: a header above the embedded artifact shows its title, type, displayed version number, and last-updated date to every visitor. A logged-in member of the artifact's team additionally sees the author and team name; the artifact's owner, a team owner/admin, or a superadmin gets the full panel — description, size, expiry, the share's view count, the version's commit message, and a version picker to browse older versions (view-only, via `?v=N`; never writes to the database, and never affects what any other visitor of the same link sees). The panel is collapsible (state remembered per-browser) and hidden when printing. "Copy link" (always copies the canonical URL, without `?v=`) and "Download source" are available to everyone, including anonymous visitors; "Open in workspace" is shown once the viewer has read access to the artifact.
 - New `GET /s/:token/download` endpoint — the artifact's raw source, served as `text/plain` (never as `text/html` or `image/svg+xml`, regardless of the artifact's own `kind`) with `Content-Disposition: attachment`, so an `html`/`svg` artifact's own script can never execute in this app's origin.
