@@ -35,6 +35,7 @@ Runs as a lightweight, single-stack Docker Compose deployment.
 - 🔑 **Flexible Authentication**: Interactive OAuth Device Flow (`oa login`) and non-interactive organization API tokens (`OA_TOKEN`).
 - 👥 **Multi-Tenancy & Teams**: Organizations, user management, and fine-grained roles (`superadmin`, `admin`, `member`) with an intuitive Team Switcher.
 - 🔗 **Secure Sharing**: Team-only links, password-protected links, public links, and automatic link expiration (1 hour, 1 day, 7 days, 30 days) — teams and instance admins control the default link mode and can disable public links entirely. Every share page shows a viewer panel (title, type, version) that expands with author, team, and a view-only version picker for anyone who can manage the artifact.
+- 🖼️ **File Attachments**: Images and other files can be uploaded to an S3-compatible bucket (MinIO ships in `docker-compose.yml` by default) and attached to an artifact — proxied through the app, never a public bucket. An agent can check its remaining quota (`oa quota` / the `get_storage_quota` MCP tool) before deciding whether to upload. Instance-wide and per-team storage quotas (team-wide and per-artifact, unlimited by default) keep usage in check; files are deleted automatically with their artifact.
 - 🚀 **One-Command Deployment**: Instant production setup with Docker Compose or the interactive `./run.sh` runner.
 
 ---
@@ -247,8 +248,24 @@ Configure the application through environment variables (see [`.env.example`](.e
 | `DEFAULT_KEY_TTL_DAYS` | Default lifetime for agent API tokens (0 = never expires) | `90` |
 | `DEFAULT_REGISTRATION_MODE` | Who may self-register: `open`, `invite_only`, or `closed` | `invite_only` |
 | `ARTIFACT_PURGE_INTERVAL_MINUTES` | How often the background sweeper hard-deletes expired artifacts (0 disables it; lifetimes still apply lazily on read either way) | `5` |
+| `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION`, `S3_FORCE_PATH_STYLE` | S3-compatible object storage for uploaded artifact files. Leave `S3_BUCKET` unset to disable the feature entirely (upload endpoints answer `501`); `docker-compose.yml` sets these to its own bundled MinIO by default | unset (disabled) |
+| `STORAGE_MAX_FILE_BYTES` | Hard per-file upload cap, independent of the team/artifact byte quotas set in `/admin/settings` | `26214400` (25 MiB) |
+| `STORAGE_GC_INTERVAL_MINUTES` | How often the background sweeper deletes objects queued for removal (0 disables it) | `5` |
 
-Most operational settings — registration mode, default key TTL, invite link lifetime, the CDN allowlist, the maximum artifact size, and the maximum/default artifact lifetime — can also be modified at runtime by superadmins in **Настройки инстанса** (`/admin/settings`); they don't need an environment variable or a restart.
+Most operational settings — registration mode, default key TTL, invite link lifetime, the CDN allowlist, the maximum artifact size, the maximum/default artifact lifetime, and storage quotas — can also be modified at runtime by superadmins in **Настройки инстанса** (`/admin/settings`); they don't need an environment variable or a restart.
+
+### File storage and quotas
+
+Uploaded files (images, attachments) live in an S3-compatible bucket, proxied through the app at
+`/af/<token>` — the bucket itself stays private, no presigned URLs are ever handed out. A file
+always belongs to exactly one artifact and is deleted with it (soft-delete, expiry, or an org being
+deleted all queue its files for removal); there is no way for an orphaned file to exist.
+
+Storage quotas are unlimited by default, at both the team and per-artifact level. A superadmin sets
+instance-wide ceilings in `/admin/settings`; a team can set its own stricter override (never
+looser) — the per-artifact one in its own team settings, the team-wide one only by a superadmin.
+Before uploading, an agent can check `GET /api/v1/quota` (or `oa quota` / the `get_storage_quota`
+MCP tool) to see remaining room and decide whether the upload is worth attempting.
 
 ### Artifact lifetime (TTL)
 

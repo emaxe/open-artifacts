@@ -1,6 +1,6 @@
 import { and, inArray, isNull, lte, sql } from "drizzle-orm";
 import type { Database } from "../db/client.js";
-import { artifacts, artifactVersions, shares } from "../db/schema.js";
+import { artifacts, artifactFiles, artifactVersions, shares } from "../db/schema.js";
 import { recordAudit } from "./audit.js";
 
 export interface PurgeResult {
@@ -45,11 +45,16 @@ export async function purgeExpiredArtifacts(
         .set({ pinnedVersionId: null, revokedAt: sql`coalesce(${shares.revokedAt}, ${now})` })
         .where(inArray(shares.artifactId, ids));
 
+      // Files disappear with their artifact here too, not just on an explicit delete — each
+      // deleted row fires artifact_files_gc_trigger (see the migration), which is what actually
+      // queues the S3 object for removal.
+      await tx.delete(artifactFiles).where(inArray(artifactFiles.artifactId, ids));
+
       await tx.delete(artifactVersions).where(inArray(artifactVersions.artifactId, ids));
 
       await tx
         .update(artifacts)
-        .set({ currentVersionId: null, sizeBytes: 0, deletedAt: sql`coalesce(${artifacts.deletedAt}, ${now})`, purgedAt: now })
+        .set({ currentVersionId: null, sizeBytes: 0, filesBytes: 0, deletedAt: sql`coalesce(${artifacts.deletedAt}, ${now})`, purgedAt: now })
         .where(inArray(artifacts.id, ids));
 
       for (const row of due) {

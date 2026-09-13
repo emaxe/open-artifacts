@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, type DefaultShareMode, type OrgDetail, type OrgInvite, type OrgMember } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { ORG_ROLE_LABELS, INVITE_STATUS_LABELS, DEFAULT_SHARE_MODE_LABELS, formatDateTime, formatLifetime, label } from "../../lib/labels";
+import { ORG_ROLE_LABELS, INVITE_STATUS_LABELS, DEFAULT_SHARE_MODE_LABELS, formatDateTime, formatLifetime, formatQuota, label } from "../../lib/labels";
 import { Card, CardHeader } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input, Select } from "../../components/ui/Input";
@@ -91,6 +91,17 @@ export function TeamSettingsPage() {
       await load();
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Не удалось изменить срок жизни артефактов", "error");
+    }
+  }
+
+  async function handleSaveQuota(field: "storageQuotaBytes" | "artifactQuotaBytes", bytes: number | null) {
+    if (!orgId) return;
+    try {
+      await api.patch(`/orgs/${orgId}`, { [field]: bytes });
+      toast.show("Квота сохранена", "success");
+      await load();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось изменить квоту", "error");
     }
   }
 
@@ -268,6 +279,28 @@ export function TeamSettingsPage() {
             )}
           </div>
         )}
+      </Card>
+
+      <Card>
+        <CardHeader title="Хранилище" description={`Используется: ${formatQuota(detail.usedBytes)}. Считаются исходники артефактов и загруженные файлы вместе.`} />
+        <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
+          <QuotaField
+            label="Квота команды"
+            value={detail.storageQuotaBytes}
+            globalValue={detail.globalOrgQuotaBytes}
+            effectiveValue={detail.effectiveOrgQuotaBytes}
+            canManage={false}
+            onSave={(bytes) => handleSaveQuota("storageQuotaBytes", bytes)}
+          />
+          <QuotaField
+            label="Квота на артефакт"
+            value={detail.artifactQuotaBytes}
+            globalValue={detail.globalArtifactQuotaBytes}
+            effectiveValue={detail.effectiveArtifactQuotaBytes}
+            canManage={canManageTeam}
+            onSave={(bytes) => handleSaveQuota("artifactQuotaBytes", bytes)}
+          />
+        </div>
       </Card>
 
       <Card>
@@ -471,6 +504,64 @@ export function TeamSettingsPage() {
           </div>
         </div>
       </Dialog>
+    </div>
+  );
+}
+
+/**
+ * Same "inherit / set your own" pattern as the lifetime card above, in bytes (shown/edited as MB).
+ * `canManage` is passed separately from the surrounding page's `canManageTeam` because the two
+ * quota fields have different edit permissions: the team-wide quota is superadmin-only (matches
+ * `storageQuotaBytes`'s existing permission in routes/orgs.ts), the per-artifact one is owner/admin.
+ */
+function QuotaField({
+  label,
+  value,
+  globalValue,
+  effectiveValue,
+  canManage,
+  onSave,
+}: {
+  label: string;
+  value: number | null;
+  globalValue: number | null;
+  effectiveValue: number | null;
+  canManage: boolean;
+  onSave: (bytes: number | null) => void;
+}) {
+  const [draftMb, setDraftMb] = useState(() => (value !== null ? String(Math.round(value / 1024 / 1024)) : ""));
+  useEffect(() => setDraftMb(value !== null ? String(Math.round(value / 1024 / 1024)) : ""), [value]);
+
+  return (
+    <div className="flex-1">
+      <p className="mb-2 text-sm font-medium text-fg">{label}</p>
+      {value === null ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-muted">
+            Наследуется: <strong className="text-fg">{formatQuota(effectiveValue)}</strong>
+          </p>
+          {canManage && (
+            <Button variant="secondary" size="sm" onClick={() => onSave(globalValue ?? 1024 * 1024 * 1024)}>
+              Задать своё значение
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <Input type="number" min={1} className="w-28" value={draftMb} onChange={(e) => setDraftMb(e.target.value)} disabled={!canManage} />
+          <span className="text-sm text-muted">МБ</span>
+          {canManage && (
+            <>
+              <Button variant="secondary" size="sm" disabled={!draftMb || Number(draftMb) * 1024 * 1024 === value} onClick={() => onSave(Math.round(Number(draftMb) * 1024 * 1024))}>
+                Сохранить
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => onSave(null)}>
+                Наследовать
+              </Button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

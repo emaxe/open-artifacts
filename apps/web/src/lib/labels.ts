@@ -94,6 +94,11 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unitIndex]}`;
 }
 
+/** `null` = unlimited (the "0/NULL" convention used by quota settings — see services/quota.ts on the server). */
+export function formatQuota(bytes: number | null): string {
+  return bytes === null ? "без ограничений" : formatBytes(bytes);
+}
+
 export function formatDateTime(value: string | Date): string {
   const date = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);

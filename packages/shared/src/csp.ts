@@ -3,6 +3,15 @@ export interface EmbedCspOptions {
   scriptAllowlist: string[];
   /** Origin the frame is permitted to be embedded from, e.g. the app's own origin. */
   frameAncestor: string;
+  /**
+   * Origin serving this instance's own uploaded artifact files (`/af/:token`), when storage is
+   * enabled — e.g. `ARTIFACT_ORIGIN` or `APP_ORIGIN`. Must be an absolute origin, never `'self'`:
+   * `/embed/:token` renders inside an iframe WITHOUT `allow-same-origin`, so it's an opaque
+   * origin and `'self'` would match nothing there. `img-src` already allows any `https:` origin,
+   * so this mainly unlocks `media-src`/`font-src`, which have no such open-ended fallback under
+   * `default-src 'none'`. Omit when storage is disabled — nothing changes without it.
+   */
+  assetOrigin?: string;
 }
 
 /**
@@ -12,12 +21,16 @@ export interface EmbedCspOptions {
  */
 export function buildEmbedCsp(opts: EmbedCspOptions): string {
   const scriptSrc = ["'unsafe-inline'", "'unsafe-eval'", ...opts.scriptAllowlist].join(" ");
+  const asset = opts.assetOrigin ? ` ${opts.assetOrigin}` : "";
   const directives = [
     "default-src 'none'",
     `script-src ${scriptSrc}`,
     "style-src 'unsafe-inline' https://fonts.googleapis.com",
-    "img-src data: blob: https:",
-    "font-src https://fonts.gstatic.com data:",
+    `img-src data: blob: https:${asset}`,
+    `font-src https://fonts.gstatic.com data:${asset}`,
+    // No media-src fallback under default-src 'none' otherwise — audio/video only ever come from
+    // this instance's own asset origin, never a third party, so it's never opened beyond that.
+    ...(opts.assetOrigin ? [`media-src ${opts.assetOrigin}`] : []),
     "connect-src 'none'",
     `frame-ancestors ${opts.frameAncestor}`,
   ];

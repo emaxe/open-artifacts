@@ -1,8 +1,10 @@
 import { and, asc, eq, sql, ilike, inArray, isNull, ne, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { effectiveLifetimeLimit, resolveSharePolicy, toLifetimeLimit, type DefaultShareMode, type OrgRole } from "@open-artifacts/shared";
+import { effectiveLifetimeLimit, effectiveQuotaLimit, toLifetimeLimit, toQuotaLimit, resolveSharePolicy, type DefaultShareMode, type OrgRole } from "@open-artifacts/shared";
 import type { Database } from "../db/client.js";
 import { artifacts, orgMembers, orgs, users } from "../db/schema.js";
+import { getOrgUsageBytes } from "./quota.js";
+import type { InstanceSettings } from "./settings.js";
 
 export interface OrgMembershipRef {
   orgId: string;
@@ -307,7 +309,8 @@ export async function updateOrg(
   orgId: string,
   patch: {
     name?: string;
-    storageQuotaBytes?: number;
+    storageQuotaBytes?: number | null;
+    artifactQuotaBytes?: number | null;
     maxArtifactLifetimeMinutes?: number | null;
     defaultShareMode?: DefaultShareMode | null;
     allowPublicShares?: boolean;
@@ -321,27 +324,35 @@ export async function updateOrg(
  * `instance` carries the instance-wide settings needed to resolve effective policy for this org;
  * passed in by the route, which already has `env`/settings in scope, so this function stays free
  * of a settings-service dependency. Exposes both the raw per-team override and the resolved
- * value for both the lifetime and the share-policy knobs, so the web UI can render the bound
+ * value for the lifetime, share-policy, and quota knobs, so the web UI can render the bound
  * without a separate `/admin/settings` call.
  */
 export async function getOrgDetail(
   db: Database,
   orgId: string,
-  instance: { maxArtifactLifetimeMinutes: number; allowPublicShares: boolean; defaultShareMode: DefaultShareMode },
+  instance: Pick<InstanceSettings, "maxArtifactLifetimeMinutes" | "allowPublicShares" | "defaultShareMode" | "orgQuotaBytes" | "artifactQuotaBytes">,
 ) {
   const org = await db.query.orgs.findFirst({ where: eq(orgs.id, orgId) });
   if (!org) return null;
-  const [counts, owners] = await Promise.all([countsByOrg(db, [orgId]), ownersByOrg(db, [orgId])]);
+  const [counts, owners, usedBytes] = await Promise.all([countsByOrg(db, [orgId]), ownersByOrg(db, [orgId]), getOrgUsageBytes(db, orgId)]);
   const sharePolicy = resolveSharePolicy({
     instance: { allowPublicShares: instance.allowPublicShares, defaultShareMode: instance.defaultShareMode },
     org: { allowPublicShares: org.allowPublicShares, defaultShareMode: (org.defaultShareMode as DefaultShareMode | null) ?? null },
   });
+  const effectiveOrgQuotaBytes = effectiveQuotaLimit(toQuotaLimit(instance.orgQuotaBytes), toQuotaLimit(org.storageQuotaBytes));
+  const effectiveArtifactQuotaBytes = effectiveQuotaLimit(toQuotaLimit(instance.artifactQuotaBytes), toQuotaLimit(org.artifactQuotaBytes));
   return {
     id: org.id,
     name: org.name,
     slug: org.slug,
     kind: org.kind,
     storageQuotaBytes: org.storageQuotaBytes,
+    artifactQuotaBytes: org.artifactQuotaBytes,
+    globalOrgQuotaBytes: toQuotaLimit(instance.orgQuotaBytes),
+    globalArtifactQuotaBytes: toQuotaLimit(instance.artifactQuotaBytes),
+    effectiveOrgQuotaBytes,
+    effectiveArtifactQuotaBytes,
+    usedBytes,
     maxArtifactLifetimeMinutes: org.maxArtifactLifetimeMinutes,
     globalMaxArtifactLifetimeMinutes: toLifetimeLimit(instance.maxArtifactLifetimeMinutes),
     effectiveMaxArtifactLifetimeMinutes: effectiveLifetimeLimit(

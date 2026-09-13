@@ -24,6 +24,14 @@ interface InstanceSettings {
   allowPublicShares: boolean;
   /** Link mode used when a share is created without naming one, unless a team overrides it. */
   defaultShareMode: DefaultShareMode;
+  /** Bytes; 0 = unlimited (the default). A team may set its own stricter override. */
+  orgQuotaBytes: number;
+  /** Bytes; 0 = unlimited (the default). A team may set its own stricter override. */
+  artifactQuotaBytes: number;
+}
+
+function bytesToMb(bytes: number): number {
+  return Math.round(bytes / 1024 / 1024);
 }
 
 export function AdminSettingsPage() {
@@ -130,6 +138,23 @@ export function AdminSettingsPage() {
             }}
           />
         </Field>
+
+        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:gap-6">
+          <Field
+            label="Квота хранилища на команду, МБ"
+            hint="0 = без ограничений (по умолчанию). Считаются исходники артефактов и загруженные файлы вместе. Команда может задать своё значение, но не больше этого."
+            className="max-w-52"
+          >
+            <NumberField value={bytesToMb(settings.orgQuotaBytes)} onSave={(mb) => save({ orgQuotaBytes: Math.round(mb * 1024 * 1024) })} />
+          </Field>
+          <Field
+            label="Квота хранилища на артефакт, МБ"
+            hint="0 = без ограничений (по умолчанию). Ограничивает суммарный размер исходника и файлов одного артефакта."
+            className="max-w-52"
+          >
+            <NumberField value={bytesToMb(settings.artifactQuotaBytes)} onSave={(mb) => save({ artifactQuotaBytes: Math.round(mb * 1024 * 1024) })} />
+          </Field>
+        </div>
 
         <Field label="Разрешённые CDN-домены для встраиваемых скриптов" className="mt-4">
           <div className="flex flex-col gap-2">

@@ -22,6 +22,14 @@ export default defineConfig({
       // Most integration tests exercise post-registration flows and don't care about gating;
       // registration-mode enforcement itself is covered by a dedicated test.
       DEFAULT_REGISTRATION_MODE: "open",
+      // Points at docker-compose.dev.yml's `minio` service so artifact-files tests exercise a
+      // real object store, not just the "disabled" (501) path. Override via TEST_S3_* env vars to
+      // point elsewhere; storage.ts falls back to disabled if S3_BUCKET ends up unset regardless.
+      S3_ENDPOINT: process.env.TEST_S3_ENDPOINT ?? "http://localhost:9000",
+      S3_BUCKET: process.env.TEST_S3_BUCKET ?? "open-artifacts-test",
+      S3_ACCESS_KEY_ID: process.env.TEST_S3_ACCESS_KEY_ID ?? "minioadmin",
+      S3_SECRET_ACCESS_KEY: process.env.TEST_S3_SECRET_ACCESS_KEY ?? "minioadmin",
+      S3_FORCE_PATH_STYLE: "true",
     },
   },
 });

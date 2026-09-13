@@ -5,6 +5,7 @@ import { login } from "./commands/login.js";
 import { listCommand, pushCommand, getCommand, rmCommand } from "./commands/artifacts.js";
 import { shareCommand, unshareCommand, whoamiCommand } from "./commands/share.js";
 import { orgsCommand, useCommand } from "./commands/orgs.js";
+import { quotaCommand, filesUploadCommand, filesListCommand, filesRmCommand } from "./commands/files.js";
 
 const program = new Command();
 program.name("oa").description("CLI for Open Artifacts — self-hosted artifact hosting for AI agents").version("0.6.1");
@@ -83,5 +84,30 @@ program
   .action(shareCommand);
 
 program.command("unshare <shareId>").description("Revoke a share link").action(unshareCommand);
+
+program
+  .command("quota")
+  .description("Show remaining storage quota — team-wide, or for one artifact with --artifact")
+  .option("--org <team>", "Team id or slug (overrides the project/machine default)")
+  .option("--artifact <id>", "Narrow the answer to one artifact's own remaining quota")
+  .option("--json", "Output raw JSON")
+  .action(quotaCommand);
+
+const files = program.command("files").description("Manage files uploaded and attached to an artifact");
+
+files
+  .command("upload <artifactId> <file>")
+  .description("Upload a local file and attach it to an artifact — prints the URL to reference in the artifact's own content")
+  .option("--name <name>", "Override the uploaded file's name (defaults to the local filename)")
+  .option("--json", "Output raw JSON")
+  .action(filesUploadCommand);
+
+files
+  .command("ls <artifactId>")
+  .description("List files attached to an artifact")
+  .option("--json", "Output raw JSON")
+  .action(filesListCommand);
+
+files.command("rm <artifactId> <fileId>").description("Delete one file attached to an artifact").action(filesRmCommand);
 
 program.parseAsync(process.argv);

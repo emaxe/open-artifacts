@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { AppBindings, Identity } from "../types.js";
 import type { Database } from "../db/client.js";
 import type { Env } from "../env.js";
+import type { Storage } from "../services/storage.js";
 import { requiresScope } from "../services/scopes.js";
 import { actingUserId } from "../services/identity.js";
 import { recordAudit } from "../services/audit.js";
@@ -28,7 +29,8 @@ import {
   updateArtifact,
 } from "../services/artifacts.js";
 import { createShare, listSharesForArtifact, revokeShare } from "../services/shares.js";
-import { resolveLifetimeLimitForRequest } from "../services/lifetime.js";
+import { resolveArtifactCeilings, buildQuotaSnapshot } from "../services/quota.js";
+import { listFilesForArtifact, deleteFile } from "../services/artifact-files.js";
 import { resolveSharePolicyForRequest } from "../services/share-policy.js";
 import { resolveRequestedShareMode, shareModeSchema } from "@open-artifacts/shared";
 
@@ -85,6 +87,7 @@ async function resolveOrgForTool(
 function createMcpServer(
   db: Database,
   env: Env,
+  storage: Storage,
   identity: Identity,
   defaultOrgId: string | undefined,
   onOrgResolved: (orgId: string) => void,
@@ -204,7 +207,7 @@ function createMcpServer(
       onOrgResolved(resolved.orgId);
 
       try {
-        const maxLifetimeMinutes = await resolveLifetimeLimitForRequest(db, env, resolved.orgId);
+        const ceilings = await resolveArtifactCeilings(db, env, resolved.orgId);
         const { artifact, version } = await createArtifact(db, {
           orgId: resolved.orgId,
           identity,
@@ -214,12 +217,15 @@ function createMcpServer(
           description,
           visibility,
           lifetime,
-          maxLifetimeMinutes,
+          ...ceilings,
         });
         await recordAudit(db, { orgId: resolved.orgId, identity, action: "artifact.create", targetType: "artifact", targetId: artifact.id });
         return ok({ id: artifact.id, versionNo: version.versionNo, expiresAt: artifact.expiresAt });
       } catch (err) {
-        if (err instanceof ArtifactTooLargeError || err instanceof QuotaExceededError) return toolError(err.message);
+        if (err instanceof ArtifactTooLargeError) return toolError(err.message);
+        if (err instanceof QuotaExceededError) {
+          return toolError(JSON.stringify({ code: "quota_exceeded", message: err.message, scope: err.scope, limitBytes: err.limitBytes, usedBytes: err.usedBytes }));
+        }
         if (err instanceof LifetimeExceedsMaxError) {
           return toolError(JSON.stringify({ code: "lifetime_exceeds_max", message: err.message, maxLifetimeMinutes: err.maxMinutes }));
         }
@@ -251,14 +257,19 @@ function createMcpServer(
       if (!access.write) return toolError("Forbidden: no write access to this artifact");
 
       try {
-        const lifetimePatch =
-          lifetime !== undefined ? { requested: lifetime, maxMinutes: await resolveLifetimeLimitForRequest(db, env, artifact.orgId) } : undefined;
-        const result = await updateArtifact(db, id, { content, title, description, visibility, message, identity, ifMatchContentHash, lifetime: lifetimePatch });
+        const ceilings = await resolveArtifactCeilings(db, env, artifact.orgId);
+        const lifetimePatch = lifetime !== undefined ? { requested: lifetime, maxMinutes: ceilings.maxLifetimeMinutes } : undefined;
+        const contentPatch =
+          content !== undefined ? { text: content, message, maxArtifactSizeBytes: ceilings.maxArtifactSizeBytes, quota: ceilings.quota } : undefined;
+        const result = await updateArtifact(db, id, { title, description, visibility, identity, ifMatchContentHash, lifetime: lifetimePatch, content: contentPatch });
         await recordAudit(db, { orgId: artifact.orgId, identity, action: "artifact.update", targetType: "artifact", targetId: id });
         return ok({ id, newVersionNo: result.version?.versionNo, expiresAt: result.artifact.expiresAt });
       } catch (err) {
         if (err instanceof VersionConflictError) return toolError(`Version conflict: ${err.message}. Call get_artifact again to see the latest content.`);
-        if (err instanceof ArtifactTooLargeError || err instanceof QuotaExceededError) return toolError(err.message);
+        if (err instanceof ArtifactTooLargeError) return toolError(err.message);
+        if (err instanceof QuotaExceededError) {
+          return toolError(JSON.stringify({ code: "quota_exceeded", message: err.message, scope: err.scope, limitBytes: err.limitBytes, usedBytes: err.usedBytes }));
+        }
         if (err instanceof LifetimeExceedsMaxError) {
           return toolError(JSON.stringify({ code: "lifetime_exceeds_max", message: err.message, maxLifetimeMinutes: err.maxMinutes }));
         }
@@ -279,6 +290,72 @@ function createMcpServer(
 
       await softDeleteArtifact(db, id);
       await recordAudit(db, { orgId: artifact.orgId, identity, action: "artifact.delete", targetType: "artifact", targetId: id });
+      return ok({ deleted: true });
+    },
+  );
+
+  server.registerTool(
+    "get_storage_quota",
+    {
+      description:
+        "Check remaining storage quota before deciding whether to upload a file to an artifact. Call this " +
+        "BEFORE attaching a file — this tool cannot upload one itself (uploading is a binary/multipart " +
+        "operation, done via the REST API or the CLI's `oa files upload`, not over this text protocol); use " +
+        "it only to decide whether the upload is worth attempting and to size it against `maxFileBytes`. " +
+        "`limitBytes: null` means unlimited.",
+      inputSchema: {
+        orgId: z.string().uuid().optional().describe("Team id — omit to use the connection's default team, or when you belong to only one"),
+        artifactId: z.string().uuid().optional().describe("Narrow the answer to one artifact's own remaining quota, in addition to the team-wide number"),
+      },
+    },
+    async ({ orgId, artifactId }): Promise<CallToolResult> => {
+      let resolvedOrgId: string;
+      if (artifactId) {
+        const artifact = await getArtifact(db, artifactId);
+        if (!artifact) return toolError("Artifact not found");
+        const access = await resolveAccessForIdentity(db, identity, artifact);
+        if (!access.read) return toolError("Forbidden: no read access to this artifact");
+        resolvedOrgId = artifact.orgId;
+      } else {
+        const resolved = await resolveOrgForTool(db, identity, orgId, defaultOrgId);
+        if (!resolved.ok) return resolved.result;
+        resolvedOrgId = resolved.orgId;
+      }
+      onOrgResolved(resolvedOrgId);
+      return ok(await buildQuotaSnapshot(db, env, resolvedOrgId, storage.enabled, artifactId));
+    },
+  );
+
+  server.registerTool(
+    "list_artifact_files",
+    { description: "List files uploaded and attached to an artifact.", inputSchema: { artifactId: z.string().uuid() } },
+    async ({ artifactId }): Promise<CallToolResult> => {
+      if (!requiresScope(identity, "artifacts:read")) return toolError("Missing scope: artifacts:read");
+      const artifact = await getArtifact(db, artifactId);
+      if (!artifact) return toolError("Artifact not found");
+      const access = await resolveAccessForIdentity(db, identity, artifact);
+      if (!access.read) return toolError("Forbidden: no read access to this artifact");
+
+      const files = await listFilesForArtifact(db, artifactId);
+      return ok({
+        files: files.map((f) => ({ id: f.id, name: f.name, contentType: f.contentType, sizeBytes: f.sizeBytes, createdAt: f.createdAt, url: `/af/${f.token}` })),
+      });
+    },
+  );
+
+  server.registerTool(
+    "delete_artifact_file",
+    { description: "Delete one file previously attached to an artifact.", inputSchema: { artifactId: z.string().uuid(), fileId: z.string().uuid() } },
+    async ({ artifactId, fileId }): Promise<CallToolResult> => {
+      if (!requiresScope(identity, "artifacts:write")) return toolError("Missing scope: artifacts:write");
+      const artifact = await getArtifact(db, artifactId);
+      if (!artifact) return toolError("Artifact not found");
+      const access = await resolveAccessForIdentity(db, identity, artifact);
+      if (!access.write) return toolError("Forbidden: no write access to this artifact");
+
+      const deleted = await deleteFile(db, artifactId, fileId);
+      if (!deleted) return toolError("File not found");
+      await recordAudit(db, { orgId: artifact.orgId, identity, action: "artifact.file_delete", targetType: "artifact", targetId: artifactId, meta: { fileId, name: deleted.name } });
       return ok({ deleted: true });
     },
   );
@@ -399,7 +476,7 @@ mcpRoutes.all("/mcp", async (c) => {
   }
 
   const defaultOrgId = c.req.query("orgId") || c.req.header("x-oa-org") || undefined;
-  const server = createMcpServer(c.get("db"), c.get("env"), identity, defaultOrgId, (orgId) => c.set("resolvedOrgId", orgId));
+  const server = createMcpServer(c.get("db"), c.get("env"), c.get("storage"), identity, defaultOrgId, (orgId) => c.set("resolvedOrgId", orgId));
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // stateless: no session to track across requests
     enableJsonResponse: true, // plain JSON responses over SSE — every tool call here is quick

@@ -122,6 +122,35 @@ curl -s "$OA_SERVER/api/v1/artifacts/$ARTIFACT_ID"     -H "Authorization: Bearer
 curl -sX DELETE "$OA_SERVER/api/v1/artifacts/$ARTIFACT_ID" -H "Authorization: Bearer $OA_TOKEN"
 ```
 
+## Files and storage quota
+
+Check quota BEFORE uploading — `storageEnabled: false` means don't attempt an upload at all:
+
+```bash
+curl -s "$OA_SERVER/api/v1/quota?orgId=$OA_ORG_ID" -H "Authorization: Bearer $OA_TOKEN"
+# -> {"storageEnabled":true,"maxFileBytes":26214400,
+#     "org":{"id":"...","limitBytes":null,"usedBytes":1234,"availableBytes":null},
+#     "inlineTypes":["image/png", ...]}
+curl -s "$OA_SERVER/api/v1/quota?artifactId=$ARTIFACT_ID" -H "Authorization: Bearer $OA_TOKEN"
+# same shape, plus an "artifact" bucket narrowed to that one artifact's own quota
+```
+
+`limitBytes: null` means unlimited. Upload with `multipart/form-data`, a single `file` field:
+
+```bash
+curl -sX POST "$OA_SERVER/api/v1/artifacts/$ARTIFACT_ID/files" \
+  -H "Authorization: Bearer $OA_TOKEN" -F "file=@logo.png;type=image/png"
+# -> {"file":{"id":"...","name":"logo.png","contentType":"image/png","sizeBytes":1234,"url":"/af/<token>"}}
+```
+
+The `url` is server-relative — prefix it with `$OA_SERVER` to get an absolute URL, and reference
+that in the artifact's own content (e.g. `<img src="...">`). List and delete:
+
+```bash
+curl -s "$OA_SERVER/api/v1/artifacts/$ARTIFACT_ID/files" -H "Authorization: Bearer $OA_TOKEN"
+curl -sX DELETE "$OA_SERVER/api/v1/artifacts/$ARTIFACT_ID/files/$FILE_ID" -H "Authorization: Bearer $OA_TOKEN"
+```
+
 ## Managing personal keys
 
 Session-only (cookie auth in the web UI) — a key can't mint or revoke another key:
@@ -137,5 +166,7 @@ curl -sX DELETE "$OA_SERVER/api/v1/me/keys/$KEY_ID" -H "Cookie: oa_session=$SESS
 Every error response is `{"error": {"code": "...", "message": "..."}}` with an appropriate HTTP
 status. `org_required` additionally carries `"orgs": [...]` — the same shape as `GET /me/orgs`'
 `orgs` array — so you can show the human the choice without a second request. `public_shares_forbidden`
-carries `"allowedModes": [...]` and `"defaultShareMode"` for the same reason. See the table in
-`SKILL.md` for the codes you're likely to hit and what they mean.
+carries `"allowedModes": [...]` and `"defaultShareMode"` for the same reason. `quota_exceeded`
+carries `"scope"` (`"org"` or `"artifact"`), `"limitBytes"`, and `"usedBytes"` — the same numbers
+`GET /quota` reports, so you don't need a second request just to explain the failure. See the table
+in `SKILL.md` for the codes you're likely to hit and what they mean.

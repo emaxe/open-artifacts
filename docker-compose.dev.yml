@@ -19,3 +19,24 @@ services:
       retries: 10
     tmpfs:
       - /var/lib/postgresql/data
+
+  # Local S3-compatible storage for artifact-file integration tests and `pnpm dev:api`. Optional:
+  # the storage-dependent tests and code paths degrade to "disabled" (501) when this isn't running
+  # or TEST_S3_BUCKET/S3_BUCKET isn't set — see apps/api/src/services/storage.ts.
+  minio:
+    image: quay.io/minio/minio:latest
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    tmpfs:
+      - /data

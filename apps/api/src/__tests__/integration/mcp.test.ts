@@ -73,7 +73,7 @@ function toolJson(result: Awaited<ReturnType<Client["callTool"]>>): any {
 }
 
 describe("MCP server", () => {
-  it("lists all 10 tools and exercises the full publish/share flow", async () => {
+  it("lists all 13 tools and exercises the full publish/share flow", async () => {
     const app = buildTestApp();
     const { orgId, sessionCookie } = await registerAndLogin(app);
     const apiKey = await issueKey(app, orgId, sessionCookie, ["artifacts:read", "artifacts:write", "artifacts:delete", "shares:write"]);
@@ -83,7 +83,21 @@ describe("MCP server", () => {
 
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ["whoami", "list_orgs", "list_artifacts", "get_artifact", "create_artifact", "update_artifact", "delete_artifact", "create_share", "list_shares", "revoke_share"].sort(),
+      [
+        "whoami",
+        "list_orgs",
+        "list_artifacts",
+        "get_artifact",
+        "create_artifact",
+        "update_artifact",
+        "delete_artifact",
+        "get_storage_quota",
+        "list_artifact_files",
+        "delete_artifact_file",
+        "create_share",
+        "list_shares",
+        "revoke_share",
+      ].sort(),
     );
 
     const who = toolJson(await client.callTool({ name: "whoami", arguments: {} }));
