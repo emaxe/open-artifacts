@@ -117,10 +117,12 @@ oa push <file> [options]
   --title <title>       Artifact title (defaults to filename)
   --kind <kind>         Content type: html | markdown | mermaid | svg (auto-detected if omitted)
   --id <id>             Update an existing artifact instead of creating a new one
-  --share               Automatically generate a public share link
+  --share               Also create a share link, in the team's configured default mode
+  --team                Create the link in 'team' mode: only logged-in members of the artifact's team can open it (implies --share)
+  --public              Create a fully public link, no login or password needed (implies --share; the team or instance may forbid this)
   --password <pass>     Protect the share link with a password (implies --share)
-  --expires <ttl>       Share expiration: 1h, 1d, 7d, 30d (implies --share)
   --message <msg>       Version commit message
+  --lifetime <duration> Delete the artifact after this long: 30m, 12h, 7d, or 0 for never (omit to use the team's default)
   --org <team>          Team id or slug to publish into (overrides the project/machine default)
   --json                Output result as JSON
 ```
@@ -151,9 +153,12 @@ Generates a new shareable link for an existing artifact.
 
 ```bash
 oa share <artifact-id> [options]
-  --password <pass>     Password protect the link
-  --expires <ttl>       Link expiration duration (e.g. 1h, 1d, 7d, 30d)
-  --json                Output share metadata as JSON
+  --team                 Only logged-in members of the artifact's team can open it
+  --public               Fully public link, no login or password needed (the team or instance may forbid this)
+  --password <pass>      Require this password to view
+  --expires <ttl>        Link expiration duration (e.g. 1h, 1d, 7d, 30d; default: never)
+  --version <n>          Pin the share to a specific version number
+  --json                 Output share metadata as JSON
 ```
 
 ### `oa unshare <share-id>`

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-09-13
+
+### Added
+- **`--team` and `--public` flags** on `oa push` and `oa share`, alongside the existing `--password` — pick a share mode explicitly instead of always getting a public link. `oa push`/`oa share` now also print the resolved share mode next to the URL.
+
+### Changed
+- **Breaking**: `oa push --share` and `oa share <id>` with no mode flag now create a link in the team's configured default mode instead of always `public`. Pass `--public` to get the old behavior explicitly.
+
 ## [0.4.0] - 2026-09-11
 
 ### Added
