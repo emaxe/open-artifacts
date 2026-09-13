@@ -92,7 +92,7 @@ function createMcpServer(
   defaultOrgId: string | undefined,
   onOrgResolved: (orgId: string) => void,
 ): McpServer {
-  const server = new McpServer({ name: "open-artifacts", version: "0.7.1" });
+  const server = new McpServer({ name: "open-artifacts", version: "0.8.0" });
 
   server.registerTool(
     "whoami",
@@ -377,12 +377,13 @@ function createMcpServer(
               "password needed. 'password' = anyone with the link and the password. 'public' = anyone with the link, " +
               "no login or password — the team or instance may forbid this, returning public_shares_forbidden.",
           ),
+        label: z.string().max(100).optional().describe("Optional internal name shown only to managers in the 'Шаринг' table, never to a visitor of the link"),
         password: z.string().min(4).max(200).optional(),
         expires: z.union([z.string(), z.number()]).optional().describe("e.g. '7d', '12h', or omit for never"),
         versionNo: z.number().int().positive().optional().describe("Pin the link to a specific version instead of always showing the latest"),
       },
     },
-    async ({ artifactId, mode, password, expires, versionNo }): Promise<CallToolResult> => {
+    async ({ artifactId, mode, label, password, expires, versionNo }): Promise<CallToolResult> => {
       if (!requiresScope(identity, "shares:write")) return toolError("Missing scope: shares:write");
       const artifact = await getArtifact(db, artifactId);
       if (!artifact) return toolError("Artifact not found");
@@ -411,7 +412,7 @@ function createMcpServer(
       }
 
       const createdBy = identity.kind === "agent" ? identity.agentId : actingUserId(identity)!;
-      const share = await createShare(db, { artifactId, mode: resolved.mode, password, expires, pinnedVersionId, createdBy });
+      const share = await createShare(db, { artifactId, mode: resolved.mode, label, password, expires, pinnedVersionId, createdBy });
       await recordAudit(db, { orgId: artifact.orgId, identity, action: "share.create", targetType: "share", targetId: share.id, meta: { mode: share.mode } });
       return ok({ id: share.id, url: `${env.APP_ORIGIN}/s/${share.token}`, mode: share.mode, expiresAt: share.expiresAt });
     },
@@ -428,7 +429,16 @@ function createMcpServer(
 
       const list = await listSharesForArtifact(db, artifactId);
       return ok({
-        shares: list.map((s) => ({ id: s.id, mode: s.mode, url: `${env.APP_ORIGIN}/s/${s.token}`, viewCount: s.viewCount, expiresAt: s.expiresAt, revokedAt: s.revokedAt })),
+        shares: list.map((s) => ({
+          id: s.id,
+          mode: s.mode,
+          label: s.label,
+          url: `${env.APP_ORIGIN}/s/${s.token}`,
+          viewCount: s.viewCount,
+          managerViewCount: s.managerViewCount,
+          expiresAt: s.expiresAt,
+          revokedAt: s.revokedAt,
+        })),
       });
     },
   );

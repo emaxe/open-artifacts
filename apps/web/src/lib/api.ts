@@ -5,6 +5,7 @@
 // ArtifactSummary, ...) is declared the same way, for the same reason.
 export type ShareMode = "public" | "password" | "team";
 export type DefaultShareMode = "public" | "team";
+export type RegistrationMode = "open" | "invite_only" | "closed";
 
 const BASE = "/api/v1";
 
@@ -51,6 +52,10 @@ export const api = {
     request<T>(path, { method: "PATCH", body: JSON.stringify(body), headers }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
+
+export interface InstanceConfig {
+  registrationMode: RegistrationMode;
+}
 
 export interface Me {
   id: string;

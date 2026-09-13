@@ -1,6 +1,6 @@
 {
   "name": "@emaxe/oa",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "CLI for Open Artifacts — publish HTML/Markdown/Mermaid/SVG content to a self-hosted artifact host and get back a shareable link.",
   "keywords": [
     "ai-agents",
@@ -8,7 +8,9 @@
     "claude-artifacts",
     "claude",
     "mcp",
+    "mcp-server",
     "model-context-protocol",
+    "llm",
     "self-hosted",
     "cli",
     "open-artifacts",

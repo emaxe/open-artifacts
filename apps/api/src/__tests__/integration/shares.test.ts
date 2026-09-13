@@ -72,6 +72,42 @@ describe("sharing", () => {
     expect(shares[0]!.viewCount).toBe(1);
   });
 
+  it("counts a manager's own view separately, without inflating the audience-facing viewCount", async () => {
+    const app = buildTestApp();
+    const { orgId, sessionCookie } = await registerAndLogin(app);
+    const artifactId = await createArtifact(app, orgId, sessionCookie, "<h1>owner's own link</h1>");
+
+    const shareRes = await createShareViaApi(app, artifactId, sessionCookie, { mode: "public" });
+    const share = (await shareRes.json()) as { token: string };
+
+    // The owner opens their own link — this must not count as audience, but must not be dropped either.
+    const embedRes = await app.request(`/embed/${share.token}`, { headers: authedHeaders(sessionCookie) });
+    expect(embedRes.status).toBe(200);
+
+    const sharesListRes = await app.request(`/api/v1/artifacts/${artifactId}/shares`, { headers: authedHeaders(sessionCookie) });
+    const { shares } = (await sharesListRes.json()) as { shares: { viewCount: number; managerViewCount: number }[] };
+    expect(shares[0]!.viewCount).toBe(0);
+    expect(shares[0]!.managerViewCount).toBe(1);
+  });
+
+  it("carries an optional label through create and list, defaulting to null", async () => {
+    const app = buildTestApp();
+    const { orgId, sessionCookie } = await registerAndLogin(app);
+    const artifactId = await createArtifact(app, orgId, sessionCookie);
+
+    const labeledRes = await createShareViaApi(app, artifactId, sessionCookie, { mode: "public", label: "для инвесторов" });
+    expect(labeledRes.status).toBe(201);
+    expect(((await labeledRes.json()) as { label: string | null }).label).toBe("для инвесторов");
+
+    const unlabeledRes = await createShareViaApi(app, artifactId, sessionCookie, { mode: "team" });
+    expect(((await unlabeledRes.json()) as { label: string | null }).label).toBeNull();
+
+    const sharesListRes = await app.request(`/api/v1/artifacts/${artifactId}/shares`, { headers: authedHeaders(sessionCookie) });
+    const { shares } = (await sharesListRes.json()) as { shares: { label: string | null; mode: string }[] };
+    expect(shares.find((s) => s.mode === "public")!.label).toBe("для инвесторов");
+    expect(shares.find((s) => s.mode === "team")!.label).toBeNull();
+  });
+
   it("blocks a password-protected share until the correct password is submitted", async () => {
     const app = buildTestApp();
     const { orgId, sessionCookie } = await registerAndLogin(app);

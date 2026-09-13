@@ -1,17 +1,13 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { useTheme, type ThemePreference } from "../lib/theme";
 import { TeamSwitcher } from "./TeamSwitcher";
 import { LogoMark } from "./Logo";
 import { Badge } from "./ui/Badge";
+import { ThemeSwitch } from "./ui/ThemeSwitch";
 import { cn } from "../lib/cn";
 import { LogOutIcon, MailIcon, SettingsIcon, ShieldIcon, UsersIcon } from "./ui/icons";
 
-const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
-  { value: "light", label: "Светлая" },
-  { value: "system", label: "Системная" },
-  { value: "dark", label: "Тёмная" },
-];
+const THEME_LABELS = { light: "Светлая", system: "Системная", dark: "Тёмная" };
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -22,7 +18,6 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 /** The sidebar's nav content — rendered as a fixed desktop rail by Layout, and reused inside the mobile drawer's Dialog so there's exactly one nav to keep in sync. */
 export function GlobalSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { me, logout } = useAuth();
-  const { theme, setTheme } = useTheme();
   if (!me) return null;
 
   return (
@@ -56,22 +51,7 @@ export function GlobalSidebar({ onNavigate }: { onNavigate?: () => void } = {}) 
       </nav>
 
       <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
-        <div className="flex gap-1 rounded-control bg-panel-muted p-1">
-          {THEME_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              aria-pressed={theme === opt.value}
-              onClick={() => setTheme(opt.value)}
-              className={cn(
-                "flex-1 rounded-[calc(var(--radius-control)-2px)] py-1 text-xs font-medium",
-                theme === opt.value ? "bg-panel text-fg shadow-sm" : "text-muted hover:text-fg",
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        <ThemeSwitch labels={THEME_LABELS} />
         <p className="truncate text-xs text-muted" title={me.email}>
           {me.email}
         </p>

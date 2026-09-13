@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { PageContainer } from "../../components/PageContainer";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Card, CardHeader } from "../../components/ui/Card";
-import { CopyButton } from "../../components/ui/CopyButton";
+import { CodeBlock } from "../../components/ui/CodeBlock";
 import { Table, THead, TBody, TR, TH, TD } from "../../components/ui/Table";
 
 // Moved out of /admin — connecting an agent is something every user does for their own team, not
@@ -159,13 +159,3 @@ export function AgentInstructionsPage() {
   );
 }
 
-function CodeBlock({ text }: { text: string }) {
-  return (
-    <div className="mt-1.5 flex items-start gap-2">
-      <pre className="flex-1 overflow-x-auto rounded-control bg-panel-muted p-2.5 text-xs">
-        <code>{text}</code>
-      </pre>
-      <CopyButton value={text} />
-    </div>
-  );
-}

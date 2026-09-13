@@ -9,6 +9,7 @@ import type { Identity } from "../types.js";
 export interface CreateShareInput {
   artifactId: string;
   mode: ShareMode;
+  label?: string;
   password?: string;
   expires?: string | number;
   pinnedVersionId?: string;
@@ -31,6 +32,7 @@ export async function createShare(db: Database, input: CreateShareInput) {
       artifactId: input.artifactId,
       token,
       mode: input.mode,
+      label: input.label ?? null,
       passwordHash,
       expiresAt: expiresAt ?? undefined,
       pinnedVersionId: input.pinnedVersionId,
@@ -52,10 +54,16 @@ export async function revokeShare(db: Database, shareId: string) {
   await db.update(shares).set({ revokedAt: new Date() }).where(eq(shares.id, shareId));
 }
 
-export async function incrementShareViewCount(db: Database, shareId: string) {
+/**
+ * Atomic SQL increment (never read-modify-write — concurrent views would otherwise lose counts,
+ * as the old version of this function did). `manager: true` bumps `managerViewCount` instead of
+ * `viewCount`, keeping a manager's own visits to their link out of the audience-facing number
+ * while still not discarding them outright — see the `shares.managerViewCount` column comment.
+ */
+export async function incrementShareViewCount(db: Database, shareId: string, opts: { manager: boolean }) {
   await db
     .update(shares)
-    .set({ viewCount: (await db.query.shares.findFirst({ where: eq(shares.id, shareId) }))!.viewCount + 1 })
+    .set(opts.manager ? { managerViewCount: sql`${shares.managerViewCount} + 1` } : { viewCount: sql`${shares.viewCount} + 1` })
     .where(eq(shares.id, shareId));
 }
 

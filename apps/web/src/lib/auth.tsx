@@ -10,6 +10,33 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+// A same-tab-only hint, never used for authorization (the real check is always the httpOnly
+// session cookie via GET /auth/me) — it only lets the root route pick, for a single frame, between
+// "probably signed in, wait rather than flash the marketing landing" and "probably signed out,
+// paint the landing immediately instead of a spinner". Stale in either direction is harmless: a
+// leftover "1" after the cookie expired just costs one brief spinner before the landing shows; a
+// missing hint after clearing site data just costs one brief landing flash before the redirect —
+// exactly what happened everywhere before this hint existed.
+const SESSION_HINT_KEY = "oa_has_session";
+
+export function hasSessionHint(): boolean {
+  try {
+    return localStorage.getItem(SESSION_HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setSessionHint(present: boolean) {
+  try {
+    if (present) localStorage.setItem(SESSION_HINT_KEY, "1");
+    else localStorage.removeItem(SESSION_HINT_KEY);
+  } catch {
+    // Best-effort only, same as lib/theme.tsx's persistence — a private tab or blocked site data
+    // just means every visit takes the "unknown" path above instead of the fast one.
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
@@ -19,8 +46,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api.get<Me>("/auth/me");
       setMe(data);
+      setSessionHint(true);
     } catch {
       setMe(null);
+      setSessionHint(false);
     } finally {
       setLoading(false);
     }
@@ -33,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await api.post("/auth/logout");
     setMe(null);
+    setSessionHint(false);
   };
 
   return (

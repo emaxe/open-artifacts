@@ -50,6 +50,9 @@ export const createShareSchema = z.object({
   // resolveRequestedShareMode in ./share-policy.ts. `mode` used to be required, so no existing
   // caller omits it; this is purely additive.
   mode: shareModeSchema.optional(),
+  // Creator-facing only, never shown to a visitor of the link — see the `shares.label` column
+  // comment. An all-whitespace value is treated the same as omitting it.
+  label: z.string().trim().max(100).optional(),
   password: z.string().min(4).max(200).optional(),
   expires: z.union([z.string(), z.number()]).optional(),
   versionNo: z.number().int().positive().optional(),

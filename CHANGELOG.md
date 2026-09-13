@@ -9,7 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [0.8.0] - 2026-09-13
+
+### Added
+- A bilingual (RU/EN) marketing landing page at `/`, with an inline sign-in/sign-up card so a visitor can register or log in without leaving it. Signed-in users are redirected to their workspace as before; the same landing stays reachable at `/welcome`. A new unauthenticated `GET /api/v1/instance/config` endpoint tells the page (and, later, other pages) whether self-service registration is open, invite-only, or closed, so it never advertises a form that can only 403.
+- The "Sharing" table on an artifact's detail page can now name a link: an optional, creator-facing-only `label` (never shown to a visitor of `/s/:token`) on `POST /artifacts/:id/shares` (and the `create_share` MCP tool), so several links on the same artifact can be told apart at a glance.
+- Any active link in the "Sharing" table can be copied again at any time via a "Ссылка" button, not just right after creation — the list endpoint now returns each share's full URL.
+- The three separate "create link" buttons are now a single "Создать ссылку" dialog (access mode, optional label, password when applicable) whose submit button shows a loading spinner while the link is being created, instead of the button appearing to do nothing for a moment.
+
+### Fixed
+- `incrementShareViewCount` updated a share's view count via a read-then-write instead of an atomic SQL increment, silently losing counts under concurrent views. It's now a single atomic `UPDATE ... SET view_count = view_count + 1`.
+- The web dev server's proxy rule for share pages (`"/s"`) was a bare prefix match, so it silently intercepted every request whose path merely started with "s" — including all of `/src/*`, which made `pnpm dev:web` serve a stale production bundle instead of live modules. Narrowed to `"/s/"`.
+
+### Changed
+- A manager's (owner/team admin/superadmin) own view of their link is tracked again, in a separate `managerViewCount` — the "Sharing" table now shows both "Просмотры" (audience only, unchanged since 0.6.0) and "Всего" (audience + manager), instead of a manager's own check of the link looking like it wasn't counted at all.
 
 ## [0.7.1] - 2026-09-13
 

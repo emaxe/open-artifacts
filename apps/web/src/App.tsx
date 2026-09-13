@@ -10,7 +10,8 @@ import { InvitesPage } from "./pages/InvitesPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { PersonalKeysPage } from "./pages/PersonalKeysPage";
-import { HomeRedirect } from "./pages/HomeRedirect";
+import { RootRoute } from "./pages/RootRoute";
+import { LandingPage } from "./pages/landing/LandingPage";
 import { TeamLayout } from "./components/TeamLayout";
 import { ArtifactsPage } from "./pages/ArtifactsPage";
 import { ArtifactDetailPage } from "./pages/ArtifactDetailPage";
@@ -29,13 +30,19 @@ export function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          {/* Public marketing landing, with an inline sign-in/sign-up card. Handles the redirect
+              to a signed-in user's own workspace itself — see RootRoute.tsx — so it must stay
+              outside Layout's auth-gated block. */}
+          <Route path="/" element={<RootRoute />} />
+          {/* Explicit path to the same landing content, reachable even while signed in (e.g. a
+              logged-in user wants to re-read the marketing copy or share the page). */}
+          <Route path="/welcome" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/activate" element={<ActivatePage />} />
           {/* Public: works signed-out (registration) or signed-in (accept/decline) — never gated behind Layout's auth redirect. */}
           <Route path="/invite/:token" element={<InvitePage />} />
           <Route element={<Layout />}>
-            <Route path="/" element={<HomeRedirect />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/invites" element={<InvitesPage />} />
             <Route path="/settings" element={<SettingsPage />} />

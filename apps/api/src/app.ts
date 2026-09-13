@@ -11,6 +11,7 @@ import { usageMetering } from "./middleware/usage.js";
 import { rateLimit } from "./middleware/rate-limit.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
+import { instanceRoutes } from "./routes/instance.js";
 import { orgRoutes } from "./routes/orgs.js";
 import { inviteRoutes } from "./routes/invites.js";
 import { agentRoutes } from "./routes/agents.js";
@@ -49,6 +50,7 @@ export function createApp(db: Database, env: Env, storage: Storage) {
   api.use("*", usageMetering);
   api.use("*", rateLimit({ limit: 120, windowMs: 60_000 }));
   api.route("/", authRoutes);
+  api.route("/", instanceRoutes);
   api.route("/", orgRoutes);
   api.route("/", inviteRoutes);
   api.route("/", agentRoutes);

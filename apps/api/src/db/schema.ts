@@ -259,10 +259,18 @@ export const shares = pgTable("shares", {
   artifactId: uuid("artifact_id").notNull().references(() => artifacts.id, { onDelete: "cascade" }),
   token: text("token").notNull(),
   mode: shareModeEnum("mode").notNull().default("public"),
+  // Optional, creator-facing only — never rendered on /s/:token itself. Lets someone tell apart
+  // several links on the same artifact ("для отдела продаж" vs. "для инвесторов") in the "Шаринг" table.
+  label: text("label"),
   passwordHash: text("password_hash"),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   pinnedVersionId: uuid("pinned_version_id").references(() => artifactVersions.id),
+  // Views by anyone who does NOT have manage access to the artifact — the "audience" number.
   viewCount: integer("view_count").notNull().default(0),
+  // Views by a manager (owner/team admin/superadmin) browsing their own link — tracked separately
+  // so it can't inflate `viewCount` (see the "Changed" note in CHANGELOG) but still isn't silently
+  // dropped: the UI sums both into a "Всего" column.
+  managerViewCount: integer("manager_view_count").notNull().default(0),
   createdBy: uuid("created_by").notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

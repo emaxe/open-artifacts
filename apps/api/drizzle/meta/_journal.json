@@ -64,6 +64,13 @@
       "when": 1789298621215,
       "tag": "0008_special_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789316510263,
+      "tag": "0009_yummy_star_brand",
+      "breakpoints": true
     }
   ]
 }

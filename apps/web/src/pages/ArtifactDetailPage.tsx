@@ -5,7 +5,7 @@ import { formatDateTime, formatBytes, formatQuota, formatExpiry, formatLifetime,
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { Input, Textarea } from "../components/ui/Input";
+import { Input, Textarea, Select } from "../components/ui/Input";
 import { Field } from "../components/ui/Field";
 import { LifetimeSelect } from "../components/ui/LifetimeSelect";
 import { Table, THead, TBody, TR, TH, TD, TableEmptyRow } from "../components/ui/Table";
@@ -27,9 +27,12 @@ interface Version {
 interface Share {
   id: string;
   token: string;
+  url: string;
   mode: ShareMode;
+  label: string | null;
   expiresAt: string | null;
   viewCount: number;
+  managerViewCount: number;
   revokedAt: string | null;
   createdAt: string;
 }
@@ -72,8 +75,12 @@ export function ArtifactDetailPage() {
   const [previewKey, setPreviewKey] = useState(0);
 
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareMode, setShareMode] = useState<ShareMode>("team");
+  const [shareLabel, setShareLabel] = useState("");
   const [sharePassword, setSharePassword] = useState("");
+  const [creatingShare, setCreatingShare] = useState(false);
+  const [revokingShareId, setRevokingShareId] = useState<string | null>(null);
   const [lastShareUrl, setLastShareUrl] = useState<string | null>(null);
   const [lifetimeDialogOpen, setLifetimeDialogOpen] = useState(false);
   const [lifetimeDraft, setLifetimeDraft] = useState<number | null>(null);
@@ -144,21 +151,46 @@ export function ArtifactDetailPage() {
     toast.show(`Версия ${versionNo} восстановлена`, "success");
   }
 
-  async function createShare(mode?: ShareMode, password?: string) {
+  function openShareDialog() {
+    setShareMode(orgDetail?.effectiveDefaultShareMode ?? "team");
+    setShareLabel("");
+    setSharePassword("");
+    setShareDialogOpen(true);
+  }
+
+  async function createShare(e: React.FormEvent) {
+    e.preventDefault();
+    setCreatingShare(true);
     try {
-      const res = await api.post<{ url: string }>(`/artifacts/${id}/shares`, { mode, password });
+      const res = await api.post<{ url: string }>(`/artifacts/${id}/shares`, {
+        mode: shareMode,
+        label: shareLabel || undefined,
+        password: shareMode === "password" ? sharePassword : undefined,
+      });
       await load();
       setLastShareUrl(res.url);
-      setPasswordDialogOpen(false);
+      setShareDialogOpen(false);
       setSharePassword("");
+      setShareLabel("");
+      toast.show("Ссылка создана", "success");
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Не удалось создать ссылку", "error");
+    } finally {
+      setCreatingShare(false);
     }
   }
 
   async function revokeShare(shareId: string) {
-    await api.delete(`/shares/${shareId}`);
-    await load();
+    setRevokingShareId(shareId);
+    try {
+      await api.delete(`/shares/${shareId}`);
+      await load();
+      toast.show("Ссылка отозвана", "success");
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось отозвать ссылку", "error");
+    } finally {
+      setRevokingShareId(null);
+    }
   }
 
   async function remove() {
@@ -239,26 +271,7 @@ export function ArtifactDetailPage() {
       )}
 
       <Card className="mb-4">
-        <CardHeader title="Шаринг" />
-        <div className="mb-3 flex flex-wrap gap-2">
-          <Button
-            variant={orgDetail?.effectiveDefaultShareMode === "team" ? "primary" : "secondary"}
-            onClick={() => createShare("team")}
-          >
-            Ссылка для команды
-          </Button>
-          <Button variant="secondary" onClick={() => setPasswordDialogOpen(true)}>
-            Ссылка с паролем
-          </Button>
-          <Button
-            variant={orgDetail?.effectiveDefaultShareMode === "public" ? "primary" : "secondary"}
-            onClick={() => createShare("public")}
-            disabled={orgDetail?.effectiveAllowPublicShares === false}
-            title={orgDetail?.effectiveAllowPublicShares === false ? "Публичные ссылки запрещены настройками команды" : undefined}
-          >
-            Публичная ссылка
-          </Button>
-        </div>
+        <CardHeader title="Шаринг" action={<Button onClick={openShareDialog}>Создать ссылку</Button>} />
         {lastShareUrl && (
           <div className="mb-3 flex items-center gap-2 rounded-control border border-border bg-panel-muted px-3 py-2 text-sm">
             <span className="flex-1 truncate">{lastShareUrl}</span>
@@ -268,23 +281,28 @@ export function ArtifactDetailPage() {
         <Table>
           <THead>
             <TR>
+              <TH>Название</TH>
               <TH>Режим</TH>
-              <TH>Просмотры</TH>
+              <TH title="Просмотры без учёта участников с правами управления артефактом">Просмотры</TH>
+              <TH title="Все просмотры, включая владельца и администраторов команды">Всего</TH>
               <TH>Истекает</TH>
               <TH />
             </TR>
           </THead>
           <TBody>
-            {shares.filter((s) => !s.revokedAt).length === 0 && <TableEmptyRow colSpan={4}>Нет активных ссылок</TableEmptyRow>}
+            {shares.filter((s) => !s.revokedAt).length === 0 && <TableEmptyRow colSpan={6}>Нет активных ссылок</TableEmptyRow>}
             {shares
               .filter((s) => !s.revokedAt)
               .map((s) => (
                 <TR key={s.id}>
+                  <TD className={s.label ? undefined : "text-muted"}>{s.label || "—"}</TD>
                   <TD>{label(SHARE_MODE_LABELS, s.mode)}</TD>
                   <TD>{s.viewCount}</TD>
+                  <TD className="text-muted">{s.viewCount + s.managerViewCount}</TD>
                   <TD className="text-muted">{s.expiresAt ? formatDateTime(s.expiresAt) : "никогда"}</TD>
-                  <TD className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => revokeShare(s.id)}>
+                  <TD className="flex justify-end gap-2">
+                    <CopyButton value={s.url} label="Ссылка" />
+                    <Button variant="ghost" size="sm" loading={revokingShareId === s.id} onClick={() => revokeShare(s.id)}>
                       Отозвать
                     </Button>
                   </TD>
@@ -382,22 +400,33 @@ export function ArtifactDetailPage() {
         </Table>
       </Card>
 
-      <Dialog open={passwordDialogOpen} onClose={() => setPasswordDialogOpen(false)} title="Ссылка с паролем">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (sharePassword) createShare("password", sharePassword);
-          }}
-          className="flex flex-col gap-3"
-        >
-          <Field label="Пароль" required>
-            <Input type="text" value={sharePassword} onChange={(e) => setSharePassword(e.target.value)} required minLength={4} autoFocus />
+      <Dialog open={shareDialogOpen} onClose={() => setShareDialogOpen(false)} title="Создать ссылку">
+        <form onSubmit={createShare} className="flex flex-col gap-3">
+          <Field label="Режим доступа" required>
+            <Select value={shareMode} onChange={(e) => setShareMode(e.target.value as ShareMode)} autoFocus>
+              <option value="team">{label(SHARE_MODE_LABELS, "team")}</option>
+              <option value="password">{label(SHARE_MODE_LABELS, "password")}</option>
+              <option value="public" disabled={orgDetail?.effectiveAllowPublicShares === false}>
+                {label(SHARE_MODE_LABELS, "public")}
+                {orgDetail?.effectiveAllowPublicShares === false ? " (запрещены настройками команды)" : ""}
+              </option>
+            </Select>
           </Field>
+          <Field label="Название" hint="Необязательно. Видно только вам, в таблице «Шаринг».">
+            <Input type="text" value={shareLabel} onChange={(e) => setShareLabel(e.target.value)} maxLength={100} />
+          </Field>
+          {shareMode === "password" && (
+            <Field label="Пароль" required>
+              <Input type="text" value={sharePassword} onChange={(e) => setSharePassword(e.target.value)} required minLength={4} />
+            </Field>
+          )}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setPasswordDialogOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setShareDialogOpen(false)}>
               Отмена
             </Button>
-            <Button type="submit">Создать</Button>
+            <Button type="submit" loading={creatingShare}>
+              Создать
+            </Button>
           </div>
         </form>
       </Dialog>

@@ -22,13 +22,17 @@ shareRoutes.get("/artifacts/:id/shares", requireAuth, async (c) => {
   if (!access.write) return c.json({ error: { code: "forbidden" } }, 403);
 
   const list = await listSharesForArtifact(db, artifact.id);
+  const env = c.get("env");
   return c.json({
     shares: list.map((s) => ({
       id: s.id,
       token: s.token,
+      url: `${env.APP_ORIGIN}/s/${s.token}`,
       mode: s.mode,
+      label: s.label,
       expiresAt: s.expiresAt,
       viewCount: s.viewCount,
+      managerViewCount: s.managerViewCount,
       revokedAt: s.revokedAt,
       createdAt: s.createdAt,
     })),
@@ -78,6 +82,7 @@ shareRoutes.post("/artifacts/:id/shares", requireAuth, async (c) => {
   const share = await createShare(db, {
     artifactId: artifact.id,
     mode: resolved.mode,
+    label: body.data.label || undefined,
     password: body.data.password,
     expires: body.data.expires,
     pinnedVersionId,
@@ -86,7 +91,10 @@ shareRoutes.post("/artifacts/:id/shares", requireAuth, async (c) => {
 
   await recordAudit(db, { orgId: artifact.orgId, identity, action: "share.create", targetType: "share", targetId: share.id, meta: { mode: share.mode } });
   const env = c.get("env");
-  return c.json({ id: share.id, token: share.token, url: `${env.APP_ORIGIN}/s/${share.token}`, mode: share.mode, expiresAt: share.expiresAt }, 201);
+  return c.json(
+    { id: share.id, token: share.token, url: `${env.APP_ORIGIN}/s/${share.token}`, mode: share.mode, label: share.label, expiresAt: share.expiresAt },
+    201,
+  );
 });
 
 shareRoutes.delete("/shares/:id", requireAuth, async (c) => {

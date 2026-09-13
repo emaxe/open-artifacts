@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Open Artifacts</title>
+    <!-- Static defaults for the whole SPA (no SSR — see apps/api/src/app.ts's readFileSync fallback).
+         The landing (pages/landing/LandingI18nProvider) swaps <title> and this description at
+         runtime for JS-executing crawlers, but social unfurlers (Telegram, Slack, X, Facebook)
+         never run JS, so they always see this Russian version — acceptable since Russian is the
+         primary audience and matches the document's default lang. -->
+    <meta name="description" content="Self-hosted хостинг артефактов для AI-агентов: HTML, Markdown, Mermaid и SVG в изолированной песочнице, по одной ссылке. MIT, свой сервер, встроенный MCP." />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafafa" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0b" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Open Artifacts" />
+    <meta property="og:title" content="Open Artifacts" />
+    <meta property="og:description" content="Self-hosted хостинг артефактов для AI-агентов — HTML, Markdown, Mermaid и SVG по одной ссылке." />
+    <meta property="og:image" content="/brand/logo-lockup.png" />
+    <meta name="twitter:card" content="summary" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <script>

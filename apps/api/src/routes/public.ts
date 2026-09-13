@@ -189,7 +189,9 @@ publicRoutes.get("/embed/:token", async (c) => {
   if (!resolved) return c.html(embedErrorPage("No content available."), 404);
 
   // A manager (owner/team admin/superadmin) browsing their own versions shouldn't inflate the
-  // view count they're the one reading — see the "Changed" note in CHANGELOG.
+  // audience-facing view count they're the one reading — see the "Changed" note in CHANGELOG —
+  // so their visits land in `managerViewCount` instead of `viewCount`, and never in the
+  // `artifact_views` analytics table (which is meant to describe the actual audience only).
   if (!ctx.canManage) {
     const ip = c.req.header("x-forwarded-for");
     recordArtifactView(db, {
@@ -199,8 +201,8 @@ publicRoutes.get("/embed/:token", async (c) => {
       uaHash: c.req.header("user-agent") ? hashIp(c.req.header("user-agent")!, env.IP_HASH_SALT) : undefined,
       referer: c.req.header("referer"),
     }).catch((err) => console.error("failed to record view:", err));
-    incrementShareViewCount(db, share.id).catch((err) => console.error("failed to bump view count:", err));
   }
+  incrementShareViewCount(db, share.id, { manager: ctx.canManage }).catch((err) => console.error("failed to bump view count:", err));
 
   return c.html(renderArtifactHtml(artifact.kind, resolved.version.content));
 });
