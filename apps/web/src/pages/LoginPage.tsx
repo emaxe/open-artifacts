@@ -6,6 +6,7 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Field } from "../components/ui/Field";
+import { LogoLockup } from "../components/Logo";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -41,7 +42,8 @@ export function LoginPage() {
 
   return (
     <div className="mx-auto mt-[10vh] max-w-sm px-4">
-      <h2 className="mb-4 text-xl font-semibold text-fg">Вход</h2>
+      <LogoLockup className="mx-auto mb-6 h-36 w-32" />
+      <h2 className="mb-4 text-center text-xl font-semibold text-fg">Вход</h2>
       <Card>
         <form onSubmit={onSubmit} className="flex flex-col gap-3">
           <Field label="Email" required>

@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useTheme, type ThemePreference } from "../lib/theme";
 import { TeamSwitcher } from "./TeamSwitcher";
+import { LogoMark } from "./Logo";
 import { Badge } from "./ui/Badge";
 import { cn } from "../lib/cn";
 import { LogOutIcon, MailIcon, SettingsIcon, ShieldIcon, UsersIcon } from "./ui/icons";
@@ -26,7 +27,9 @@ export function GlobalSidebar({ onNavigate }: { onNavigate?: () => void } = {}) 
 
   return (
     <div className="flex h-full flex-col p-4">
-      <h1 className="mb-1 text-base font-semibold text-fg">Open Artifacts</h1>
+      <h1 className="mb-1 flex items-center gap-2 text-base font-semibold text-fg">
+        <LogoMark size={20} /> Open Artifacts
+      </h1>
       <TeamSwitcher />
 
       <nav className="mt-6 flex flex-1 flex-col gap-0.5" onClick={onNavigate}>

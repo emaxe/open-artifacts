@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { GlobalSidebar } from "./GlobalSidebar";
+import { LogoMark } from "./Logo";
 import { Spinner } from "./ui/Spinner";
 import { IconButton } from "./ui/Button";
 import { Dialog } from "./ui/Dialog";
@@ -34,6 +35,7 @@ export function Layout() {
           <IconButton label="Меню" onClick={() => setMobileNavOpen(true)}>
             <MenuIcon />
           </IconButton>
+          <LogoMark size={20} />
           <span className="text-sm font-semibold text-fg">Open Artifacts</span>
         </header>
 

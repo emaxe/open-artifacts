@@ -28,6 +28,10 @@
   --oa-danger-fg: #ffffff;
   --oa-success: #16a34a;
   --oa-ring: #a1a1aa;
+  /* Wordmark in the source art is a flat dark navy, invisible on the dark background — swapped
+     per theme like the color tokens above rather than via `dark:`, since that variant only
+     matches an explicit [data-theme="dark"] and misses the "system" (no-attribute) state below. */
+  --oa-logo-lockup: url("/brand/logo-lockup.png");
 }
 
 @media (prefers-color-scheme: dark) {
@@ -45,6 +49,7 @@
     --oa-danger-fg: #1a0a0a;
     --oa-success: #4ade80;
     --oa-ring: #52525b;
+    --oa-logo-lockup: url("/brand/logo-lockup-dark.png");
   }
 }
 
@@ -62,6 +67,7 @@
   --oa-danger-fg: #1a0a0a;
   --oa-success: #4ade80;
   --oa-ring: #52525b;
+  --oa-logo-lockup: url("/brand/logo-lockup-dark.png");
 }
 
 @theme inline {
