@@ -3,7 +3,7 @@ import type { OrgRole } from "@open-artifacts/shared";
 import type { Database } from "../db/client.js";
 import type { AppBindings, Identity } from "../types.js";
 import { getOrgRole } from "./users.js";
-import { listOrgMembershipsForUser, type OrgMembershipRef } from "./orgs.js";
+import { listOrgMembershipsForUser, resolveOrgId, type OrgMembershipRef } from "./orgs.js";
 
 export type OrgChoice = OrgMembershipRef;
 
@@ -28,9 +28,15 @@ function normalizeRequested(requested?: string | null): string | undefined {
  *    checked against live membership; with none given, the org is picked automatically only when
  *    the holder belongs to exactly one, otherwise the caller must choose — callers surface that
  *    as `org_required` with the candidate list, never guess.
+ *
+ * `requested` may be the org's real id or its slug (both are documented as accepted by `--org`);
+ * it's resolved to the real id once, up front, so every branch below — including the value
+ * returned in `ok: true` — works with the real id an artifact's `orgId` column actually stores.
  */
 export async function resolveOrgScope(db: Database, identity: Identity, requested?: string | null): Promise<OrgScope> {
-  const orgId = normalizeRequested(requested);
+  const requestedRaw = normalizeRequested(requested);
+  const orgId = requestedRaw ? await resolveOrgId(db, requestedRaw) : undefined;
+  if (requestedRaw && !orgId) return { ok: false, code: "forbidden" };
 
   if (identity.kind === "agent") {
     if (orgId && orgId !== identity.orgId) return { ok: false, code: "forbidden" };

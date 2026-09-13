@@ -7,7 +7,7 @@ import { shareCommand, unshareCommand, whoamiCommand } from "./commands/share.js
 import { orgsCommand, useCommand } from "./commands/orgs.js";
 
 const program = new Command();
-program.name("oa").description("CLI for Open Artifacts — self-hosted artifact hosting for AI agents").version("0.6.0");
+program.name("oa").description("CLI for Open Artifacts — self-hosted artifact hosting for AI agents").version("0.6.1");
 
 program
   .command("login")

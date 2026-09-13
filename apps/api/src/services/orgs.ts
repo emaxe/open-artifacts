@@ -12,6 +12,21 @@ export interface OrgMembershipRef {
   role: OrgRole;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolves a caller-supplied org identifier — the real `orgs.id` UUID, or the human-readable
+ * `slug` shown by `oa orgs` and accepted by `--org` — to the real UUID, or `null` if neither
+ * matches. A syntactically valid UUID is trusted as-is (no query) so real ids stay a fast path;
+ * anything else is looked up by slug. See services/org-scope.ts, the only caller that has to
+ * handle a caller-chosen identifier instead of one already read back from the database.
+ */
+export async function resolveOrgId(db: Database, identifier: string): Promise<string | null> {
+  if (UUID_RE.test(identifier)) return identifier;
+  const org = await db.query.orgs.findFirst({ where: eq(orgs.slug, identifier) });
+  return org?.id ?? null;
+}
+
 /** Every org a user belongs to right now, for personal-key scope resolution (see services/org-scope.ts). */
 export async function listOrgMembershipsForUser(db: Database, userId: string): Promise<OrgMembershipRef[]> {
   return db

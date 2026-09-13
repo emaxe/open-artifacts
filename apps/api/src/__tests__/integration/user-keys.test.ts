@@ -70,6 +70,19 @@ describe("personal (user-scoped) API keys", () => {
     expect(((await resTeam.json()) as { artifact: { orgId: string } }).artifact.orgId).toBe(user.orgId);
   });
 
+  it("publishes into a holder's org when its slug is given instead of its id", async () => {
+    const app = buildTestApp();
+    const user = await registerAndLogin(app);
+    const key = await issueUserKey(app, user.sessionCookie);
+
+    const orgRes = await app.request(`/api/v1/orgs/${user.orgId}`, { headers: { Cookie: `oa_session=${user.sessionCookie}` } });
+    const { slug } = (await orgRes.json()) as { slug: string };
+
+    const res = await postArtifact(app, key.token, slug);
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { artifact: { orgId: string } }).artifact.orgId).toBe(user.orgId);
+  });
+
   it("auto-selects the org when the holder belongs to exactly one", async () => {
     const app = buildTestApp();
     const solo = await registerOnly(app);

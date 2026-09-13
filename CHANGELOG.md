@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-13
+
+### Fixed
+- `--org <team>` (CLI) and `orgId` (REST/MCP) accept either a team's real id or its slug, per their own documentation — but passing the slug on an explicit request (anyone in more than one team, using `--org`/`orgId` to pick a non-default one) crashed with a `500`: `resolveOrgScope` forwarded it straight into a UUID-typed database column instead of resolving it first. Affected `POST`/`GET /artifacts` and the org-scoped MCP tools; the single-team auto-selected case was never affected.
+
 ## [0.6.0] - 2026-09-13
 
 ### Added
