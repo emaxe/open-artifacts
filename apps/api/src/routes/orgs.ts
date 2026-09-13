@@ -63,11 +63,7 @@ orgRoutes.get("/orgs/:id", requireAuth, async (c) => {
   const db = c.get("db");
 
   const instanceSettings = await getInstanceSettings(db, defaultInstanceSettings(c.get("env")));
-  const detail = await getOrgDetail(db, orgId, {
-    maxArtifactLifetimeMinutes: instanceSettings.maxArtifactLifetimeMinutes,
-    allowPublicShares: instanceSettings.allowPublicShares,
-    defaultShareMode: instanceSettings.defaultShareMode,
-  });
+  const detail = await getOrgDetail(db, orgId, instanceSettings);
   if (!detail) return c.json({ error: { code: "not_found" } }, 404);
 
   const myRole = await getOrgRole(db, orgId, identity.userId);
@@ -78,7 +74,13 @@ orgRoutes.get("/orgs/:id", requireAuth, async (c) => {
 
 const updateOrgSchema = z.object({
   name: z.string().min(1).max(200).optional(),
-  storageQuotaBytes: z.number().int().positive().optional(),
+  // A positive integer sets a team-local ceiling (must be within the instance max); `null` reverts
+  // to inheriting the instance quota (which itself defaults to unlimited). `0` is rejected —
+  // "explicitly unlimited" is meaningless once a finite instance max exists (a team can never be
+  // LOOSER than the instance, only equal-or-stricter), and would be indistinguishable from
+  // "inherit" in the UI. Same shape and reasoning as maxArtifactLifetimeMinutes below.
+  storageQuotaBytes: z.number().int().positive().nullable().optional(),
+  artifactQuotaBytes: z.number().int().positive().nullable().optional(),
   // A positive integer sets a team-local ceiling (must be within the instance max); `null` reverts
   // to inheriting the instance max. `0` is rejected — "explicitly unlimited" is meaningless once
   // a finite instance max exists, and would be indistinguishable from "inherit" in the UI.
@@ -114,6 +116,20 @@ orgRoutes.patch("/orgs/:id", requireAuth, async (c) => {
     if (globalMaxMinutes > 0 && body.data.maxArtifactLifetimeMinutes > globalMaxMinutes) {
       return c.json(
         { error: { code: "lifetime_exceeds_max", message: "Team lifetime cannot exceed the instance maximum", maxLifetimeMinutes: globalMaxMinutes } },
+        400,
+      );
+    }
+  }
+
+  // Same "equal-or-stricter, never looser" rule as maxArtifactLifetimeMinutes — a team owner/admin
+  // MAY set their own per-artifact ceiling themselves (unlike storageQuotaBytes above), but never
+  // past the instance-wide one.
+  if (body.data.artifactQuotaBytes !== undefined && body.data.artifactQuotaBytes !== null) {
+    const instanceSettings = await getInstanceSettings(db, defaultInstanceSettings(c.get("env")));
+    const globalArtifactQuotaBytes = instanceSettings.artifactQuotaBytes;
+    if (globalArtifactQuotaBytes > 0 && body.data.artifactQuotaBytes > globalArtifactQuotaBytes) {
+      return c.json(
+        { error: { code: "quota_exceeds_max", message: "Team artifact quota cannot exceed the instance maximum", maxArtifactQuotaBytes: globalArtifactQuotaBytes } },
         400,
       );
     }
@@ -157,6 +173,7 @@ orgRoutes.patch("/orgs/:id", requireAuth, async (c) => {
     name: updated.name,
     slug: updated.slug,
     storageQuotaBytes: updated.storageQuotaBytes,
+    artifactQuotaBytes: updated.artifactQuotaBytes,
     maxArtifactLifetimeMinutes: updated.maxArtifactLifetimeMinutes,
     defaultShareMode: updated.defaultShareMode,
     allowPublicShares: updated.allowPublicShares,

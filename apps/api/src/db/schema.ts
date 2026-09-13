@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   check,
   index,
@@ -54,7 +55,12 @@ export const orgs = pgTable("orgs", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   slug: text("slug").notNull(),
-  storageQuotaBytes: integer("storage_quota_bytes").notNull().default(1_073_741_824), // 1 GiB
+  // NULL = inherit the instance-wide quota (see InstanceSettings.orgQuotaBytes); 0 there means
+  // unlimited, the default for a fresh instance. `bigint` because this now also counts uploaded
+  // file bytes, not just artifact source text — `integer` would cap out around 2 GiB.
+  storageQuotaBytes: bigint("storage_quota_bytes", { mode: "number" }),
+  // NULL = inherit the instance-wide per-artifact quota (InstanceSettings.artifactQuotaBytes).
+  artifactQuotaBytes: bigint("artifact_quota_bytes", { mode: "number" }),
   // NULL = inherit the instance-wide max artifact lifetime; superadmin-controlled bound applies regardless.
   maxArtifactLifetimeMinutes: integer("max_artifact_lifetime_minutes"),
   // NULL = inherit the instance-wide default link mode. Never 'password': a default-mode create
@@ -171,6 +177,10 @@ export const artifacts = pgTable("artifacts", {
   currentVersionId: uuid("current_version_id"),
   visibility: artifactVisibilityEnum("visibility").notNull().default("private"),
   sizeBytes: integer("size_bytes").notNull().default(0),
+  // Denormalized sum of live artifact_files.size_bytes for this artifact — kept in the same
+  // transaction as every file insert/delete so quota checks stay a single scan of `artifacts`,
+  // same shape as sizeBytes above. bigint: uploaded files can add up past integer's ~2 GiB cap.
+  filesBytes: bigint("files_bytes", { mode: "number" }).notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -199,6 +209,50 @@ export const artifactVersions = pgTable("artifact_versions", {
 }, (table) => [
   uniqueIndex("artifact_versions_artifact_version_idx").on(table.artifactId, table.versionNo),
 ]);
+
+/**
+ * A file (image/attachment) uploaded to an S3-compatible bucket and attached to one artifact.
+ * `artifactId` is NOT NULL with ON DELETE CASCADE on purpose — a file with no artifact must be
+ * structurally impossible, not just a convention every call site has to remember. Attached to the
+ * artifact, not a specific version: restoring an older version never resurrects or drops files.
+ */
+export const artifactFiles = pgTable("artifact_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  artifactId: uuid("artifact_id").notNull().references(() => artifacts.id, { onDelete: "cascade" }),
+  // Public path segment for GET /af/:token — a capability token, not a database id, so knowing an
+  // artifact's id never lets you enumerate or guess its files.
+  token: text("token").notNull(),
+  // orgs/<orgId>/artifacts/<artifactId>/<id> — never derived from caller-supplied data.
+  storageKey: text("storage_key").notNull(),
+  name: text("name").notNull(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+  // sha256 of the object body — dedup/debugging aid and input to reconcileStorage(), not a security control.
+  checksum: text("checksum"),
+  createdByType: ownerTypeEnum("created_by_type").notNull(),
+  createdById: uuid("created_by_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("artifact_files_token_idx").on(table.token),
+  uniqueIndex("artifact_files_storage_key_idx").on(table.storageKey),
+  index("artifact_files_artifact_id_idx").on(table.artifactId),
+]);
+
+/**
+ * Outbox for object-storage deletions. Deliberately carries NO foreign key to `artifacts` or
+ * `artifact_files` — an `artifact_files` row that cascades away (explicit delete, artifact
+ * deletion, or an org's raw-SQL cascade with zero application code involved) must still leave its
+ * object queued for removal, which a `storageGcQueue` -> `artifactFiles` FK would prevent. Rows
+ * are inserted by the `artifact_files_gc_trigger` (see the migration), not application code, so
+ * every deletion path is covered without each one remembering to enqueue it.
+ */
+export const storageGcQueue = pgTable("storage_gc_queue", {
+  storageKey: text("storage_key").primaryKey(),
+  sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+  enqueuedAt: timestamp("enqueued_at", { withTimezone: true }).notNull().defaultNow(),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+});
 
 export const shares = pgTable("shares", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -286,10 +340,15 @@ export const orgsRelations = relations(orgs, ({ many }) => ({
 export const artifactsRelations = relations(artifacts, ({ many }) => ({
   versions: many(artifactVersions),
   shares: many(shares),
+  files: many(artifactFiles),
 }));
 
 export const artifactVersionsRelations = relations(artifactVersions, ({ one }) => ({
   artifact: one(artifacts, { fields: [artifactVersions.artifactId], references: [artifacts.id] }),
+}));
+
+export const artifactFilesRelations = relations(artifactFiles, ({ one }) => ({
+  artifact: one(artifacts, { fields: [artifactFiles.artifactId], references: [artifacts.id] }),
 }));
 
 export const agentsRelations = relations(agents, ({ many, one }) => ({

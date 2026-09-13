@@ -30,9 +30,23 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
+/**
+ * Multipart upload — bypasses `request()`'s hardcoded `Content-Type: application/json` (a
+ * `FormData` body needs the browser to set its own `multipart/form-data; boundary=...` header).
+ */
+async function postForm<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { method: "POST", credentials: "include", body: form });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(body?.error?.code ?? "unknown_error", body?.error?.message ?? res.statusText, res.status, body);
+  }
+  return body as T;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
+  postForm,
   patch: <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body), headers }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
@@ -73,7 +87,20 @@ export interface OrgDetail {
   name: string;
   slug: string;
   kind: "main" | "team";
-  storageQuotaBytes: number;
+  /** This team's own override, in bytes. `null` = inherits the instance quota (which itself defaults to unlimited). */
+  storageQuotaBytes: number | null;
+  /** This team's own per-artifact override, in bytes. `null` = inherits the instance quota. */
+  artifactQuotaBytes: number | null;
+  /** The instance-wide team quota, in bytes. `null` = unlimited. */
+  globalOrgQuotaBytes: number | null;
+  /** The instance-wide per-artifact quota, in bytes. `null` = unlimited. */
+  globalArtifactQuotaBytes: number | null;
+  /** The stricter of the two team-quota values above — what this team is actually held to. `null` = unlimited. */
+  effectiveOrgQuotaBytes: number | null;
+  /** The stricter of the two per-artifact-quota values above. `null` = unlimited. */
+  effectiveArtifactQuotaBytes: number | null;
+  /** Bytes currently used by this team (artifact source + uploaded files, live artifacts only). */
+  usedBytes: number;
   /** This team's own override, in minutes. `null` = inherits the instance maximum. */
   maxArtifactLifetimeMinutes: number | null;
   /** The instance-wide maximum, in minutes. `null` = unlimited. */

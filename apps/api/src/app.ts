@@ -5,6 +5,7 @@ import { readFileSync, existsSync } from "node:fs";
 import type { AppBindings } from "./types.js";
 import type { Database } from "./db/client.js";
 import type { Env } from "./env.js";
+import type { Storage } from "./services/storage.js";
 import { resolveIdentity } from "./middleware/auth.js";
 import { usageMetering } from "./middleware/usage.js";
 import { rateLimit } from "./middleware/rate-limit.js";
@@ -21,13 +22,15 @@ import { publicRoutes } from "./routes/public.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { userRoutes } from "./routes/users.js";
 import { meRoutes } from "./routes/me.js";
+import { fileRoutes, publicFileRoutes } from "./routes/files.js";
 
-export function createApp(db: Database, env: Env) {
+export function createApp(db: Database, env: Env, storage: Storage) {
   const app = new Hono<AppBindings>();
 
   app.use("*", async (c, next) => {
     c.set("db", db);
     c.set("env", env);
+    c.set("storage", storage);
     c.set("requestStartedAt", Date.now());
     return next();
   });
@@ -36,6 +39,10 @@ export function createApp(db: Database, env: Env) {
 
   app.route("/", healthRoutes);
   app.route("/", publicRoutes);
+  // GET /af/:token — serves an uploaded artifact file. Public like /embed/:token, but gated on the
+  // PARENT ARTIFACT's own liveness rather than any one share, since a file's URL is baked into the
+  // artifact's own content and outlives any single share link (see routes/files.ts).
+  app.route("/", publicFileRoutes);
 
   const api = new Hono<AppBindings>();
   api.use("*", resolveIdentity);
@@ -51,6 +58,7 @@ export function createApp(db: Database, env: Env) {
   api.route("/", adminRoutes);
   api.route("/", userRoutes);
   api.route("/", meRoutes);
+  api.route("/", fileRoutes);
 
   app.route("/api/v1", api);
 

@@ -1,5 +1,6 @@
 export * from "./ttl.js";
 export * from "./lifetime.js";
+export * from "./quota.js";
 export * from "./content-hash.js";
 export * from "./csp.js";
 export * from "./scopes.js";

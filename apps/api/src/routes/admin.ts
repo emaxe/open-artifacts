@@ -4,13 +4,15 @@ import { z } from "zod";
 import { defaultShareModeSchema } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import { requireAuth, requireSuperadmin } from "../middleware/auth.js";
-import { artifacts, agents, orgs, users } from "../db/schema.js";
+import { artifacts, agents, artifactFiles, orgs, users } from "../db/schema.js";
 import { listAuditLog, recordAudit } from "../services/audit.js";
 import { defaultInstanceSettings, getInstanceSettings, updateInstanceSettings } from "../services/settings.js";
 import { getTopArtifacts } from "../services/analytics.js";
 import { setUserStatus, CannotModifySuperadminError } from "../services/users.js";
 import { clampArtifactExpirations, clampOrgLifetimeOverrides } from "../services/lifetime.js";
 import { purgeExpiredArtifacts } from "../services/retention.js";
+import { clampOrgQuotaOverrides } from "../services/quota.js";
+import { reconcileStorage } from "../services/storage-gc.js";
 
 export const adminRoutes = new Hono<AppBindings>();
 // Scoped to "/admin/*" rather than a bare "*": once merged into the shared `api` router (all
@@ -20,13 +22,17 @@ adminRoutes.use("/admin/*", requireAuth, requireSuperadmin);
 
 adminRoutes.get("/admin/stats", async (c) => {
   const db = c.get("db");
-  const [[artifactCount], [teamOrgCount], [mainOrgCount], [agentCount], [userCount], [storage]] = await Promise.all([
+  const [[artifactCount], [teamOrgCount], [mainOrgCount], [agentCount], [userCount], [storage], [fileCount]] = await Promise.all([
     db.select({ n: sql<number>`count(*)` }).from(artifacts).where(isNull(artifacts.deletedAt)),
     db.select({ n: sql<number>`count(*)` }).from(orgs).where(eq(orgs.kind, "team")),
     db.select({ n: sql<number>`count(*)` }).from(orgs).where(eq(orgs.kind, "main")),
     db.select({ n: sql<number>`count(*)` }).from(agents),
     db.select({ n: sql<number>`count(*)` }).from(users),
-    db.select({ total: sql<number>`coalesce(sum(${artifacts.sizeBytes}), 0)` }).from(artifacts).where(isNull(artifacts.deletedAt)),
+    // Includes uploaded file bytes alongside artifact source text — the same total the per-team
+    // quota (services/quota.ts) is checked against, so this number and a team's own usage always
+    // agree in what they're counting.
+    db.select({ total: sql<number>`coalesce(sum(${artifacts.sizeBytes} + ${artifacts.filesBytes}), 0)` }).from(artifacts).where(isNull(artifacts.deletedAt)),
+    db.select({ n: sql<number>`count(*)` }).from(artifactFiles),
   ]);
 
   return c.json({
@@ -40,6 +46,8 @@ adminRoutes.get("/admin/stats", async (c) => {
     agents: Number(agentCount!.n),
     users: Number(userCount!.n),
     storageBytes: Number(storage!.total),
+    files: Number(fileCount!.n),
+    storageEnabled: c.get("storage").enabled,
   });
 });
 
@@ -92,6 +100,9 @@ const settingsPatchSchema = z.object({
   maxArtifactLifetimeMinutes: z.number().int().nonnegative().optional(),
   allowPublicShares: z.boolean().optional(),
   defaultShareMode: defaultShareModeSchema.optional(),
+  // Bytes; 0 = unlimited (the default). A team may set its own stricter override — see quota.ts.
+  orgQuotaBytes: z.number().int().nonnegative().optional(),
+  artifactQuotaBytes: z.number().int().nonnegative().optional(),
 });
 
 adminRoutes.patch("/admin/settings", async (c) => {
@@ -117,6 +128,20 @@ adminRoutes.patch("/admin/settings", async (c) => {
   }
 
   if (
+    (body.data.orgQuotaBytes !== undefined && body.data.orgQuotaBytes !== current.orgQuotaBytes) ||
+    (body.data.artifactQuotaBytes !== undefined && body.data.artifactQuotaBytes !== current.artifactQuotaBytes)
+  ) {
+    // Same reasoning as the lifetime clamp above: lowering a quota is destructive to what a team
+    // believed its own override meant, so keep stored overrides truthful and log it separately.
+    await clampOrgQuotaOverrides(db, body.data.orgQuotaBytes ?? current.orgQuotaBytes, body.data.artifactQuotaBytes ?? current.artifactQuotaBytes);
+    await recordAudit(db, {
+      identity: c.get("identity")!,
+      action: "settings.quota_update",
+      meta: { orgQuotaBytes: body.data.orgQuotaBytes, artifactQuotaBytes: body.data.artifactQuotaBytes },
+    });
+  }
+
+  if (
     (body.data.allowPublicShares !== undefined && body.data.allowPublicShares !== current.allowPublicShares) ||
     (body.data.defaultShareMode !== undefined && body.data.defaultShareMode !== current.defaultShareMode)
   ) {
@@ -138,6 +163,18 @@ adminRoutes.post("/admin/retention/purge", async (c) => {
   const db = c.get("db");
   const result = await purgeExpiredArtifacts(db);
   await recordAudit(db, { identity: c.get("identity")!, action: "artifact.purge_run", meta: { purged: result.purged } });
+  return c.json(result);
+});
+
+/**
+ * Safety-net trigger for "a file with no artifact must not exist" (see storage-gc.ts's
+ * reconcileStorage doc comment) — queues any bucket object with no matching `artifact_files` row
+ * for deletion. Not run on a timer; an admin action, like the retention purge above.
+ */
+adminRoutes.post("/admin/storage/reconcile", async (c) => {
+  const db = c.get("db");
+  const result = await reconcileStorage(db, c.get("storage"));
+  await recordAudit(db, { identity: c.get("identity")!, action: "storage.reconcile_run", meta: { orphans: result.orphans } });
   return c.json(result);
 });
 

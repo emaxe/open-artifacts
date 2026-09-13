@@ -57,6 +57,13 @@
       "when": 1789289189247,
       "tag": "0007_large_rick_jones",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789298621215,
+      "tag": "0008_special_goblin_queen",
+      "breakpoints": true
     }
   ]
 }

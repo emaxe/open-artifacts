@@ -12,7 +12,10 @@ interface Stats {
   mainOrgs: number;
   agents: number;
   users: number;
+  // Includes uploaded file bytes alongside artifact source text — see routes/admin.ts.
   storageBytes: number;
+  files: number;
+  storageEnabled: boolean;
 }
 
 export function AdminOverviewPage() {
@@ -35,6 +38,7 @@ export function AdminOverviewPage() {
         <StatCard label="Агенты" value={stats.agents} />
         <StatCard label="Пользователи" value={stats.users} />
         <StatCard label="Хранилище" value={formatBytes(stats.storageBytes)} />
+        {stats.storageEnabled && <StatCard label="Файлы" value={stats.files} />}
       </div>
 
       <Card>

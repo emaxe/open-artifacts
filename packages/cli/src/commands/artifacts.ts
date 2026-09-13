@@ -177,7 +177,18 @@ export function handleError(err: unknown): never {
       die("Your API key has expired. Run `oa login` again.");
     }
     if (err.code === "quota_exceeded") {
-      die("Organization storage quota exceeded.");
+      const scope = err.body?.error?.scope;
+      const limit = err.body?.error?.limitBytes;
+      const used = err.body?.error?.usedBytes;
+      const detail = scope && limit !== undefined && used !== undefined ? ` (${scope}: ${used}/${limit} bytes)` : "";
+      die(`Storage quota exceeded${detail}. Run \`oa quota\` to see the current limit and usage, or free up space.`);
+    }
+    if (err.code === "storage_disabled") {
+      die("Object storage is not configured on this instance — an admin needs to set S3_BUCKET (and related S3_* vars) to enable file uploads.");
+    }
+    if (err.code === "file_too_large") {
+      const max = err.body?.error?.maxFileBytes;
+      die(`File exceeds the maximum allowed size${max ? ` (${max} bytes)` : ""}.`);
     }
     if (err.code === "version_conflict") {
       die("Someone else changed this artifact since you last read it (409). Fetch the latest with `oa get` and retry.");

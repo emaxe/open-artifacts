@@ -22,4 +22,18 @@ describe("buildEmbedCsp", () => {
     const csp = buildEmbedCsp({ scriptAllowlist: [], frameAncestor: "https://app.example.com" });
     expect(csp).toContain("frame-ancestors https://app.example.com");
   });
+
+  it("omits media-src and leaves img-src/font-src untouched when no asset origin is given", () => {
+    const csp = buildEmbedCsp({ scriptAllowlist: [], frameAncestor: "https://app.example.com" });
+    expect(csp).not.toContain("media-src");
+    expect(csp).toContain("img-src data: blob: https:;");
+    expect(csp).toContain("font-src https://fonts.gstatic.com data:;");
+  });
+
+  it("adds the asset origin to img-src/font-src and opens media-src when storage is enabled", () => {
+    const csp = buildEmbedCsp({ scriptAllowlist: [], frameAncestor: "https://app.example.com", assetOrigin: "https://app.example.com" });
+    expect(csp).toContain("img-src data: blob: https: https://app.example.com;");
+    expect(csp).toContain("font-src https://fonts.gstatic.com data: https://app.example.com;");
+    expect(csp).toContain("media-src https://app.example.com;");
+  });
 });

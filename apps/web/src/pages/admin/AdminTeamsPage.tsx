@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError, type OrgDetail, type OrgListItem } from "../../lib/api";
-import { formatDateTime, formatLifetime } from "../../lib/labels";
+import { formatDateTime, formatLifetime, formatBytes, formatQuota } from "../../lib/labels";
 import { Card, CardHeader } from "../../components/ui/Card";
 import { Table, THead, TBody, TR, TH, TD, TableEmptyRow } from "../../components/ui/Table";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -192,16 +192,24 @@ function LifetimeDialog({ org, onClose, onDone }: { org: OrgListItem; onClose: (
 
 function QuotaDialog({ org, onClose, onDone }: { org: OrgListItem; onClose: () => void; onDone: () => void }) {
   const toast = useToast();
-  // OrgListItem doesn't carry the current quota (only GET /orgs/:id does) — default to the
-  // platform default (1 GiB) rather than firing an extra fetch just to prefill this field.
-  const [mb, setMb] = useState("1024");
+  const [detail, setDetail] = useState<OrgDetail | null>(null);
+  // "" renders as the inherited/effective value in the field's hint rather than a real number —
+  // submitting with it empty means "inherit" (storageQuotaBytes: null), not "0 bytes".
+  const [mb, setMb] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get<OrgDetail>(`/orgs/${org.id}`).then((d) => {
+      setDetail(d);
+      setMb(d.storageQuotaBytes !== null ? String(Math.round(d.storageQuotaBytes / 1024 / 1024)) : "");
+    });
+  }, [org.id]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      await api.patch(`/orgs/${org.id}`, { storageQuotaBytes: Math.round(Number(mb) * 1024 * 1024) });
+      await api.patch(`/orgs/${org.id}`, { storageQuotaBytes: mb.trim() === "" ? null : Math.round(Number(mb) * 1024 * 1024) });
       toast.show("Квота изменена", "success");
       onDone();
     } catch (err) {
@@ -213,19 +221,26 @@ function QuotaDialog({ org, onClose, onDone }: { org: OrgListItem; onClose: () =
 
   return (
     <Dialog open onClose={onClose} title={`Квота хранилища: ${org.name}`}>
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        <Field label="Мегабайт" hint="Значение по умолчанию для новой команды — 1024 МБ (1 ГиБ)">
-          <Input type="number" min={1} value={mb} onChange={(e) => setMb(e.target.value)} required />
-        </Field>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button type="submit" loading={busy}>
-            Сохранить
-          </Button>
-        </div>
-      </form>
+      {!detail ? (
+        <Spinner />
+      ) : (
+        <form onSubmit={submit} className="flex flex-col gap-3">
+          <p className="text-sm text-muted">
+            Используется: {formatBytes(detail.usedBytes)}. Действующий лимит команды: {formatQuota(detail.effectiveOrgQuotaBytes)}.
+          </p>
+          <Field label="Мегабайт" hint="Оставьте пустым, чтобы наследовать лимит инстанса (по умолчанию — без ограничений)">
+            <Input type="number" min={1} placeholder="без ограничений" value={mb} onChange={(e) => setMb(e.target.value)} />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Отмена
+            </Button>
+            <Button type="submit" loading={busy}>
+              Сохранить
+            </Button>
+          </div>
+        </form>
+      )}
     </Dialog>
   );
 }

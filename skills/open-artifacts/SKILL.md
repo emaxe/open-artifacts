@@ -134,7 +134,10 @@ rather than show it to a human.
 
 ## Content kinds
 
-- `html` — a self-contained HTML file (inline `<style>`/`<script>` — no separate asset files).
+- `html` — a self-contained HTML file: inline `<style>`/`<script>`, no relative-path assets of your
+  own. An artifact CAN have real image/file attachments — see "Files: images and attachments"
+  below — but they're uploaded separately and referenced by an absolute `/af/...` URL the server
+  gives you back, never by a bundled sibling file.
   Default if you don't pass `--kind` and the file extension isn't recognized.
 - `markdown` — rendered server-side to HTML.
 - `mermaid` — a raw Mermaid diagram definition, rendered client-side.
@@ -142,6 +145,46 @@ rather than show it to a human.
 
 `oa push` infers the kind from the file extension (`.html`, `.md`, `.mmd`/`.mermaid`, `.svg`);
 override with `--kind` if the extension doesn't match.
+
+## Files: images and attachments
+
+An artifact can have real binary files attached to it — a logo, a screenshot, a downloadable
+asset — stored in the instance's own object storage rather than embedded as a base64 `data:` URI
+in the HTML. **Not every instance has this configured.** Check first:
+
+```bash
+oa quota                        # team-wide remaining quota
+oa quota --artifact <artifact-id>   # narrows to that artifact's own remaining quota too
+```
+
+If the response says storage is disabled, don't attempt an upload — fall back to inlining the
+asset (a small image as a `data:` URI, which `img-src` already allows) or tell the human an admin
+needs to configure object storage. Otherwise, decide whether to upload based on `maxFileBytes` and
+the remaining `availableBytes` in the quota response (`null` means unlimited) — an agent is
+expected to make this call itself, not upload blindly and handle the failure after the fact.
+
+**Create the artifact first, then attach files to it, then reference their URLs in an update:**
+
+```bash
+oa push draft.html                              # create the artifact, note its id
+oa files upload <artifact-id> ./logo.png        # prints: URL: http://<server>/af/<token>
+# edit draft.html, replacing a placeholder with <img src="http://<server>/af/<token>">
+oa push draft.html --id <artifact-id>           # push the version that references it
+```
+
+The URL is absolute and works from anywhere the artifact is rendered (any share link, the authed
+preview) — it isn't tied to one specific share. `oa files ls <artifact-id>` lists what's attached
+(with sizes); `oa files rm <artifact-id> <file-id>` removes one. Deleting the artifact deletes its
+files too — there's no way to keep an orphaned file around, and no separate cleanup step needed.
+
+A file's `Content-Type` decides how it's served: images/audio/video/fonts render inline (usable
+directly in `<img src>`/`<video src>`/etc.); everything else — notably `.html` and `.svg` files —
+is always forced to download as `application/octet-stream`, never executed from the file's own
+URL. Don't try to attach an executable HTML fragment as a "file" and load it inline; if you need
+programmatic content, put it in the artifact's own `content` instead.
+
+Uploading is a binary/multipart operation, so it's **CLI/REST only** — see "If you're an MCP
+client instead" below for what MCP can and can't do here.
 
 ## Design: read a template before you write
 
@@ -181,7 +224,8 @@ Two rules decide what works:
    library's separate CSS file from a CDN will be silently blocked — inline the CSS yourself
    (fetch its text and paste it into a `<style>` tag) or pick a library that needs no external CSS.
 4. **`img-src`** is open (`data:`, `blob:`, `https:`) — unlike scripts/styles, images and textures
-   (e.g. three.js texture maps) can load directly from any `https://` URL at runtime.
+   (e.g. three.js texture maps) can load directly from any `https://` URL at runtime, including
+   this instance's own `/af/<token>` file URLs (see "Files: images and attachments" above).
 
 Practical recipe: load each library as a `<script src="https://cdnjs.cloudflare.com/ajax/libs/
 <lib>/<exact-version>/<file>">` (cdnjs preferred; jsdelivr as fallback — `https://cdn.jsdelivr.net/
@@ -224,8 +268,10 @@ not an ESM one.
 | `key_revoked` (401) | A human revoked your key | Ask them to issue a new one, or `oa login` again |
 | `org_required` (400) | Your personal key spans several teams and none is selected | The response includes the candidate list — show it to the human and ask which team, then `oa use <slug>` (see Setup step 4). Don't pick one yourself. |
 | `forbidden` (403) | Missing scope, or no access to that org/artifact | Check `oa whoami`; you may need a key with `artifacts:write` |
-| `quota_exceeded` (413) | The org hit its storage quota | Tell the human — an admin needs to raise the quota or free up space |
-| `artifact_too_large` (413) | A single artifact exceeds the size cap (default 5 MiB) | Split the content or reduce it — there's no per-artifact override |
+| `quota_exceeded` (413) | The team or artifact hit its storage quota (source text + uploaded files) | The body carries `scope` (`"org"` or `"artifact"`), `limitBytes`, `usedBytes` — run `oa quota` to see the current state. A team owner/admin can raise the per-artifact quota themselves; the team-wide one needs a superadmin. |
+| `artifact_too_large` (413) | A single artifact's own source text exceeds the size cap (default 5 MiB) | Split the content or reduce it — this is separate from the file-storage quota above and has no per-artifact override |
+| `storage_disabled` (501) | This instance has no object storage configured | Don't retry the upload — inline the asset instead, or tell the human an admin needs to set `S3_BUCKET` |
+| `file_too_large` (413) | One uploaded file exceeds the per-file cap (default 25 MiB, independent of the quota above) | Check `maxFileBytes` from `oa quota` before uploading a large file |
 | `version_conflict` (409) | Someone else changed this artifact since you last read it | `oa get <id>` to see the latest, merge your change, retry |
 | `lifetime_exceeds_max` (400) | The requested `--lifetime`/`lifetime` is longer than the instance/team maximum | The error body carries `maxLifetimeMinutes` — retry within that bound, or omit `--lifetime` to get the default (which is also the max) |
 | `public_shares_forbidden` (403) | A `public` link was requested but the team or instance disallows public links | The error carries `allowedModes` — retry with `--team`/`--password`, or omit the mode flag to use the team default. Tell the human why, don't route around it. |
@@ -238,10 +284,18 @@ examples covering the same operations.
 The instance also runs an MCP server directly — no CLI needed. Connect to `<server>/mcp` (Streamable
 HTTP) with the same API key as a Bearer token, and use its tools instead of shelling out to `oa`:
 `whoami`, `list_orgs`, `list_artifacts`, `get_artifact`, `create_artifact`, `update_artifact`,
-`delete_artifact`, `create_share`, `list_shares`, `revoke_share`. Same scopes, same error
-semantics as the table above — just called as MCP tools rather than CLI commands.
+`delete_artifact`, `get_storage_quota`, `list_artifact_files`, `delete_artifact_file`,
+`create_share`, `list_shares`, `revoke_share`. Same scopes, same error semantics as the table above
+— just called as MCP tools rather than CLI commands.
 `create_artifact`/`update_artifact` take an optional `lifetime` argument (minutes, or a duration
 like `"12h"`/`"7d"`) mirroring `oa push --lifetime`; omit it to get the team's default/maximum.
+
+**Uploading a file is not available over MCP** (it's a binary/multipart operation; MCP tool calls
+here are JSON-only) — `get_storage_quota` still lets you check remaining quota before deciding
+whether an upload would be worth doing, and `list_artifact_files`/`delete_artifact_file` manage
+files someone else already uploaded via the CLI or REST. If you need to attach a file and only have
+MCP available, tell the human to run `oa files upload <artifact-id> <file>` themselves and give you
+the URL it prints back.
 
 `create_share`'s `mode` argument is optional, same rule as the CLI's `--share` with no mode flag:
 omit it to get the team's configured default (usually `team`), and only pass `"team"`, `"password"`,

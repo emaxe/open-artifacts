@@ -20,6 +20,14 @@ export interface InstanceSettings {
   /** Instance-wide kill switch for `public` share links. A team may be stricter, never looser — see `services/share-policy.ts`. */
   allowPublicShares: boolean;
   /**
+   * Maximum total bytes (artifact source + uploaded files) a team may store, `0` = unlimited (the
+   * default). A team may set its own stricter override (`orgs.storageQuotaBytes`), never looser —
+   * see `services/quota.ts`. Same "0/NULL = unlimited" convention as `maxArtifactLifetimeMinutes`.
+   */
+  orgQuotaBytes: number;
+  /** Maximum bytes (source + files) a single artifact may use, `0` = unlimited (the default). Team override: `orgs.artifactQuotaBytes`. */
+  artifactQuotaBytes: number;
+  /**
    * Link mode used when a caller creates a share without naming one. Teams may override this per
    * team (`orgs.defaultShareMode`); this is only the inherited value, NOT a floor — see
    * `packages/shared/src/share-policy.ts` for why the two knobs (this one and `allowPublicShares`)
@@ -39,6 +47,8 @@ export function defaultInstanceSettings(env: { DEFAULT_REGISTRATION_MODE: string
     maxArtifactLifetimeMinutes: 0,
     allowPublicShares: true,
     defaultShareMode: "team",
+    orgQuotaBytes: 0,
+    artifactQuotaBytes: 0,
   };
 }
 

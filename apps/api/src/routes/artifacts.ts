@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { buildEmbedCsp, createArtifactSchema, updateArtifactSchema } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -26,9 +26,22 @@ import { requiresScope } from "../services/scopes.js";
 import { defaultInstanceSettings, getInstanceSettings } from "../services/settings.js";
 import { listMemberOrgIds } from "../services/orgs.js";
 import { resolveOrgScope, orgScopeErrorResponse } from "../services/org-scope.js";
-import { resolveLifetimeLimitForRequest } from "../services/lifetime.js";
+import { resolveArtifactCeilings } from "../services/quota.js";
 
 export const artifactRoutes = new Hono<AppBindings>();
+
+/**
+ * `quota_exceeded` used to be a flat error string with no way for a caller (agent or CLI) to act
+ * on it beyond "tell a human". Structured the same way `lifetime_exceeds_max` already is, so an
+ * agent can compare `usedBytes`/`limitBytes` against `GET /api/v1/quota` and decide what to do —
+ * e.g. skip uploading a file rather than fail the whole publish.
+ */
+function quotaExceededResponse(c: Context<AppBindings>, err: QuotaExceededError) {
+  return c.json(
+    { error: { code: "quota_exceeded", message: err.message, scope: err.scope, limitBytes: err.limitBytes, usedBytes: err.usedBytes } },
+    413,
+  );
+}
 
 artifactRoutes.get("/artifacts", requireAuth, async (c) => {
   const identity = c.get("identity")!;
@@ -75,13 +88,13 @@ artifactRoutes.post("/artifacts", requireAuth, async (c) => {
   if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
 
   try {
-    const maxLifetimeMinutes = await resolveLifetimeLimitForRequest(db, c.get("env"), orgId);
-    const { artifact, version } = await createArtifact(db, { orgId, identity, ...body.data, maxLifetimeMinutes });
+    const ceilings = await resolveArtifactCeilings(db, c.get("env"), orgId);
+    const { artifact, version } = await createArtifact(db, { orgId, identity, ...body.data, ...ceilings });
     await recordAudit(db, { orgId, identity, action: "artifact.create", targetType: "artifact", targetId: artifact.id });
     return c.json({ artifact, currentVersion: version.versionNo }, 201);
   } catch (err) {
     if (err instanceof ArtifactTooLargeError) return c.json({ error: { code: "artifact_too_large", message: err.message } }, 413);
-    if (err instanceof QuotaExceededError) return c.json({ error: { code: "quota_exceeded", message: err.message } }, 413);
+    if (err instanceof QuotaExceededError) return quotaExceededResponse(c, err);
     if (err instanceof LifetimeExceedsMaxError) {
       return c.json({ error: { code: "lifetime_exceeds_max", message: err.message, maxLifetimeMinutes: err.maxMinutes } }, 400);
     }
@@ -148,20 +161,25 @@ artifactRoutes.patch("/artifacts/:id", requireAuth, async (c) => {
   const body = updateArtifactSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) return c.json({ error: { code: "invalid_input", message: body.error.message } }, 400);
 
-  const { lifetime, ...rest } = body.data;
+  const { lifetime, content, message, ...rest } = body.data;
   const ifMatch = c.req.header("if-match");
   try {
-    const lifetimePatch =
-      lifetime !== undefined
-        ? { requested: lifetime, maxMinutes: await resolveLifetimeLimitForRequest(db, c.get("env"), artifact.orgId) }
+    // Both ceilings come from one settings read regardless of which of lifetime/content changed —
+    // resolving only the one that's actually needed would save a query but risks the same "forgot
+    // to resolve it" mistake this whole structure exists to prevent.
+    const ceilings = await resolveArtifactCeilings(db, c.get("env"), artifact.orgId);
+    const lifetimePatch = lifetime !== undefined ? { requested: lifetime, maxMinutes: ceilings.maxLifetimeMinutes } : undefined;
+    const contentPatch =
+      content !== undefined
+        ? { text: content, message, maxArtifactSizeBytes: ceilings.maxArtifactSizeBytes, quota: ceilings.quota }
         : undefined;
-    const result = await updateArtifact(db, artifact.id, { ...rest, identity, ifMatchContentHash: ifMatch, lifetime: lifetimePatch });
+    const result = await updateArtifact(db, artifact.id, { ...rest, identity, ifMatchContentHash: ifMatch, lifetime: lifetimePatch, content: contentPatch });
     await recordAudit(db, { orgId: artifact.orgId, identity, action: "artifact.update", targetType: "artifact", targetId: artifact.id });
     return c.json({ artifact: result.artifact, newVersionNo: result.version?.versionNo });
   } catch (err) {
     if (err instanceof VersionConflictError) return c.json({ error: { code: "version_conflict", message: err.message } }, 409);
     if (err instanceof ArtifactTooLargeError) return c.json({ error: { code: "artifact_too_large", message: err.message } }, 413);
-    if (err instanceof QuotaExceededError) return c.json({ error: { code: "quota_exceeded", message: err.message } }, 413);
+    if (err instanceof QuotaExceededError) return quotaExceededResponse(c, err);
     if (err instanceof LifetimeExceedsMaxError) {
       return c.json({ error: { code: "lifetime_exceeds_max", message: err.message, maxLifetimeMinutes: err.maxMinutes } }, 400);
     }
@@ -222,7 +240,15 @@ artifactRoutes.post("/artifacts/:id/versions/:n/restore", requireAuth, async (c)
   if (!access.write) return c.json({ error: { code: "forbidden" } }, 403);
 
   const versionNo = Number(c.req.param("n"));
-  const result = await restoreVersion(db, artifact.id, versionNo, identity);
-  await recordAudit(db, { orgId: artifact.orgId, identity, action: "artifact.restore", targetType: "artifact", targetId: artifact.id, meta: { versionNo } });
-  return c.json({ artifact: result.artifact, newVersionNo: result.version?.versionNo });
+  try {
+    const ceilings = await resolveArtifactCeilings(db, c.get("env"), artifact.orgId);
+    const result = await restoreVersion(db, artifact.id, versionNo, identity, ceilings);
+    await recordAudit(db, { orgId: artifact.orgId, identity, action: "artifact.restore", targetType: "artifact", targetId: artifact.id, meta: { versionNo } });
+    return c.json({ artifact: result.artifact, newVersionNo: result.version?.versionNo });
+  } catch (err) {
+    // A version that was accepted once could now exceed a since-lowered size/quota policy.
+    if (err instanceof ArtifactTooLargeError) return c.json({ error: { code: "artifact_too_large", message: err.message } }, 413);
+    if (err instanceof QuotaExceededError) return quotaExceededResponse(c, err);
+    throw err;
+  }
 });

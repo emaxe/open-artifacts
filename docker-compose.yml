@@ -14,6 +14,26 @@ services:
       timeout: 5s
       retries: 10
 
+  # Default out-of-the-box object storage for uploaded artifact files (images/attachments) — see
+  # .env.example's S3_* variables. Point those at an external S3/R2/Spaces bucket instead and drop
+  # this service if you don't want to run MinIO yourself; leaving S3_BUCKET unset entirely just
+  # disables the feature (upload endpoints answer 501), so upgrading an existing instance without
+  # adding this service is safe and requires no changes.
+  minio:
+    image: quay.io/minio/minio:latest
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   app:
     build:
       context: .
@@ -22,10 +42,20 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     env_file:
       - .env
     environment:
       DATABASE_URL: postgres://postgres:postgres@db:5432/open_artifacts
+      # Overrides whatever S3_ENDPOINT/credentials the .env file sets, so this compose file's own
+      # bundled MinIO always wins for a stock deployment — point .env's S3_* at an external bucket
+      # instead and remove the `minio` service above if you don't want this default.
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: open-artifacts
+      S3_FORCE_PATH_STYLE: "true"
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
     ports:
       - "3000:3000"
     healthcheck:
@@ -37,3 +67,4 @@ services:
 
 volumes:
   db_data:
+  minio_data:

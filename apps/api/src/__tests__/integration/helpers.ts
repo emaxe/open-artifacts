@@ -4,6 +4,7 @@ import { createApp } from "../../app.js";
 import { loadEnv, resetEnvCacheForTests } from "../../env.js";
 import { clearApiKeyVerifyCacheForTests } from "../../services/agents.js";
 import { clearRateLimitBucketsForTests } from "../../middleware/rate-limit.js";
+import { createStorage, createDisabledStorage, type Storage } from "../../services/storage.js";
 
 let db: Database | undefined;
 
@@ -17,8 +18,16 @@ export function getTestEnv() {
   return loadEnv();
 }
 
-export function buildTestApp() {
-  return createApp(getTestDb(), getTestEnv());
+let storage: Storage | undefined;
+
+/** Storage is enabled when the test environment points at a real S3-compatible endpoint (see docker-compose.dev.yml's `minio` service, wired in vitest.integration.config.ts) — real for every artifact-files test unless a test builds its own disabled instance via `buildTestApp({ storageDisabled: true })`. */
+export function getTestStorage(): Storage {
+  if (!storage) storage = createStorage(getTestEnv());
+  return storage;
+}
+
+export function buildTestApp(opts: { storageDisabled?: boolean } = {}) {
+  return createApp(getTestDb(), getTestEnv(), opts.storageDisabled ? createDisabledStorage() : getTestStorage());
 }
 
 const TABLES = [
@@ -27,6 +36,8 @@ const TABLES = [
   "artifact_view_daily",
   "artifact_views",
   "shares",
+  "storage_gc_queue",
+  "artifact_files",
   "artifact_versions",
   "artifacts",
   "device_auth_requests",
@@ -45,6 +56,9 @@ export async function resetDb() {
   await database.execute(sql.raw(`truncate table ${TABLES.map((t) => `"${t}"`).join(", ")} cascade`));
   clearApiKeyVerifyCacheForTests();
   clearRateLimitBucketsForTests();
+  // Idempotent (HeadBucket short-circuits once it exists) — cheap enough to call before every
+  // test, and means artifact-files tests don't need their own beforeAll to provision the bucket.
+  await getTestStorage().ensureBucket();
 }
 
 /** Extracts a single cookie's value from a Set-Cookie response header. */

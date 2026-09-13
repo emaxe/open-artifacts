@@ -50,3 +50,19 @@ export function contentDispositionValue(title: string, kind: ArtifactKind, versi
   const { asciiName, displayName } = downloadFileName(title, kind, versionNo);
   return `attachment; filename="${asciiName}"; filename*=UTF-8''${percentEncodeExtValue(displayName)}`;
 }
+
+/**
+ * Same injection-safe construction as `contentDispositionValue`, for an uploaded file's own
+ * caller-supplied name (`GET /af/:token` — see routes/files.ts) rather than an artifact title.
+ * `disposition` is the caller's choice, not derived from the name: routes/files.ts decides
+ * `inline` vs `attachment` from the file's stored, server-validated content type, never from the
+ * name itself.
+ */
+export function fileContentDisposition(name: string, disposition: "inline" | "attachment"): string {
+  // The ASCII fallback (`slugify` also collapses a literal "." to "-", so it loses the real
+  // extension) only matters to browsers old enough to ignore `filename*=` — every modern browser
+  // uses the RFC 5987 form below, which keeps the exact name and extension.
+  const asciiName = slugify(name) || "file";
+  const displayName = name.trim() || "file";
+  return `${disposition}; filename="${asciiName}"; filename*=UTF-8''${percentEncodeExtValue(displayName)}`;
+}

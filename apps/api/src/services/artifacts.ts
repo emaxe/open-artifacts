@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, or, sql, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   computeContentHash,
   resolveOrgArtifactAccess,
@@ -9,18 +9,15 @@ import {
   type OwnerType,
 } from "@open-artifacts/shared";
 import type { Database } from "../db/client.js";
-import { artifacts, artifactVersions, orgs } from "../db/schema.js";
+import { artifacts, artifactVersions } from "../db/schema.js";
 import type { Identity } from "../types.js";
 import { getOrgRole } from "./users.js";
 import { actorRef } from "./identity.js";
+import { liveArtifactWhere } from "./artifact-liveness.js";
+import { assertWithinQuota, getOrgUsageBytes, type EffectiveQuota } from "./quota.js";
+import { deleteAllFilesForArtifact } from "./artifact-files.js";
 
-export const MAX_ARTIFACT_SIZE_BYTES = 5 * 1024 * 1024; // 5 MiB, plan default
-
-export class QuotaExceededError extends Error {
-  constructor() {
-    super("Organization storage quota exceeded");
-  }
-}
+export { QuotaExceededError } from "./quota.js";
 
 export class VersionConflictError extends Error {
   constructor() {
@@ -29,8 +26,8 @@ export class VersionConflictError extends Error {
 }
 
 export class ArtifactTooLargeError extends Error {
-  constructor() {
-    super(`Artifact content exceeds the maximum allowed size (${MAX_ARTIFACT_SIZE_BYTES} bytes)`);
+  constructor(public readonly maxBytes: number) {
+    super(`Artifact content exceeds the maximum allowed size (${maxBytes} bytes)`);
   }
 }
 
@@ -59,32 +56,12 @@ function resolveArtifactExpiry(
   return expiresAtFromMinutes(requestedMinutes, from);
 }
 
-/**
- * The single predicate for "an artifact a normal read should see": not soft-deleted and not past
- * its lifetime. Used by every list/read path (REST, MCP, the authed preview, and — via
- * `getArtifact` — the public embed) so lazy expiry never needs to be re-implemented per call site.
- */
-export function liveArtifactWhere(now: Date = new Date()) {
-  return and(isNull(artifacts.deletedAt), or(isNull(artifacts.expiresAt), gt(artifacts.expiresAt, now)));
-}
+// Re-exported for call sites that already imported liveArtifactWhere from here before it moved
+// into its own module (to break a circular import with services/quota.ts).
+export { liveArtifactWhere } from "./artifact-liveness.js";
 
 function ownerFromIdentity(identity: Identity): { ownerType: OwnerType; ownerId: string } {
   return actorRef(identity);
-}
-
-async function assertWithinQuota(db: Database, orgId: string, additionalBytes: number) {
-  const org = await db.query.orgs.findFirst({ where: eq(orgs.id, orgId) });
-  if (!org) throw new Error("Org not found");
-
-  const rows = await db
-    .select({ total: sql<number>`coalesce(sum(${artifacts.sizeBytes}), 0)` })
-    .from(artifacts)
-    .where(and(eq(artifacts.orgId, orgId), liveArtifactWhere()));
-  const total = rows[0]!.total;
-
-  if (Number(total) + additionalBytes > org.storageQuotaBytes) {
-    throw new QuotaExceededError();
-  }
 }
 
 export interface CreateArtifactInput {
@@ -100,15 +77,24 @@ export interface CreateArtifactInput {
   /**
    * The effective ceiling for this org (`null` = unlimited), from `resolveLifetimeLimitForRequest`.
    * Required on purpose — the compiler forces every creation surface to resolve the policy rather
-   * than silently skipping it, the mistake `MAX_ARTIFACT_SIZE_BYTES` above already made once.
+   * than silently skipping it.
    */
   maxLifetimeMinutes: number | null;
+  /**
+   * The effective maximum size (bytes) of the artifact's own source text, from instance settings
+   * (`InstanceSettings.maxArtifactSizeBytes`). Required for the same reason as `maxLifetimeMinutes`
+   * above — this used to be a hardcoded module constant that the admin-editable setting silently
+   * never fed into; making it a required parameter is the fix, not just a rename.
+   */
+  maxArtifactSizeBytes: number;
+  /** The effective org/artifact byte quotas (source + files), from `resolveQuotaForRequest`. */
+  quota: EffectiveQuota;
 }
 
 export async function createArtifact(db: Database, input: CreateArtifactInput) {
   const sizeBytes = Buffer.byteLength(input.content, "utf8");
-  if (sizeBytes > MAX_ARTIFACT_SIZE_BYTES) throw new ArtifactTooLargeError();
-  await assertWithinQuota(db, input.orgId, sizeBytes);
+  if (sizeBytes > input.maxArtifactSizeBytes) throw new ArtifactTooLargeError(input.maxArtifactSizeBytes);
+  await assertWithinQuota(db, { orgId: input.orgId, quota: input.quota, additionalBytes: sizeBytes });
 
   const owner = ownerFromIdentity(input.identity);
   const contentHash = computeContentHash(input.content);
@@ -248,8 +234,6 @@ export interface UpdateArtifactInput {
   title?: string;
   description?: string;
   visibility?: "private" | "org";
-  content?: string;
-  message?: string;
   identity: Identity;
   /** Optimistic-locking guard: if provided, must match the artifact's current content hash. */
   ifMatchContentHash?: string;
@@ -258,6 +242,12 @@ export interface UpdateArtifactInput {
    * can't travel apart; `restoreVersion` below simply omits this and leaves the lifetime alone.
    */
   lifetime?: { requested: string | number | null; maxMinutes: number | null };
+  /**
+   * Present only when the caller is changing content. Bundles the new text with the size/quota
+   * ceilings the same way `lifetime` bundles its own ceiling — a content update can't accidentally
+   * skip evaluating them, the mistake the old bare `MAX_ARTIFACT_SIZE_BYTES` constant made once.
+   */
+  content?: { text: string; message?: string; maxArtifactSizeBytes: number; quota: EffectiveQuota };
 }
 
 export async function updateArtifact(db: Database, artifactId: string, input: UpdateArtifactInput) {
@@ -289,17 +279,23 @@ export async function updateArtifact(db: Database, artifactId: string, input: Up
 
     let newVersion: typeof artifactVersions.$inferSelect | undefined;
     if (input.content !== undefined) {
-      const sizeBytes = Buffer.byteLength(input.content, "utf8");
-      if (sizeBytes > MAX_ARTIFACT_SIZE_BYTES) throw new ArtifactTooLargeError();
+      const { text, message, maxArtifactSizeBytes, quota } = input.content;
+      const sizeBytes = Buffer.byteLength(text, "utf8");
+      if (sizeBytes > maxArtifactSizeBytes) throw new ArtifactTooLargeError(maxArtifactSizeBytes);
 
-      const usageRows = await tx
-        .select({ total: sql<number>`coalesce(sum(${artifacts.sizeBytes}), 0)` })
-        .from(artifacts)
-        .where(and(eq(artifacts.orgId, artifact.orgId), liveArtifactWhere()));
-      const total = usageRows[0]!.total;
-      if (Number(total) - artifact.sizeBytes + sizeBytes > (await tx.query.orgs.findFirst({ where: eq(orgs.id, artifact.orgId) }))!.storageQuotaBytes) {
-        throw new QuotaExceededError();
-      }
+      // Exclude THIS artifact's own current source/files from both totals before adding the new
+      // source size back in, so growing one artifact is never double-counted against itself.
+      const orgTotal = await getOrgUsageBytes(tx, artifact.orgId);
+      const orgUsedBytesExcluding = orgTotal - artifact.sizeBytes;
+      const artifactUsedBytesExcluding = Number(artifact.filesBytes);
+      await assertWithinQuota(tx, {
+        orgId: artifact.orgId,
+        artifactId,
+        quota,
+        additionalBytes: sizeBytes,
+        orgUsedBytesExcluding,
+        artifactUsedBytesExcluding,
+      });
 
       const versions = await tx.query.artifactVersions.findMany({
         where: eq(artifactVersions.artifactId, artifactId),
@@ -314,12 +310,12 @@ export async function updateArtifact(db: Database, artifactId: string, input: Up
         .values({
           artifactId,
           versionNo: nextVersionNo,
-          content: input.content,
-          contentHash: computeContentHash(input.content),
+          content: text,
+          contentHash: computeContentHash(text),
           sizeBytes,
           createdByType: owner.ownerType,
           createdById: owner.ownerId,
-          message: input.message,
+          message,
         })
         .returning();
 
@@ -332,18 +328,32 @@ export async function updateArtifact(db: Database, artifactId: string, input: Up
   });
 }
 
-export async function restoreVersion(db: Database, artifactId: string, versionNo: number, identity: Identity) {
+export async function restoreVersion(
+  db: Database,
+  artifactId: string,
+  versionNo: number,
+  identity: Identity,
+  ceilings: { maxArtifactSizeBytes: number; quota: EffectiveQuota },
+) {
   const target = await getVersionByNumber(db, artifactId, versionNo);
   if (!target) throw new Error("Version not found");
   return updateArtifact(db, artifactId, {
     identity,
-    content: target.content,
-    message: `Restored from version ${versionNo}`,
+    content: { text: target.content, message: `Restored from version ${versionNo}`, ...ceilings },
   });
 }
 
+/**
+ * Marks an artifact deleted and deletes its `artifact_files` rows in the same transaction — the
+ * `artifact_files_gc_trigger` (see the migration) then enqueues each one's object for removal.
+ * There's no "undelete" path in this API, so this is the point where "files disappear with their
+ * artifact" actually happens for a user/agent-initiated delete (the retention sweeper is the other one).
+ */
 export async function softDeleteArtifact(db: Database, artifactId: string) {
-  await db.update(artifacts).set({ deletedAt: new Date() }).where(eq(artifacts.id, artifactId));
+  await db.transaction(async (tx) => {
+    await deleteAllFilesForArtifact(tx, artifactId);
+    await tx.update(artifacts).set({ deletedAt: new Date(), filesBytes: 0 }).where(eq(artifacts.id, artifactId));
+  });
 }
 
 /** Resolves read/write/delete access for an authenticated (non-share) request. */

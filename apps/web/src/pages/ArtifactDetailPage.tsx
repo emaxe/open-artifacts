@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, type ArtifactSummary, type OrgDetail, type ShareMode } from "../lib/api";
-import { formatDateTime, formatBytes, formatExpiry, formatLifetime, label, SHARE_MODE_LABELS } from "../lib/labels";
+import { formatDateTime, formatBytes, formatQuota, formatExpiry, formatLifetime, label, SHARE_MODE_LABELS } from "../lib/labels";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -34,6 +34,25 @@ interface Share {
   createdAt: string;
 }
 
+interface ArtifactFile {
+  id: string;
+  name: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+  url: string;
+}
+
+interface QuotaBucket {
+  limitBytes: number | null;
+  usedBytes: number;
+}
+
+interface QuotaSnapshot {
+  storageEnabled: boolean;
+  artifact?: QuotaBucket;
+}
+
 export function ArtifactDetailPage() {
   const { orgId, id } = useParams<{ orgId: string; id: string }>();
   const navigate = useNavigate();
@@ -44,6 +63,9 @@ export function ArtifactDetailPage() {
   const [contentHash, setContentHash] = useState("");
   const [versions, setVersions] = useState<Version[]>([]);
   const [shares, setShares] = useState<Share[]>([]);
+  const [files, setFiles] = useState<ArtifactFile[]>([]);
+  const [quota, setQuota] = useState<QuotaSnapshot | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +88,35 @@ export function ArtifactDetailPage() {
     setVersions(v.versions);
     const s = await api.get<{ shares: Share[] }>(`/artifacts/${id}/shares`);
     setShares(s.shares);
+    const f = await api.get<{ files: ArtifactFile[] }>(`/artifacts/${id}/files`);
+    setFiles(f.files);
+    setQuota(await api.get<QuotaSnapshot>(`/quota?artifactId=${id}`));
     if (orgId) setOrgDetail(await api.get<OrgDetail>(`/orgs/${orgId}`));
+  }
+
+  async function uploadFile(file: File) {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      await api.postForm(`/artifacts/${id}/files`, form);
+      await load();
+      toast.show("Файл загружен", "success");
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось загрузить файл", "error");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function deleteFile(fileId: string) {
+    try {
+      await api.delete(`/artifacts/${id}/files/${fileId}`);
+      await load();
+      toast.show("Файл удалён", "success");
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось удалить файл", "error");
+    }
   }
 
   useEffect(() => {
@@ -242,6 +292,62 @@ export function ArtifactDetailPage() {
               ))}
           </TBody>
         </Table>
+      </Card>
+
+      <Card className="mb-4">
+        <CardHeader
+          title="Файлы"
+          description={
+            quota && !quota.storageEnabled
+              ? "Объектное хранилище не настроено на этом инстансе — загрузка файлов недоступна."
+              : quota?.artifact
+                ? `Использовано: ${formatQuota(quota.artifact.usedBytes)} из ${formatQuota(quota.artifact.limitBytes)}`
+                : undefined
+          }
+        />
+        {quota?.storageEnabled && (
+          <>
+            <label className="mb-3 inline-block">
+              <span className="sr-only">Загрузить файл</span>
+              <input
+                type="file"
+                disabled={uploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadFile(file);
+                  e.target.value = "";
+                }}
+                className="block w-full max-w-sm cursor-pointer text-sm text-muted file:mr-3 file:cursor-pointer file:rounded-control file:border file:border-border file:bg-panel file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-fg hover:file:bg-panel-muted"
+              />
+            </label>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Имя</TH>
+                  <TH>Тип</TH>
+                  <TH>Размер</TH>
+                  <TH />
+                </TR>
+              </THead>
+              <TBody>
+                {files.length === 0 && <TableEmptyRow colSpan={4}>Нет загруженных файлов</TableEmptyRow>}
+                {files.map((f) => (
+                  <TR key={f.id}>
+                    <TD>{f.name}</TD>
+                    <TD className="text-muted">{f.contentType}</TD>
+                    <TD className="text-muted">{formatBytes(f.sizeBytes)}</TD>
+                    <TD className="flex justify-end gap-2">
+                      <CopyButton value={`${window.location.origin}${f.url}`} label="Ссылка" />
+                      <Button variant="ghost" size="sm" onClick={() => deleteFile(f.id)}>
+                        Удалить
+                      </Button>
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </>
+        )}
       </Card>
 
       <Card>
