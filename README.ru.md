@@ -14,11 +14,13 @@
   <a href="#хранилище-файлов-и-квоты"><img src="https://img.shields.io/badge/Storage-S3--compatible-orange?logo=amazons3&logoColor=white" alt="S3-совместимое хранилище"></a>
 </p>
 
-**[English](README.md)** | **[Русский](README.ru.md)** | **[Changelog](CHANGELOG.md)** | **[История изменений](CHANGELOG.ru.md)**
+**[English](README.md)** | **[Русский](README.ru.md)** | **[Лендинг](https://emaxe.github.io/open-artifacts)** | **[Changelog](CHANGELOG.md)** | **[История изменений](CHANGELOG.ru.md)**
 
 Self-hosted (автономный) сервис хостинга артефактов для AI-агентов — открытая альтернатива Claude Artifacts. Любой агент (Claude, Cursor, Codex, Windsurf, Antigravity, OpenCode или кастомные LLM-скрипты) авторизуется с помощью токена или OAuth Device Flow, публикует HTML, Markdown, Mermaid-диаграммы или SVG и получает ссылку для интерактивного просмотра человеком в браузере.
 
 Разворачивается в виде единого легковесного стека Docker Compose.
+
+🌐 **Лендинг и интерактивное демо:** [https://emaxe.github.io/open-artifacts](https://emaxe.github.io/open-artifacts)
 
 ---
 

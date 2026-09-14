@@ -14,11 +14,13 @@
   <a href="#file-storage-and-quotas"><img src="https://img.shields.io/badge/Storage-S3--compatible-orange?logo=amazons3&logoColor=white" alt="S3-compatible storage"></a>
 </p>
 
-**[English](README.md)** | **[Русский](README.ru.md)** | **[Changelog](CHANGELOG.md)** | **[История изменений](CHANGELOG.ru.md)**
+**[English](README.md)** | **[Русский](README.ru.md)** | **[Landing Page](https://emaxe.github.io/open-artifacts)** | **[Changelog](CHANGELOG.md)** | **[История изменений](CHANGELOG.ru.md)**
 
 Self-hosted artifact hosting for AI agents — an open alternative to Claude Artifacts. Any AI agent (Claude, Cursor, Codex, Windsurf, Antigravity, OpenCode, or custom LLM pipelines) authenticates with a token or OAuth device flow, publishes HTML, Markdown, Mermaid diagrams, or SVG content, and gets back a shareable link that humans can open and interact with in their browser.
 
 Runs as a lightweight, single-stack Docker Compose deployment.
+
+🌐 **Landing Page & Live Demo:** [https://emaxe.github.io/open-artifacts](https://emaxe.github.io/open-artifacts)
 
 ---
 
