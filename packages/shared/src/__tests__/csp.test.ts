@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEmbedCsp, DEFAULT_CDN_ALLOWLIST } from "../csp.js";
+import { buildEmbedCsp, buildViewerShellCsp, DEFAULT_CDN_ALLOWLIST } from "../csp.js";
 
 describe("buildEmbedCsp", () => {
   it("blocks everything by default and only opens what's needed", () => {
@@ -35,5 +35,33 @@ describe("buildEmbedCsp", () => {
     expect(csp).toContain("img-src data: blob: https: https://app.example.com;");
     expect(csp).toContain("font-src https://fonts.gstatic.com data: https://app.example.com;");
     expect(csp).toContain("media-src https://app.example.com;");
+  });
+});
+
+describe("buildViewerShellCsp", () => {
+  it("blocks everything by default, scoped to the nonce, and permits only the shell's own image/iframe", () => {
+    const csp = buildViewerShellCsp({ nonce: "abc123" });
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("script-src 'nonce-abc123'");
+    expect(csp).toContain("style-src 'nonce-abc123'");
+    expect(csp).toContain("img-src 'self'");
+    expect(csp).toContain("frame-src 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
+  });
+
+  it("blocks connect-src by default (the anon/member render, which never fetches anything)", () => {
+    const csp = buildViewerShellCsp({ nonce: "abc123" });
+    expect(csp).toContain("connect-src 'none'");
+  });
+
+  it("opens connect-src to 'self' only when allowConnectSelf is set (the manager render's visibility control)", () => {
+    const csp = buildViewerShellCsp({ nonce: "abc123", allowConnectSelf: true });
+    expect(csp).toContain("connect-src 'self'");
+    expect(csp).not.toContain("connect-src 'none'");
+  });
+
+  it("never widens img-src beyond 'self', regardless of allowConnectSelf", () => {
+    const csp = buildViewerShellCsp({ nonce: "abc123", allowConnectSelf: true });
+    expect(csp).toContain("img-src 'self'");
   });
 });

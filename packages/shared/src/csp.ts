@@ -40,7 +40,8 @@ export function buildEmbedCsp(opts: EmbedCspOptions): string {
 export interface ViewerShellCspOptions {
   /** Per-response nonce authorizing the shell's own inline `<style>`/`<script>` — never reused across responses. */
   nonce: string;
-  /** True only on the password-entry page, whose inline script `fetch`es `POST /s/:token/unlock`. */
+  /** True for a viewer who can manage the artifact — their panel's inline script `fetch`es
+   *  `POST /s/:token/unlock` (password page) or `PATCH /api/v1/shares/:id` (visibility control). */
   allowConnectSelf?: boolean;
 }
 
@@ -57,6 +58,9 @@ export function buildViewerShellCsp(opts: ViewerShellCspOptions): string {
     "default-src 'none'",
     `script-src 'nonce-${opts.nonce}'`,
     `style-src 'nonce-${opts.nonce}'`,
+    // The shell's only image is its own brand mark, served from this same origin — never a
+    // third party.
+    "img-src 'self'",
     // The shell's only child resource is its own /embed/:token iframe — never a third party.
     "frame-src 'self'",
     `connect-src ${opts.allowConnectSelf ? "'self'" : "'none'"}`,

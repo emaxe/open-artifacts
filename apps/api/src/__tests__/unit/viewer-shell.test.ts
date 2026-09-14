@@ -62,6 +62,9 @@ function managerVm(overrides: Partial<BaseOverrides & Omit<ManagerVm, "audience"
     ],
     versionsTruncated = false,
     nonDefaultNotice = null,
+    shareId = "share1",
+    shareMode = "team",
+    allowedModes = ["team", "password", "public"],
     ...base
   } = overrides;
   return {
@@ -78,6 +81,9 @@ function managerVm(overrides: Partial<BaseOverrides & Omit<ManagerVm, "audience"
     versions,
     versionsTruncated,
     nonDefaultNotice,
+    shareId,
+    shareMode,
+    allowedModes,
   };
 }
 
@@ -95,6 +101,11 @@ describe("renderViewerShell — anon audience", () => {
     expect(html).not.toContain("Open in workspace");
     expect(html).not.toContain('<details class="oa-versions"');
     expect(html).not.toMatch(/By\s/);
+  });
+
+  it("shows a logo linking home, but no visibility control", () => {
+    expect(html).toContain('<a class="oa-logo" href="/"');
+    expect(html).not.toContain('<details class="oa-share-mode"');
   });
 
   it("stamps every inline <style>/<script> with the given nonce", () => {
@@ -124,6 +135,11 @@ describe("renderViewerShell — member audience", () => {
   it("omits the cabinet link entirely when cabinetHref is null (no read access)", () => {
     const out = renderViewerShell(memberVm({ cabinetHref: null }), NONCE);
     expect(out).not.toContain("Open in workspace");
+  });
+
+  it("shows the logo but no visibility control (a member cannot change it)", () => {
+    expect(html).toContain('<a class="oa-logo" href="/"');
+    expect(html).not.toContain('<details class="oa-share-mode"');
   });
 });
 
@@ -161,6 +177,35 @@ describe("renderViewerShell — manager audience", () => {
     const long = "&amp;".repeat(100);
     const html = renderViewerShell(managerVm({ versionMessage: long }), NONCE);
     expect(html).not.toMatch(/&amp[^;]/); // a mid-entity cut would leave a bare "&amp" with no ";"
+  });
+
+  it("shows the logo linking home", () => {
+    const html = renderViewerShell(managerVm(), NONCE);
+    expect(html).toContain('<a class="oa-logo" href="/"');
+  });
+
+  describe("visibility control", () => {
+    it("carries the share id and marks the current mode selected", () => {
+      const html = renderViewerShell(managerVm({ shareId: "share-xyz", shareMode: "password" }), NONCE);
+      expect(html).toContain('<details class="oa-share-mode" data-share-id="share-xyz">');
+      expect(html).toContain('<option value="password" selected>Password protected</option>');
+      expect(html).toContain("Visibility: Password protected");
+    });
+
+    it("renders 'public' as disabled with an explanation when the team's policy forbids it", () => {
+      const html = renderViewerShell(managerVm({ allowedModes: ["team", "password"] }), NONCE);
+      expect(html).toContain('<option value="public" disabled>Public (disabled for this team)</option>');
+    });
+
+    it("leaves 'public' enabled when the team's policy allows it", () => {
+      const html = renderViewerShell(managerVm({ allowedModes: ["team", "password", "public"] }), NONCE);
+      expect(html).toContain('<option value="public">Public</option>');
+    });
+
+    it("escapes a hostile share id instead of rendering it as markup", () => {
+      const html = renderViewerShell(managerVm({ shareId: XSS }), NONCE);
+      expect(html).not.toContain("<img src=x onerror=alert(1)>");
+    });
   });
 });
 

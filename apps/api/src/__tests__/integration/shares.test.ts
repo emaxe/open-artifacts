@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { shares, users } from "../../db/schema.js";
+import { auditLog, shares, users } from "../../db/schema.js";
 import { buildTestApp, extractCookie, getTestDb, registerAndLogin, resetDb } from "./helpers.js";
 
 beforeEach(resetDb);
@@ -47,6 +47,24 @@ async function inviteAndRegister(app: ReturnType<typeof buildTestApp>, owner: { 
 
 async function makeSuperadmin(userId: string) {
   await getTestDb().update(users).set({ isSuperadmin: true }).where(eq(users.id, userId));
+}
+
+function patchShareViaApi(app: ReturnType<typeof buildTestApp>, shareId: string, sessionCookie: string, payload: Record<string, unknown>) {
+  return app.request(`/api/v1/shares/${shareId}`, {
+    method: "PATCH",
+    headers: authedHeaders(sessionCookie),
+    body: JSON.stringify(payload),
+  });
+}
+
+async function issueUserKey(app: ReturnType<typeof buildTestApp>, sessionCookie: string, scopes: string[]) {
+  const res = await app.request("/api/v1/me/keys", {
+    method: "POST",
+    headers: authedHeaders(sessionCookie),
+    body: JSON.stringify({ name: "test key", scopes }),
+  });
+  if (res.status !== 201) throw new Error(`issue key failed: ${res.status} ${await res.text()}`);
+  return (await res.json()) as { id: string; token: string; scopes: string[] };
 }
 
 describe("sharing", () => {
@@ -355,6 +373,238 @@ describe("sharing", () => {
 
       const secondRevokeRes = await app.request(`/api/v1/orgs/${orgId}/shares/revoke-public`, { method: "POST", headers: authedHeaders(sessionCookie) });
       expect((await secondRevokeRes.json()) as { revoked: number }).toEqual({ revoked: 0 });
+    });
+  });
+
+  describe("PATCH /shares/:id — change link mode in place", () => {
+    it("changes team -> public, keeping the same token", async () => {
+      const app = buildTestApp();
+      const { orgId, sessionCookie } = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, orgId, sessionCookie, "<h1>content</h1>");
+      const share = (await (await createShareViaApi(app, artifactId, sessionCookie, { mode: "team" })).json()) as { id: string; token: string };
+
+      const res = await patchShareViaApi(app, share.id, sessionCookie, { mode: "public" });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { id: string; token: string; mode: string };
+      expect(body.token).toBe(share.token);
+      expect(body.mode).toBe("public");
+
+      const embedRes = await app.request(`/embed/${share.token}`);
+      expect(embedRes.status).toBe(200);
+      expect(await embedRes.text()).toContain("content");
+    });
+
+    it("changes team -> password (with a password) and blocks anonymous access until unlocked", async () => {
+      const app = buildTestApp();
+      const { orgId, sessionCookie } = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, orgId, sessionCookie, "<h1>secret</h1>");
+      const share = (await (await createShareViaApi(app, artifactId, sessionCookie, { mode: "team" })).json()) as { id: string; token: string };
+
+      const res = await patchShareViaApi(app, share.id, sessionCookie, { mode: "password", password: "hunter2" });
+      expect(res.status).toBe(200);
+
+      // Anonymous — password required.
+      expect((await app.request(`/embed/${share.token}`)).status).toBe(403);
+      const wrongUnlock = await app.request(`/s/${share.token}/unlock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: "wrong" }),
+      });
+      expect(wrongUnlock.status).toBe(401);
+      const rightUnlock = await app.request(`/s/${share.token}/unlock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: "hunter2" }),
+      });
+      expect(rightUnlock.status).toBe(200);
+    });
+
+    it("changes password -> team, clearing the stored password hash so the old password no longer works if switched back", async () => {
+      const app = buildTestApp();
+      const { orgId, sessionCookie } = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, orgId, sessionCookie);
+      const share = (await (await createShareViaApi(app, artifactId, sessionCookie, { mode: "password", password: "hunter2" })).json()) as {
+        id: string;
+        token: string;
+      };
+
+      const toTeam = await patchShareViaApi(app, share.id, sessionCookie, { mode: "team" });
+      expect(toTeam.status).toBe(200);
+
+      const row = await getTestDb().query.shares.findFirst({ where: eq(shares.id, share.id) });
+      expect(row!.passwordHash).toBeNull();
+
+      // Switching back to "password" with no new password is refused — there is nothing left to keep.
+      const backToPassword = await patchShareViaApi(app, share.id, sessionCookie, { mode: "password" });
+      expect(backToPassword.status).toBe(400);
+    });
+
+    it("hands the caller a fresh unlock cookie when they set a new password, so they aren't immediately locked out of the link they're looking at", async () => {
+      const app = buildTestApp();
+      const { orgId, sessionCookie } = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, orgId, sessionCookie, "<h1>owner-visible</h1>");
+      const share = (await (await createShareViaApi(app, artifactId, sessionCookie, { mode: "team" })).json()) as { id: string; token: string };
+
+      const res = await patchShareViaApi(app, share.id, sessionCookie, { mode: "password", password: "hunter2" });
+      const unlockCookie = extractCookie(res, `oa_unlock_${share.token}`);
+      expect(unlockCookie).toBeTruthy();
+
+      // The owner's own session, carrying only the fresh unlock cookie (not oa_session), can read
+      // the shell immediately — no re-entering the password they just set.
+      const shellRes = await app.request(`/s/${share.token}`, {
+        headers: { Accept: "text/html", Cookie: `oa_unlock_${share.token}=${unlockCookie}` },
+      });
+      expect(shellRes.status).toBe(200);
+      expect(await shellRes.text()).not.toContain("Password required");
+    });
+
+    it("invalidates a standing unlock session when the password is rotated, even though the token is unchanged", async () => {
+      const app = buildTestApp();
+      const { orgId, sessionCookie } = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, orgId, sessionCookie);
+      const share = (await (await createShareViaApi(app, artifactId, sessionCookie, { mode: "password", password: "old-pw-1" })).json()) as {
+        id: string;
+        token: string;
+      };
+      const unlockRes = await app.request(`/s/${share.token}/unlock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: "old-pw-1" }),
+      });
+      const oldUnlockCookie = extractCookie(unlockRes, `oa_unlock_${share.token}`);
+
+      await patchShareViaApi(app, share.id, sessionCookie, { mode: "password", password: "new-pw-2" });
+
+      const staleRes = await app.request(`/embed/${share.token}`, { headers: { Cookie: `oa_unlock_${share.token}=${oldUnlockCookie}` } });
+      expect(staleRes.status).toBe(403);
+    });
+
+    it("403s a team member without write access to the artifact", async () => {
+      const app = buildTestApp();
+      const owner = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, owner.orgId, owner.sessionCookie);
+      const share = (await (await createShareViaApi(app, artifactId, owner.sessionCookie, { mode: "team" })).json()) as { id: string };
+      const member = await inviteAndRegister(app, owner, `member-${Math.random().toString(36).slice(2)}@example.com`, "member");
+
+      const res = await patchShareViaApi(app, share.id, member.sessionCookie, { mode: "public" });
+      expect(res.status).toBe(403);
+    });
+
+    it("200s for a team admin who isn't the artifact's owner, and for a superadmin", async () => {
+      const app = buildTestApp();
+      const owner = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, owner.orgId, owner.sessionCookie);
+      const share = (await (await createShareViaApi(app, artifactId, owner.sessionCookie, { mode: "team" })).json()) as { id: string };
+
+      const adminEmail = `admin-${Math.random().toString(36).slice(2)}@example.com`;
+      const inviteRes = await app.request(`/api/v1/orgs/${owner.orgId}/invites`, {
+        method: "POST",
+        headers: authedHeaders(owner.sessionCookie),
+        body: JSON.stringify({ email: adminEmail, role: "admin" }),
+      });
+      const invite = (await inviteRes.json()) as { token: string };
+      const registerRes = await app.request(`/api/v1/auth/register?invite=${invite.token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminEmail, password: "correct horse battery staple", name: "Team Admin" }),
+      });
+      const adminCookie = extractCookie(registerRes, "oa_session")!;
+
+      expect((await patchShareViaApi(app, share.id, adminCookie, { mode: "public" })).status).toBe(200);
+
+      const superadmin = await registerAndLogin(app);
+      await makeSuperadmin(superadmin.userId);
+      expect((await patchShareViaApi(app, share.id, superadmin.sessionCookie, { mode: "team" })).status).toBe(200);
+    });
+
+    it("403s with public_shares_forbidden and the allowed modes when the team disallows public links", async () => {
+      const app = buildTestApp();
+      const { orgId, sessionCookie } = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, orgId, sessionCookie);
+      const share = (await (await createShareViaApi(app, artifactId, sessionCookie, { mode: "team" })).json()) as { id: string };
+      await app.request(`/api/v1/orgs/${orgId}`, {
+        method: "PATCH",
+        headers: authedHeaders(sessionCookie),
+        body: JSON.stringify({ allowPublicShares: false }),
+      });
+
+      const res = await patchShareViaApi(app, share.id, sessionCookie, { mode: "public" });
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { error: { code: string; allowedModes: string[] } };
+      expect(body.error.code).toBe("public_shares_forbidden");
+      expect(body.error.allowedModes).toEqual(["team", "password"]);
+    });
+
+    it("400s a switch to password with no password given, on a share that was never password-protected", async () => {
+      const app = buildTestApp();
+      const { orgId, sessionCookie } = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, orgId, sessionCookie);
+      const share = (await (await createShareViaApi(app, artifactId, sessionCookie, { mode: "team" })).json()) as { id: string };
+
+      const res = await patchShareViaApi(app, share.id, sessionCookie, { mode: "password" });
+      expect(res.status).toBe(400);
+    });
+
+    it("410s a change attempt on a revoked share", async () => {
+      const app = buildTestApp();
+      const { orgId, sessionCookie } = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, orgId, sessionCookie);
+      const share = (await (await createShareViaApi(app, artifactId, sessionCookie, { mode: "team" })).json()) as { id: string };
+      await app.request(`/api/v1/shares/${share.id}`, { method: "DELETE", headers: authedHeaders(sessionCookie) });
+
+      const res = await patchShareViaApi(app, share.id, sessionCookie, { mode: "public" });
+      expect(res.status).toBe(410);
+    });
+
+    it("410s a change attempt on an expired share", async () => {
+      const app = buildTestApp();
+      const { orgId, sessionCookie } = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, orgId, sessionCookie);
+      const share = (await (await createShareViaApi(app, artifactId, sessionCookie, { mode: "team" })).json()) as { id: string };
+      await getTestDb().update(shares).set({ expiresAt: new Date(Date.now() - 60_000) }).where(eq(shares.id, share.id));
+
+      const res = await patchShareViaApi(app, share.id, sessionCookie, { mode: "public" });
+      expect(res.status).toBe(410);
+    });
+
+    it("records an audit entry with the mode transition, and never with the plaintext password", async () => {
+      const app = buildTestApp();
+      const { orgId, sessionCookie } = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, orgId, sessionCookie);
+      const share = (await (await createShareViaApi(app, artifactId, sessionCookie, { mode: "team" })).json()) as { id: string };
+
+      await patchShareViaApi(app, share.id, sessionCookie, { mode: "password", password: "hunter2" });
+
+      const entry = await getTestDb().query.auditLog.findFirst({ where: eq(auditLog.action, "share.update_mode") });
+      expect(entry).toBeTruthy();
+      expect(entry!.targetId).toBe(share.id);
+      expect(entry!.meta).toMatchObject({ from: "team", to: "password" });
+      expect(JSON.stringify(entry!.meta)).not.toContain("hunter2");
+    });
+
+    it("403s a user_key caller missing the shares:write scope, and never sets an unlock cookie for one that has it", async () => {
+      const app = buildTestApp();
+      const { orgId, sessionCookie } = await registerAndLogin(app);
+      const artifactId = await createArtifact(app, orgId, sessionCookie);
+      const share = (await (await createShareViaApi(app, artifactId, sessionCookie, { mode: "team" })).json()) as { id: string; token: string };
+
+      const restrictedKey = await issueUserKey(app, sessionCookie, ["artifacts:read", "artifacts:write"]);
+      const forbiddenRes = await app.request(`/api/v1/shares/${share.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${restrictedKey.token}` },
+        body: JSON.stringify({ mode: "public" }),
+      });
+      expect(forbiddenRes.status).toBe(403);
+
+      const fullKey = await issueUserKey(app, sessionCookie, ["artifacts:read", "artifacts:write", "shares:write"]);
+      const okRes = await app.request(`/api/v1/shares/${share.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${fullKey.token}` },
+        body: JSON.stringify({ mode: "password", password: "hunter2" }),
+      });
+      expect(okRes.status).toBe(200);
+      // An API-key caller has no browser session for a cookie to help — none should be set.
+      expect(okRes.headers.get("set-cookie")).toBeNull();
     });
   });
 });

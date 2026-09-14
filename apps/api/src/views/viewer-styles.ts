@@ -93,6 +93,15 @@ body.oa-viewer { display: flex; flex-direction: column; }
   align-items: baseline;
   gap: 8px;
 }
+.oa-logo {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  align-self: center; /* .oa-panel-title is align-items:baseline; the mark has no text baseline of its own */
+  opacity: 0.85;
+}
+.oa-logo:hover { opacity: 1; }
+.oa-logo img { display: block; width: 18px; height: 18px; border-radius: 4px; }
 .oa-panel-title h1 {
   font-size: 14px;
   font-weight: 600;
@@ -182,6 +191,38 @@ body.oa-viewer { display: flex; flex-direction: column; }
 }
 .oa-versions-more { padding: 6px 8px; font-size: 11px; color: var(--oa-muted); }
 
+.oa-share-mode-menu {
+  position: absolute;
+  right: 14px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--oa-panel);
+  border: 1px solid var(--oa-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  min-width: 240px;
+  padding: 10px;
+}
+.oa-share-mode-menu select,
+.oa-share-mode-menu input[type="password"] {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--oa-border);
+  border-radius: 6px;
+  background: var(--oa-bg);
+  color: var(--oa-fg);
+  font: inherit;
+  font-size: 12px;
+}
+.oa-share-mode-menu button { width: 100%; justify-content: center; }
+.oa-share-mode-menu .oa-error { margin: 0; }
+/* Native [hidden] already sets display:none, but a later class selector setting display on the
+   same element would win on specificity and silently defeat it — this keeps hiding the password
+   field robust regardless. */
+[hidden] { display: none !important; }
+
 .oa-banner {
   padding: 6px 14px;
   font-size: 12px;
@@ -250,11 +291,12 @@ html[data-oa-panel="collapsed"] .oa-panel { max-height: none; }
   font: inherit;
 }
 .oa-card button { width: 100%; justify-content: center; }
-.oa-card .oa-error {
+/* Not scoped to .oa-card — reused by the visibility control's popup in .oa-panel too. */
+.oa-error {
   color: var(--oa-danger);
   font-size: 12px;
   margin: 8px 0 0;
   display: none;
 }
-.oa-card .oa-error[data-visible="true"] { display: block; }
+.oa-error[data-visible="true"] { display: block; }
 `;

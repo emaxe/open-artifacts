@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import type { EffectiveSharePolicy } from "@open-artifacts/shared";
 import type { Database } from "../db/client.js";
 import { orgs, type artifacts, type shares } from "../db/schema.js";
 import { listVersionSummaries } from "./artifacts.js";
@@ -15,6 +16,10 @@ export interface BuildViewerModelInput {
   artifact: typeof artifacts.$inferSelect;
   resolved: ResolvedDisplayVersion;
   ctx: ViewerContext;
+  /** The team's effective share policy — only ever read on the manager branch (the visibility
+   *  control's disabled/enabled options), so the caller resolves and passes it in rather than this
+   *  function querying it unconditionally for every anon/member render. */
+  policy?: EffectiveSharePolicy;
 }
 
 function urls(token: string, versionNo: number) {
@@ -33,7 +38,7 @@ function urls(token: string, versionNo: number) {
  * `ViewerShellModel` union's typing) that nothing extra ends up in memory to leak by mistake.
  */
 export async function buildViewerModel(db: Database, input: BuildViewerModelInput): Promise<ViewerShellModel> {
-  const { token, share, artifact, resolved, ctx } = input;
+  const { token, share, artifact, resolved, ctx, policy } = input;
   const version = resolved.version;
   const { canonicalHref, embedSrc, downloadHref } = urls(token, version.versionNo);
 
@@ -70,6 +75,7 @@ export async function buildViewerModel(db: Database, input: BuildViewerModelInpu
 
   // audience === "manager": write access always implies read access (resolveOrgArtifactAccess
   // never grants write without read), so cabinetHref is never null here.
+  if (!policy) throw new Error("buildViewerModel: policy is required on the manager branch");
   const summaries = await listVersionSummaries(db, artifact.id, VERSION_LIST_LIMIT + 1);
   const versionsTruncated = summaries.length > VERSION_LIST_LIMIT;
   const versions: ViewerVersionEntry[] = summaries.slice(0, VERSION_LIST_LIMIT).map((v) => ({
@@ -95,5 +101,11 @@ export async function buildViewerModel(db: Database, input: BuildViewerModelInpu
     versions,
     versionsTruncated,
     nonDefaultNotice: resolved.requestedApplied ? { canonicalHref } : null,
+    shareId: share.id,
+    shareMode: share.mode,
+    // `policy` is only ever passed in on this branch (see BuildViewerModelInput) — falling back to
+    // the share's own current mode would be wrong when it's `public` on a team that has since
+    // forbidden public links, so absence is a caller bug, not something to paper over silently.
+    allowedModes: policy!.allowedModes,
   };
 }

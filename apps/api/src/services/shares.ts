@@ -46,6 +46,32 @@ export async function getShareByToken(db: Database, token: string) {
   return db.query.shares.findFirst({ where: eq(shares.token, token) });
 }
 
+export interface UpdateShareModeInput {
+  mode: ShareMode;
+  password?: string;
+}
+
+/**
+ * Changes an existing share's mode in place — same token, same URL. `passwordHash` is written on
+ * every call, not only when `mode === "password"`: leaving a stale hash behind on a `password` ->
+ * `team`/`public` transition would let a later switch back to `password` silently resurrect an old,
+ * forgotten password instead of requiring a fresh one. See the NULL-hash regression this mirrors in
+ * `createShare` and `share-access.test.ts`.
+ */
+export async function updateShareMode(db: Database, shareId: string, input: UpdateShareModeInput) {
+  if (input.mode === "password" && !input.password) {
+    throw new Error("updateShareMode: password is required when mode is 'password'");
+  }
+  const passwordHash = input.mode === "password" && input.password ? await hashSecret(input.password) : null;
+
+  const [share] = await db
+    .update(shares)
+    .set({ mode: input.mode, passwordHash })
+    .where(eq(shares.id, shareId))
+    .returning();
+  return share!;
+}
+
 export async function listSharesForArtifact(db: Database, artifactId: string) {
   return db.query.shares.findMany({ where: eq(shares.artifactId, artifactId) });
 }

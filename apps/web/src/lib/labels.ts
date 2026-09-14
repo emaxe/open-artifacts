@@ -52,6 +52,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "device_auth.approve": "Подтверждение входа агента",
   "share.create": "Создание ссылки",
   "share.revoke": "Отзыв ссылки",
+  "share.update_mode": "Изменение режима ссылки",
   "share.bulk_revoke_public": "Массовый отзыв публичных ссылок",
   "settings.share_policy_update": "Изменение политики ссылок",
 };
