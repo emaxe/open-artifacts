@@ -95,6 +95,10 @@ describe("GET /s/:token — audience-gated viewer panel", () => {
     expect(html).not.toContain("Open in workspace");
     expect(html).not.toMatch(/\d+ views?/);
     expect(html).not.toContain(owner.email);
+    // The logo is shown to every audience; the visibility control (a manager-only write action)
+    // is not — an anonymous visitor gets neither the data nor the markup for it.
+    expect(html).toContain('<a class="oa-logo" href="/"');
+    expect(html).not.toContain('<details class="oa-share-mode"');
   });
 
   it("shows the artifact's owner the full manager panel", async () => {
@@ -110,6 +114,9 @@ describe("GET /s/:token — audience-gated viewer panel", () => {
     expect(html).toContain(`/t/${owner.orgId}/artifacts/${artifactId}`);
     expect(html).toContain("Open in workspace");
     expect(html).toContain('<details class="oa-versions"');
+    expect(html).toContain(`<details class="oa-share-mode" data-share-id="${share.id}">`);
+    // createShareForArtifact defaults to mode "public" — that's the option marked selected here.
+    expect(html).toContain('<option value="public" selected>Public</option>');
   });
 
   it("shows an admin of the same team the full manager panel even though they don't own the artifact", async () => {
@@ -138,6 +145,7 @@ describe("GET /s/:token — audience-gated viewer panel", () => {
     // artifact, so no dead link into a cabinet page that would just 403, and no version controls.
     expect(html).not.toContain("Open in workspace");
     expect(html).not.toContain('<details class="oa-versions"');
+    expect(html).not.toContain('<details class="oa-share-mode"');
   });
 
   it("shows a plain teammate the cabinet link when the artifact is org-visible", async () => {
@@ -308,6 +316,65 @@ describe("GET /s/:token — CSP and caching headers", () => {
     const [a, b] = await Promise.all([app.request(`/s/${share.token}`), app.request(`/s/${share.token}`)]);
     const nonceOf = (res: Response) => /script-src 'nonce-([^']+)'/.exec(res.headers.get("content-security-policy")!)![1];
     expect(nonceOf(a)).not.toBe(nonceOf(b));
+  });
+
+  it("always allows img-src 'self' (the shell's own logo), regardless of audience", async () => {
+    const app = buildTestApp();
+    const owner = await registerAndLogin(app);
+    const artifactId = await createArtifact(app, owner.orgId, owner.sessionCookie);
+    const share = await createShareForArtifact(app, artifactId, owner.sessionCookie);
+
+    const anonCsp = (await app.request(`/s/${share.token}`)).headers.get("content-security-policy")!;
+    expect(anonCsp).toContain("img-src 'self'");
+
+    const managerCsp = (await app.request(`/s/${share.token}`, { headers: { Cookie: `oa_session=${owner.sessionCookie}` } })).headers.get(
+      "content-security-policy",
+    )!;
+    expect(managerCsp).toContain("img-src 'self'");
+  });
+
+  it("opens connect-src only for a manager, whose panel can fetch the visibility-control PATCH", async () => {
+    const app = buildTestApp();
+    const owner = await registerAndLogin(app);
+    const artifactId = await createArtifact(app, owner.orgId, owner.sessionCookie);
+    const share = await createShareForArtifact(app, artifactId, owner.sessionCookie);
+
+    const anonCsp = (await app.request(`/s/${share.token}`)).headers.get("content-security-policy")!;
+    expect(anonCsp).toContain("connect-src 'none'");
+
+    const managerCsp = (await app.request(`/s/${share.token}`, { headers: { Cookie: `oa_session=${owner.sessionCookie}` } })).headers.get(
+      "content-security-policy",
+    )!;
+    expect(managerCsp).toContain("connect-src 'self'");
+  });
+});
+
+describe("GET /s/:token — visibility control (manager only)", () => {
+  it("renders 'public' as a disabled option once the team forbids public links", async () => {
+    const app = buildTestApp();
+    const owner = await registerAndLogin(app);
+    const artifactId = await createArtifact(app, owner.orgId, owner.sessionCookie);
+    const share = await createShareForArtifact(app, artifactId, owner.sessionCookie, { mode: "team" });
+    await app.request(`/api/v1/orgs/${owner.orgId}`, {
+      method: "PATCH",
+      headers: authedHeaders(owner.sessionCookie),
+      body: JSON.stringify({ allowPublicShares: false }),
+    });
+
+    const res = await app.request(`/s/${share.token}`, { headers: { Cookie: `oa_session=${owner.sessionCookie}` } });
+    const html = await res.text();
+    expect(html).toContain('<option value="public" disabled>Public (disabled for this team)</option>');
+  });
+
+  it("leaves 'public' enabled when the team's policy allows it", async () => {
+    const app = buildTestApp();
+    const owner = await registerAndLogin(app);
+    const artifactId = await createArtifact(app, owner.orgId, owner.sessionCookie);
+    const share = await createShareForArtifact(app, artifactId, owner.sessionCookie, { mode: "team" });
+
+    const res = await app.request(`/s/${share.token}`, { headers: { Cookie: `oa_session=${owner.sessionCookie}` } });
+    const html = await res.text();
+    expect(html).toContain('<option value="public">Public</option>');
   });
 });
 

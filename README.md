@@ -37,7 +37,7 @@ Runs as a lightweight, single-stack Docker Compose deployment.
 - 🔑 **Flexible Authentication**: Interactive OAuth Device Flow (`oa login`) and non-interactive organization API tokens (`OA_TOKEN`).
 - 🖥️ **Bilingual Sign-In Screen**: `/` greets a signed-out visitor with a two-panel sign-in/sign-up screen (English/Russian, toggle in the header) — no marketing copy to scroll past on your own instance. Signed-in visitors are redirected straight to their own workspace. The product's marketing site lives separately at **[emaxe.github.io/open-artifacts](https://emaxe.github.io/open-artifacts/)** (source: `apps/landing/`), published to GitHub Pages and carrying no auth of its own.
 - 👥 **Multi-Tenancy & Teams**: Organizations, user management, and fine-grained roles (`superadmin`, `admin`, `member`) with an intuitive Team Switcher.
-- 🔗 **Secure Sharing**: Team-only links, password-protected links, public links (optionally labeled for your own reference), and automatic link expiration (1 hour, 1 day, 7 days, 30 days) — teams and instance admins control the default link mode and can disable public links entirely. Every share page shows a viewer panel (title, type, version) that expands with author, team, and a view-only version picker for anyone who can manage the artifact.
+- 🔗 **Secure Sharing**: Team-only links, password-protected links, public links (optionally labeled for your own reference), and automatic link expiration (1 hour, 1 day, 7 days, 30 days) — teams and instance admins control the default link mode and can disable public links entirely. Every share page shows a branded viewer panel (title, type, version) that expands with author, team, and a version picker for anyone who can manage the artifact — who can also change that very link's access mode right there, in place, without revoking it and handing out a new URL.
 - 🖼️ **File Attachments**: Images and other files can be uploaded to an S3-compatible bucket (MinIO ships in `docker-compose.yml` by default) and attached to an artifact — proxied through the app, never a public bucket. An agent can check its remaining quota (`oa quota` / the `get_storage_quota` MCP tool) before deciding whether to upload. Instance-wide and per-team storage quotas (team-wide and per-artifact, unlimited by default) keep usage in check; files are deleted automatically with their artifact.
 - 🚀 **One-Command Deployment**: Instant production setup with Docker Compose or the interactive `./run.sh` runner.
 
@@ -299,6 +299,10 @@ whether **public links are allowed at all**. A superadmin sets the same two knob
 never re-enable public links the instance disabled, nor default to public while public links are
 forbidden. Disabling public links only blocks *new* ones; existing public shares keep working until
 revoked, one by one from the artifact page or in bulk from the team settings page.
+
+An existing link's own access mode can also be changed in place — without revoking it and handing
+out a new URL — right from its own viewer page (`/s/:token`), by anyone who can manage the artifact
+(`PATCH /api/v1/shares/:id`).
 
 ---
 

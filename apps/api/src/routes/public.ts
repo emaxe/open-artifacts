@@ -10,6 +10,8 @@ import { renderArtifactHtml } from "../services/render.js";
 import { recordArtifactView } from "../services/analytics.js";
 import { hashIp } from "../services/audit.js";
 import { getInstanceSettings, defaultInstanceSettings } from "../services/settings.js";
+import { resolveSharePolicyForRequest } from "../services/share-policy.js";
+import { unlockCookieName, isUnlocked, grantUnlock, UNLOCK_TTL_MS } from "../services/share-unlock.js";
 import { resolveViewerContext } from "../services/viewer-context.js";
 import { parseVersionParam, resolveDisplayVersion } from "../services/viewer-version.js";
 import { buildViewerModel } from "../services/viewer-panel.js";
@@ -17,28 +19,6 @@ import { contentDispositionValue } from "../services/download-name.js";
 import { renderViewerShell, renderPasswordFormPage, renderRestrictedPage, renderErrorPage } from "../views/viewer-shell.js";
 
 export const publicRoutes = new Hono<AppBindings>();
-
-// In-memory unlock-session store for password-protected shares: token -> { secret, expiresAtMs }.
-// Deliberately ephemeral (not persisted) — losing it on restart just means re-entering the password.
-// A `team`-mode share never sets or reads this — it has no password step at all — so nothing here
-// needs to change to support it; keep it that way rather than wiring the two together.
-const unlockSessions = new Map<string, { secret: string; expiresAtMs: number }>();
-const UNLOCK_TTL_MS = 60 * 60 * 1000;
-
-function unlockCookieName(token: string) {
-  return `oa_unlock_${token}`;
-}
-
-function isUnlocked(token: string, cookieValue: string | undefined): boolean {
-  if (!cookieValue) return false;
-  const entry = unlockSessions.get(token);
-  if (!entry) return false;
-  if (entry.expiresAtMs <= Date.now()) {
-    unlockSessions.delete(token);
-    return false;
-  }
-  return entry.secret === cookieValue;
-}
 
 /** Minimal, dependency-free error page for `/embed/:token` — deliberately NOT the viewer-shell
  *  template: this response is served under `buildEmbedCsp`'s policy (meant for artifact content,
@@ -118,10 +98,18 @@ publicRoutes.get("/s/:token", async (c) => {
   const db = c.get("db");
   const requested = parseVersionParam(c.req.query("v"));
   const resolved = await resolveDisplayVersion(db, artifact, share, requested, ctx.canManage);
-  c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
+  // `connect-src 'self'` only for a manager — they're the only audience whose panel has anything to
+  // fetch (the visibility control's `PATCH /api/v1/shares/:id`). Anonymous and member renders keep
+  // 'none'; this response is `private, no-store` with `Vary: Cookie`, so there's no cache-confusion
+  // risk in varying it per viewer.
+  c.header("Content-Security-Policy", buildViewerShellCsp({ nonce, allowConnectSelf: ctx.canManage }));
   if (!resolved) return c.html(renderErrorPage("No content available.", nonce), 404);
 
-  const vm = await buildViewerModel(db, { token, share, artifact, resolved, ctx });
+  // Only the manager branch renders the visibility control, so only it needs the team's share
+  // policy (whether `public` is currently choosable) — an extra DB read the anon/member majority
+  // of this route's traffic never pays for.
+  const policy = ctx.canManage ? await resolveSharePolicyForRequest(db, c.get("env"), artifact.orgId) : undefined;
+  const vm = await buildViewerModel(db, { token, share, artifact, resolved, ctx, policy });
   return c.html(renderViewerShell(vm, nonce));
 });
 
@@ -143,9 +131,8 @@ publicRoutes.post("/s/:token/unlock", async (c) => {
   const ok = await verifySecret(password, share.passwordHash);
   if (!ok) return c.json({ error: { code: "invalid_password" } }, 401);
 
-  const secret = nanoid(32);
   const expiresAtMs = Math.min(Date.now() + UNLOCK_TTL_MS, share.expiresAt ? share.expiresAt.getTime() : Infinity);
-  unlockSessions.set(token, { secret, expiresAtMs });
+  const secret = grantUnlock(token, expiresAtMs);
   setCookie(c, unlockCookieName(token), secret, {
     httpOnly: true,
     sameSite: "Lax",

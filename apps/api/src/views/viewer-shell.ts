@@ -1,4 +1,4 @@
-import type { ArtifactKind } from "@open-artifacts/shared";
+import type { ArtifactKind, ShareMode } from "@open-artifacts/shared";
 import { escapeHtml, truncate } from "../services/html.js";
 import { VIEWER_CSS } from "./viewer-styles.js";
 
@@ -61,6 +61,12 @@ interface ManagerFields extends MemberFields {
   versionsTruncated: boolean;
   /** Set when `?v=` resolved to something other than the share's default (current/pinned) version. */
   nonDefaultNotice: { canonicalHref: string } | null;
+  /** This share's own id (not the artifact's) — the visibility control PATCHes `/api/v1/shares/:id`. */
+  shareId: string;
+  shareMode: ShareMode;
+  /** Modes the team's policy currently allows choosing; `"public"` is absent when forbidden — see
+   *  the visibility control, which renders it anyway as a disabled option rather than hiding it. */
+  allowedModes: ShareMode[];
 }
 
 export type ViewerShellModel =
@@ -73,6 +79,14 @@ const KIND_LABELS: Record<ArtifactKind, string> = {
   markdown: "Markdown",
   svg: "SVG",
   mermaid: "Mermaid",
+};
+
+// English-only, like the rest of this shell's chrome — a separate vocabulary from the Russian
+// SHARE_MODE_LABELS in apps/web/src/lib/labels.ts, which serves the cabinet UI instead.
+const SHARE_MODE_LABELS: Record<ShareMode, string> = {
+  team: "Team only",
+  password: "Password protected",
+  public: "Public",
 };
 
 function formatBytes(n: number): string {
@@ -128,6 +142,16 @@ const PANEL_SCRIPT = `(function(){
       sync();
     });
   }
+  // The version picker and the visibility control are both right-anchored <details> popovers in
+  // the same header; browsers don't auto-close sibling <details>, so two open at once would
+  // overlap. Closing the others whenever one opens keeps at most one on screen.
+  var popovers=document.querySelectorAll('.oa-versions,.oa-share-mode');
+  Array.prototype.forEach.call(popovers,function(d){
+    d.addEventListener('toggle',function(){
+      if(!d.open)return;
+      Array.prototype.forEach.call(popovers,function(o){if(o!==d)o.open=false;});
+    });
+  });
   function legacyCopy(text){
     var ta=document.createElement('textarea');
     ta.value=text;
@@ -165,6 +189,39 @@ const PANEL_SCRIPT = `(function(){
       }
     });
   }
+  var modeDetails=document.querySelector('.oa-share-mode');
+  if(modeDetails){
+    var modeSelect=document.getElementById('oa-mode-select');
+    var modePw=document.getElementById('oa-mode-pw');
+    var modeApply=document.getElementById('oa-mode-apply');
+    var modeErr=document.getElementById('oa-mode-err');
+    function syncPwVisibility(){
+      modePw.hidden=modeSelect.value!=='password';
+    }
+    syncPwVisibility();
+    modeSelect.addEventListener('change',syncPwVisibility);
+    modeApply.addEventListener('click',function(){
+      modeErr.removeAttribute('data-visible');
+      modeApply.disabled=true;
+      fetch('/api/v1/shares/'+encodeURIComponent(modeDetails.dataset.shareId),{
+        method:'PATCH',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({mode:modeSelect.value,password:modePw.hidden?undefined:modePw.value}),
+      }).then(function(res){
+        if(res.ok){window.location.reload();return;}
+        return res.json().catch(function(){return {};}).then(function(body){
+          modeErr.textContent=(body&&body.error&&body.error.message)||'Could not change visibility.';
+          modeErr.setAttribute('data-visible','true');
+          modeApply.disabled=false;
+        });
+      }).catch(function(){
+        modeErr.textContent='Could not change visibility.';
+        modeErr.setAttribute('data-visible','true');
+        modeApply.disabled=false;
+      });
+    });
+  }
 })();`;
 
 function documentShell(opts: { title: string; nonce: string; bodyClass?: string; headExtra?: string; body: string }): string {
@@ -181,6 +238,34 @@ function renderVersionPicker(vm: Extract<ViewerShellModel, { audience: "manager"
     .join("");
   const more = vm.versionsTruncated ? `<div class="oa-versions-more">Showing the most recent versions only.</div>` : "";
   return `<details class="oa-versions"><summary class="oa-btn">Version ${vm.versionNo} ▾</summary><div class="oa-versions-menu">${items}${more}</div></details>`;
+}
+
+/**
+ * Visibility control for a manager: who can open THIS link, changeable in place (same token, same
+ * URL — see `PATCH /shares/:id`). The only server data it carries into the DOM is `data-share-id`
+ * (escaped) plus `selected`/`disabled` on its own `<option>`s; the click handler that reads and
+ * submits it lives entirely in PANEL_SCRIPT, which per its own docblock must never gain a
+ * server-supplied value of its own.
+ */
+function renderShareModeControl(vm: Extract<ViewerShellModel, { audience: "manager" }>): string {
+  const options = (["team", "password", "public"] as const)
+    .map((mode) => {
+      const allowed = vm.allowedModes.includes(mode);
+      const selected = mode === vm.shareMode ? " selected" : "";
+      const disabled = allowed ? "" : " disabled";
+      const label = allowed ? SHARE_MODE_LABELS[mode] : `${SHARE_MODE_LABELS[mode]} (disabled for this team)`;
+      return `<option value="${mode}"${selected}${disabled}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+  return `<details class="oa-share-mode" data-share-id="${escapeHtml(vm.shareId)}">
+<summary class="oa-btn">Visibility: ${escapeHtml(SHARE_MODE_LABELS[vm.shareMode])} ▾</summary>
+<div class="oa-share-mode-menu">
+<select id="oa-mode-select">${options}</select>
+<input type="password" id="oa-mode-pw" placeholder="New password" autocomplete="new-password" hidden>
+<button type="button" id="oa-mode-apply" class="oa-btn oa-btn-primary">Apply</button>
+<p class="oa-error" id="oa-mode-err"></p>
+</div>
+</details>`;
 }
 
 export function renderViewerShell(vm: ViewerShellModel, nonce: string): string {
@@ -204,7 +289,10 @@ export function renderViewerShell(vm: ViewerShellModel, nonce: string): string {
   }
 
   const actions: string[] = [];
-  if (vm.audience === "manager") actions.push(renderVersionPicker(vm));
+  if (vm.audience === "manager") {
+    actions.push(renderVersionPicker(vm));
+    actions.push(renderShareModeControl(vm));
+  }
   actions.push(`<a id="oa-copy" class="oa-btn" href="${escapeHtml(vm.canonicalHref)}">Copy link</a>`);
   actions.push(`<a class="oa-btn" href="${escapeHtml(vm.downloadHref)}">Download source</a>`);
   if ((vm.audience === "member" || vm.audience === "manager") && vm.cabinetHref) {
@@ -226,7 +314,7 @@ export function renderViewerShell(vm: ViewerShellModel, nonce: string): string {
 
   const body = `${notice}<header class="oa-panel">
 <div class="oa-panel-row">
-<div class="oa-panel-title"><h1 title="${escapedTitle}">${escapedTitle}</h1><span class="oa-kind">${kindLabel}</span></div>
+<div class="oa-panel-title"><a class="oa-logo" href="/" aria-label="Open Artifacts home"><img src="/brand/logo-mark.png" alt="" width="18" height="18"></a><h1 title="${escapedTitle}">${escapedTitle}</h1><span class="oa-kind">${kindLabel}</span></div>
 <div class="oa-actions">${actions.join("")}</div>
 </div>
 <div class="oa-panel-row oa-panel-secondary" id="oa-panel-body"><ul class="oa-meta">${metaItems.join("")}</ul></div>

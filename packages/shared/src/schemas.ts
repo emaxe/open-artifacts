@@ -59,6 +59,14 @@ export const createShareSchema = z.object({
 });
 export type CreateShareInput = z.infer<typeof createShareSchema>;
 
+// `mode` is required here (unlike createShareSchema, where omitting it falls back to the team's
+// default) — a PATCH that doesn't say what to change to is meaningless.
+export const updateShareSchema = z.object({
+  mode: shareModeSchema,
+  password: z.string().min(4).max(200).optional(),
+});
+export type UpdateShareInput = z.infer<typeof updateShareSchema>;
+
 export const unlockShareSchema = z.object({
   password: z.string().min(1),
 });
