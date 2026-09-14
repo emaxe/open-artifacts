@@ -91,7 +91,16 @@ export function AdminTeamsPage() {
                       <OrgIdentity org={o} secondary="none" />
                     </Link>
                   </TD>
-                  <TD className="text-muted">{o.owner?.email ?? "—"}</TD>
+                  <TD className="text-muted">
+                    {o.owner ? (
+                      <div className="min-w-0">
+                        {o.owner.name && <p className="truncate text-fg">{o.owner.name}</p>}
+                        <p className="truncate text-xs text-muted">{o.owner.email}</p>
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </TD>
                   <TD>{o.memberCount}</TD>
                   <TD>{o.artifactCount}</TD>
                   <TD className="text-muted">{formatDateTime(o.createdAt)}</TD>
