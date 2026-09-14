@@ -1,6 +1,6 @@
 import { CopyButton } from "./CopyButton";
 
-/** A copyable single-command snippet — extracted from pages/help/AgentInstructionsPage.tsx so the landing's self-host section can reuse the exact same look instead of re-implementing it. */
+/** A copyable single-command snippet — extracted from pages/help/AgentInstructionsPage.tsx so other pages needing the same look (HomePage's connect-an-agent snippet included) don't re-implement it. */
 export function CodeBlock({ text, copyLabel, copiedLabel }: { text: string; copyLabel?: string; copiedLabel?: string }) {
   return (
     <div className="mt-1.5 flex items-start gap-2">

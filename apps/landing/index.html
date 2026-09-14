@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Open Artifacts</title>
+    <!-- Static marketing site, no SSR and no app behind it — this IS the whole page for both
+         crawlers and social unfurlers, unlike apps/web/index.html where a runtime provider swaps
+         these for JS-executing visitors. Keep title/description/OG here in sync with
+         src/landing/copy.ts's ru branch by hand; the ?lang= toggle only ever updates the live DOM. -->
+    <meta name="description" content="Self-hosted хостинг артефактов для AI-агентов: HTML, Markdown, Mermaid и SVG в изолированной песочнице, по одной ссылке. MIT, свой сервер, встроенный MCP." />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafafa" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0b" />
+
+    <link rel="canonical" href="https://emaxe.github.io/open-artifacts/" />
+    <link rel="alternate" hreflang="ru" href="https://emaxe.github.io/open-artifacts/?lang=ru" />
+    <link rel="alternate" hreflang="en" href="https://emaxe.github.io/open-artifacts/?lang=en" />
+    <link rel="alternate" hreflang="x-default" href="https://emaxe.github.io/open-artifacts/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Open Artifacts" />
+    <meta property="og:title" content="Open Artifacts" />
+    <meta property="og:description" content="Self-hosted хостинг артефактов для AI-агентов — HTML, Markdown, Mermaid и SVG по одной ссылке." />
+    <meta property="og:url" content="https://emaxe.github.io/open-artifacts/" />
+    <meta property="og:image" content="https://emaxe.github.io/open-artifacts/brand/logo-mark.png" />
+    <meta property="og:locale" content="ru_RU" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta name="twitter:card" content="summary" />
+
+    <link rel="icon" href="./favicon.ico" sizes="48x48" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <script>
+      // Applied before first paint to avoid a light-mode flash for dark-theme users. Deliberately
+      // its OWN storage keys (oa_site_theme/oa_site_lang, not apps/web's oa_theme/oa_landing_lang)
+      // — emaxe.github.io is a shared origin across every Pages project on the account, so reusing
+      // the app's keys risks a collision with an unrelated project living at another path.
+      try {
+        var t = localStorage.getItem("oa_site_theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

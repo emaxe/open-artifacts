@@ -1,7 +1,8 @@
 {
   "name": "open-artifacts",
   "private": true,
-  "version": "0.8.0",
+  "version": "0.9.0",
+  "packageManager": "pnpm@11.1.2",
   "keywords": [
     "ai-agents",
     "artifacts",
@@ -27,6 +28,7 @@
     "build": "pnpm -r --filter=./packages/* --filter=./apps/* run build",
     "dev:api": "pnpm --filter @open-artifacts/api dev",
     "dev:web": "pnpm --filter @open-artifacts/web dev",
+    "dev:landing": "pnpm --filter @open-artifacts/landing dev",
     "test": "pnpm -r run test",
     "typecheck": "pnpm -r run typecheck",
     "db:generate": "pnpm --filter @open-artifacts/api db:generate",

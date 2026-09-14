@@ -1,6 +1,6 @@
 /**
- * Shared by every page that accepts a post-auth `?next=` redirect (LoginPage today, the landing's
- * inline auth card too). Kept in one place so the open-redirect guard is never re-typed, and
+ * Shared by every page that accepts a post-auth `?next=` redirect (pages/auth/AuthPage.tsx,
+ * components/Layout.tsx). Kept in one place so the open-redirect guard is never re-typed, and
  * re-typed wrong, at a second call site.
  */
 

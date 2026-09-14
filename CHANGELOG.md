@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.0] - 2026-09-14
+
+### Added
+- A published marketing website at **https://emaxe.github.io/open-artifacts/**, built from a new `apps/landing` package and deployed by `.github/workflows/landing.yml` on every push to `apps/landing/**`. Purely informational — no login/register form — with CTAs pointing to GitHub and the self-host instructions instead.
+
+### Changed
+- `/` is now a two-panel sign-in/sign-up screen (form on the left, an animated brand panel — terminal replay, live demo artifact — on the right, single column on narrow viewports), replacing the marketing landing that used to live there. Bilingual (RU/EN), same as before.
+- `/login` and `/register` now render that same screen instead of their own separate pages; both still honor `?next=` and `?invite=` exactly as before, including the redirect out of a restricted share link after signing in.
+
+### Removed
+- The in-app marketing landing (`pages/landing/`) — its content moved to `apps/landing`, published separately (see Added). `/welcome` now redirects to `/` for old bookmarks and links.
+
+---
+
 ## [0.8.0] - 2026-09-13
 
 ### Added
