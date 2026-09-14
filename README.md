@@ -20,7 +20,7 @@ Self-hosted artifact hosting for AI agents — an open alternative to Claude Art
 
 Runs as a lightweight, single-stack Docker Compose deployment.
 
-🌐 **Landing Page & Live Demo:** [https://emaxe.github.io/open-artifacts](https://emaxe.github.io/open-artifacts)
+🌐 **Landing Page:** [https://emaxe.github.io/open-artifacts](https://emaxe.github.io/open-artifacts)
 
 ---
 

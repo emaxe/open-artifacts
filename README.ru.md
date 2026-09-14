@@ -20,7 +20,7 @@ Self-hosted (автономный) сервис хостинга артефак�
 
 Разворачивается в виде единого легковесного стека Docker Compose.
 
-🌐 **Лендинг и интерактивное демо:** [https://emaxe.github.io/open-artifacts](https://emaxe.github.io/open-artifacts)
+🌐 **Лендинг:** [https://emaxe.github.io/open-artifacts](https://emaxe.github.io/open-artifacts)
 
 ---
 
