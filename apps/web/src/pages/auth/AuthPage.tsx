@@ -47,16 +47,18 @@ function AuthPageContent() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-      <div className="flex flex-col gap-8 px-4 py-8 sm:px-8 sm:py-10">
-        <div className="flex items-center justify-between">
-          <LogoLockup className="h-10 w-28" />
+      <div className="flex flex-col gap-6 px-4 py-8 sm:px-8 sm:py-10">
+        <div className="flex items-center justify-end">
           <div className="flex items-center gap-2">
             <LangToggle />
             <ThemeSwitch labels={THEME_LABELS} />
           </div>
         </div>
 
-        <div className="flex flex-1 items-center justify-center">
+        {/* Top-anchored (not vertically centered) so the register tab's extra "name" field can
+            grow the form downward without ever moving the logo above it. */}
+        <div className="flex flex-1 flex-col items-center gap-6 pt-2 sm:pt-4">
+          <LogoLockup className="h-16 w-44" />
           <AuthForm />
         </div>
 

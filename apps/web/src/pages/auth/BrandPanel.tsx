@@ -18,7 +18,10 @@ export function BrandPanel() {
   const { t } = useAuthCopy();
 
   return (
-    <div aria-hidden="true" className="oa-auth-grid relative hidden overflow-hidden bg-panel-muted lg:flex lg:flex-col lg:justify-center lg:px-12 lg:py-10">
+    <div aria-hidden="true" className="relative hidden overflow-hidden bg-panel-muted lg:flex lg:flex-col lg:justify-center lg:px-12 lg:py-10">
+      {/* Background layer: kept separate from the content below so the grid's edge-fade mask
+          only dims the decorative grid/aurora, not the copy and terminal on top of it. */}
+      <div className="oa-auth-grid pointer-events-none absolute inset-0" />
       <div className="oa-auth-aurora pointer-events-none absolute -inset-1/4 rounded-full bg-accent/10 blur-3xl" />
       <div className="relative flex max-w-md flex-col gap-6">
         <span className="w-fit rounded-full border border-border bg-panel px-3 py-1 text-xs font-medium text-muted">
