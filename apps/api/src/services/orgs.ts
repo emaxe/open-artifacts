@@ -209,7 +209,7 @@ export async function ownersByOrg(db: Database, orgIds: string[]): Promise<Map<s
   return map;
 }
 
-/** Matches name, slug, or the email of the org's owner (any of them). */
+/** Matches name, slug, or the name/email of the org's owner (any of them). */
 function buildOrgSearchCondition(search: string) {
   const pattern = `%${search}%`;
   return or(
@@ -218,7 +218,7 @@ function buildOrgSearchCondition(search: string) {
     sql`exists (
       select 1 from ${orgMembers} om
       inner join ${users} u on u.id = om.user_id
-      where om.org_id = ${orgs.id} and om.role = 'owner' and u.email ilike ${pattern}
+      where om.org_id = ${orgs.id} and om.role = 'owner' and (u.email ilike ${pattern} or u.name ilike ${pattern})
     )`,
   );
 }

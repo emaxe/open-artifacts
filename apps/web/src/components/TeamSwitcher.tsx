@@ -59,7 +59,7 @@ export function TeamSwitcher() {
   // Own orgs already cover these — don't show them twice in the instance-wide search results.
   const instanceOnly: OrgRef[] = (instanceResults ?? [])
     .filter((o) => !ownIds.has(o.id))
-    .map((o) => ({ id: o.id, name: o.name, slug: o.slug, kind: o.kind, ownerEmail: o.owner?.email }));
+    .map((o) => ({ id: o.id, name: o.name, slug: o.slug, kind: o.kind, owner: o.owner }));
 
   function goTo(newOrgId: string) {
     setOpen(false);

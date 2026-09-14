@@ -97,7 +97,7 @@ export function TeamsPage() {
                   <TR key={o.id}>
                     <TD>
                       <Link to={`/t/${o.id}`} className="hover:underline">
-                        <OrgIdentity org={o} secondary={o.owner ? "owner" : "slug"} />
+                        <OrgIdentity org={o} />
                       </Link>
                     </TD>
                     <TD>{o.role ? label(ORG_ROLE_LABELS, o.role) : "—"}</TD>

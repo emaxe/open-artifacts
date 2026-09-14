@@ -2,12 +2,17 @@ import { Avatar } from "./ui/Avatar";
 import { Badge } from "./ui/Badge";
 import { pluralRu } from "../lib/labels";
 
+export interface OrgOwnerRef {
+  name: string;
+  email: string;
+}
+
 export interface OrgRef {
   id: string;
   name: string;
   slug: string;
   kind: "main" | "team";
-  ownerEmail?: string | null;
+  owner?: OrgOwnerRef | null;
   memberCount?: number;
 }
 
@@ -16,8 +21,14 @@ export type OrgIdentitySecondary = "owner" | "slug" | "members" | "none";
 export interface OrgIdentityProps {
   org: OrgRef;
   size?: "sm" | "md";
-  /** What to show on the second line. Defaults to the first available of owner email -> slug. */
+  /** What to show on the second line. Defaults to the first available of owner -> slug. */
   secondary?: OrgIdentitySecondary;
+}
+
+/** "Имя · email", falling back to whichever half is present. */
+function formatOwnerLine(owner: OrgOwnerRef): string {
+  if (owner.name && owner.email) return `${owner.name} · ${owner.email}`;
+  return owner.name || owner.email;
 }
 
 /**
@@ -25,13 +36,13 @@ export interface OrgIdentityProps {
  * auto-provisioned "main" workspace, two orgs can trivially share a display name (two people
  * named "Иван", two teams called "Маркетинг") — this component is how they stay distinguishable:
  * a color keyed to the org's *id* (never its name, see lib/monogram.ts), a "Основное" badge for
- * personal workspaces, and a secondary line (owner email, then slug, then a short id) that a
- * plain name never provides.
+ * personal workspaces, and a secondary line (owner name + email, then slug, then a short id) that
+ * a plain name never provides.
  */
 export function OrgIdentity({ org, size = "md", secondary }: OrgIdentityProps) {
-  const resolvedSecondary = secondary ?? (org.ownerEmail ? "owner" : "slug");
+  const resolvedSecondary = secondary ?? (org.owner ? "owner" : "slug");
   let secondaryText: string | null = null;
-  if (resolvedSecondary === "owner" && org.ownerEmail) secondaryText = org.ownerEmail;
+  if (resolvedSecondary === "owner" && org.owner) secondaryText = formatOwnerLine(org.owner);
   else if (resolvedSecondary === "members" && org.memberCount !== undefined) {
     secondaryText = `${org.memberCount} ${pluralRu(org.memberCount, ["участник", "участника", "участников"])}`;
   } else if (resolvedSecondary === "slug") secondaryText = org.slug;
@@ -49,7 +60,11 @@ export function OrgIdentity({ org, size = "md", secondary }: OrgIdentityProps) {
             </Badge>
           )}
         </div>
-        {secondaryText && <p className="truncate text-xs text-muted">{secondaryText}</p>}
+        {secondaryText && (
+          <p className="truncate text-xs text-muted" title={secondaryText}>
+            {secondaryText}
+          </p>
+        )}
       </div>
     </div>
   );
