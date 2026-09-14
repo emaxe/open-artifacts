@@ -3,12 +3,21 @@
 FROM node:22-alpine AS base
 RUN corepack enable
 WORKDIR /app
+# Non-interactive builds only: newer pnpm asks to confirm before purging/reinstalling
+# node_modules when its recorded install state looks stale, and there's no TTY here to answer.
+# CI=true (pnpm's own documented fix) skips that prompt instead of hanging or aborting.
+ENV CI=true
 
 # --- deps: install with only manifests copied, for cache-friendly rebuilds ---
 FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
+# apps/landing (the published marketing site, apps.landing/README) is a workspace member and thus
+# in the lockfile, so --frozen-lockfile below needs its manifest present even though nothing in
+# this image ever builds or serves it — the landing is deployed separately by
+# .github/workflows/landing.yml, straight to GitHub Pages.
+COPY apps/landing/package.json apps/landing/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/cli/package.json packages/cli/package.json
 RUN pnpm install --frozen-lockfile

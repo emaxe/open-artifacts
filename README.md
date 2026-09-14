@@ -6,6 +6,7 @@
   <a href="https://www.npmjs.com/package/@emaxe/oa"><img src="https://img.shields.io/npm/v/@emaxe/oa.svg?color=blue&logo=npm" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/@emaxe/oa"><img src="https://img.shields.io/npm/dm/@emaxe/oa.svg?color=blue&logo=npm" alt="npm downloads"></a>
   <a href="https://skills.sh/emaxe/open-artifacts"><img src="https://skills.sh/b/emaxe/open-artifacts" alt="skills.sh"></a>
+  <a href="https://emaxe.github.io/open-artifacts/"><img src="https://img.shields.io/badge/Website-emaxe.github.io-blue?logo=github" alt="Website"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-%3E%3D20-brightgreen?logo=node.js" alt="Node.js"></a>
   <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white" alt="Docker"></a>
@@ -34,7 +35,7 @@ Runs as a lightweight, single-stack Docker Compose deployment.
 - 🤖 **Standard AI Agent Skill**: First-class support for `skills.sh` (`npx skills add emaxe/open-artifacts`) with automatic CLI detection and device-flow authorization.
 - 🎨 **Built-in Design Systems**: Four ready-made design templates (dashboards, documents, promo/decks, diagrams) ship with the skill so an agent picks the right one before publishing, keeping artifacts visually consistent.
 - 🔑 **Flexible Authentication**: Interactive OAuth Device Flow (`oa login`) and non-interactive organization API tokens (`OA_TOKEN`).
-- 🖥️ **Bilingual Landing Page**: `/` greets a signed-out visitor with a marketing page (English/Russian, toggle in the header) that explains the product and lets them sign in or register right from the hero, with no separate page hop. Signed-in visitors are redirected straight to their own workspace; the same page stays reachable at `/welcome`.
+- 🖥️ **Bilingual Sign-In Screen**: `/` greets a signed-out visitor with a two-panel sign-in/sign-up screen (English/Russian, toggle in the header) — no marketing copy to scroll past on your own instance. Signed-in visitors are redirected straight to their own workspace. The product's marketing site lives separately at **[emaxe.github.io/open-artifacts](https://emaxe.github.io/open-artifacts/)** (source: `apps/landing/`), published to GitHub Pages and carrying no auth of its own.
 - 👥 **Multi-Tenancy & Teams**: Organizations, user management, and fine-grained roles (`superadmin`, `admin`, `member`) with an intuitive Team Switcher.
 - 🔗 **Secure Sharing**: Team-only links, password-protected links, public links (optionally labeled for your own reference), and automatic link expiration (1 hour, 1 day, 7 days, 30 days) — teams and instance admins control the default link mode and can disable public links entirely. Every share page shows a viewer panel (title, type, version) that expands with author, team, and a view-only version picker for anyone who can manage the artifact.
 - 🖼️ **File Attachments**: Images and other files can be uploaded to an S3-compatible bucket (MinIO ships in `docker-compose.yml` by default) and attached to an artifact — proxied through the app, never a public bucket. An agent can check its remaining quota (`oa quota` / the `get_storage_quota` MCP tool) before deciding whether to upload. Instance-wide and per-team storage quotas (team-wide and per-artifact, unlimited by default) keep usage in check; files are deleted automatically with their artifact.
@@ -66,8 +67,9 @@ Open `http://localhost:3000`, log in using the superadmin credentials configured
 ## Project Layout
 
 ```
-apps/api/              Hono REST API + MCP server + Postgres (Drizzle) + Static web server
-apps/web/              React SPA (Vite) — Admin & User interface
+apps/api/               Hono REST API + MCP server + Postgres (Drizzle) + Static web server
+apps/web/               React SPA (Vite) — sign-in screen + Admin & User interface
+apps/landing/           Static marketing site (Vite, no backend) — published to GitHub Pages
 packages/shared/       Zod schemas + shared validation rules (access control, CSP, TTL parsing)
 packages/cli/          `oa` CLI for AI agents (published on npm as @emaxe/oa)
 skills/open-artifacts/ Agent skill (SKILL.md) + design templates (references/design/) compatible with skills.sh
@@ -93,8 +95,9 @@ cd apps/api && DATABASE_URL=postgres://postgres:postgres@localhost:5433/open_art
   pnpm exec drizzle-kit push
 
 # 4. Start development servers
-pnpm dev:api   # API & MCP server at http://localhost:3000
-pnpm dev:web   # React UI at http://localhost:5173 (proxies /api to :3000)
+pnpm dev:api      # API & MCP server at http://localhost:3000
+pnpm dev:web      # React UI at http://localhost:5173 (proxies /api to :3000)
+pnpm dev:landing  # Marketing site at http://localhost:5174 (apps/landing, no backend needed)
 ```
 
 Develop and test the CLI locally:

@@ -1,11 +1,11 @@
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { TeamSwitcher } from "./TeamSwitcher";
 import { LogoMark } from "./Logo";
 import { Badge } from "./ui/Badge";
 import { ThemeSwitch } from "./ui/ThemeSwitch";
 import { cn } from "../lib/cn";
-import { LogOutIcon, MailIcon, SettingsIcon, ShieldIcon, UsersIcon } from "./ui/icons";
+import { HomeIcon, LogOutIcon, MailIcon, SettingsIcon, ShieldIcon, UsersIcon } from "./ui/icons";
 
 const THEME_LABELS = { light: "Светлая", system: "Системная", dark: "Тёмная" };
 
@@ -22,12 +22,15 @@ export function GlobalSidebar({ onNavigate }: { onNavigate?: () => void } = {}) 
 
   return (
     <div className="flex h-full flex-col p-4">
-      <h1 className="mb-1 flex items-center gap-2 text-base font-semibold text-fg">
+      <Link to="/home" className="mb-1 flex items-center gap-2 text-base font-semibold text-fg" onClick={onNavigate}>
         <LogoMark size={20} /> Open Artifacts
-      </h1>
+      </Link>
       <TeamSwitcher />
 
       <nav className="mt-6 flex flex-1 flex-col gap-0.5" onClick={onNavigate}>
+        <NavLink to="/home" className={navLinkClass}>
+          <HomeIcon size={16} /> Главная
+        </NavLink>
         <NavLink to="/teams" className={navLinkClass}>
           <UsersIcon size={16} /> Команды
         </NavLink>

@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+/*
+ * Token block mirrors apps/web/src/styles.css — kept as a deliberate copy (see apps.landing's
+ * note in the repo root README for why), minus --oa-logo-lockup (the landing never renders the
+ * full wordmark lockup, only LogoMark). A token added on the app side will NOT automatically
+ * reach this file — keep the two in sync by hand.
+ *
+ * Same three-state contract as the app: explicit "light"/"dark" via [data-theme] on <html>,
+ * "system" (default) via prefers-color-scheme with no attribute.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  color-scheme: light;
+  --oa-bg: #fafafa;
+  --oa-panel: #ffffff;
+  --oa-panel-muted: #f4f4f5;
+  --oa-border: #e4e4e7;
+  --oa-fg: #18181b;
+  --oa-muted: #71717a;
+  --oa-accent: #111827;
+  --oa-accent-fg: #ffffff;
+  --oa-danger: #dc2626;
+  --oa-danger-fg: #ffffff;
+  --oa-success: #16a34a;
+  --oa-ring: #a1a1aa;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --oa-bg: #0a0a0b;
+    --oa-panel: #18181b;
+    --oa-panel-muted: #232326;
+    --oa-border: #2c2c31;
+    --oa-fg: #f4f4f5;
+    --oa-muted: #a1a1aa;
+    --oa-accent: #e4e4e7;
+    --oa-accent-fg: #18181b;
+    --oa-danger: #f87171;
+    --oa-danger-fg: #1a0a0a;
+    --oa-success: #4ade80;
+    --oa-ring: #52525b;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --oa-bg: #0a0a0b;
+  --oa-panel: #18181b;
+  --oa-panel-muted: #232326;
+  --oa-border: #2c2c31;
+  --oa-fg: #f4f4f5;
+  --oa-muted: #a1a1aa;
+  --oa-accent: #e4e4e7;
+  --oa-accent-fg: #18181b;
+  --oa-danger: #f87171;
+  --oa-danger-fg: #1a0a0a;
+  --oa-success: #4ade80;
+  --oa-ring: #52525b;
+}
+
+@theme inline {
+  --color-bg: var(--oa-bg);
+  --color-panel: var(--oa-panel);
+  --color-panel-muted: var(--oa-panel-muted);
+  --color-border: var(--oa-border);
+  --color-fg: var(--oa-fg);
+  --color-muted: var(--oa-muted);
+  --color-accent: var(--oa-accent);
+  --color-accent-fg: var(--oa-accent-fg);
+  --color-danger: var(--oa-danger);
+  --color-danger-fg: var(--oa-danger-fg);
+  --color-success: var(--oa-success);
+  --color-ring: var(--oa-ring);
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--oa-bg);
+  color: var(--oa-fg);
+  font-family: var(--font-sans);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+}
+
+/*
+ * Scroll-reveal + terminal-caret animations, moved verbatim from apps/web/src/styles.css.
+ *  - `.oa-reveal` / `.is-visible`: the scroll-reveal wrapper (Reveal.tsx) toggles the modifier
+ *    class via IntersectionObserver; the transition itself lives here.
+ *  - `.oa-caret`: the blinking cursor at the end of TerminalAnimation's still-typing line.
+ * Both are killed outright under prefers-reduced-motion — Reveal.tsx and TerminalAnimation.tsx
+ * already skip the *triggering* JS in that case, but this is the actual enforcement: even if a
+ * class ends up applied, no motion reaches the screen.
+ */
+.oa-reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 500ms ease, transform 500ms ease;
+}
+.oa-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.oa-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  animation: oa-blink 1s step-end infinite;
+}
+@keyframes oa-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oa-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .oa-caret {
+    animation: none !important;
+    opacity: 1;
+  }
+}

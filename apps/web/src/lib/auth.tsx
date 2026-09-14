@@ -11,12 +11,12 @@ interface AuthState {
 const AuthContext = createContext<AuthState | null>(null);
 
 // A same-tab-only hint, never used for authorization (the real check is always the httpOnly
-// session cookie via GET /auth/me) — it only lets the root route pick, for a single frame, between
-// "probably signed in, wait rather than flash the marketing landing" and "probably signed out,
-// paint the landing immediately instead of a spinner". Stale in either direction is harmless: a
-// leftover "1" after the cookie expired just costs one brief spinner before the landing shows; a
-// missing hint after clearing site data just costs one brief landing flash before the redirect —
-// exactly what happened everywhere before this hint existed.
+// session cookie via GET /auth/me) — it only lets pages/auth/AuthPage.tsx pick, for a single
+// frame, between "probably signed in, wait rather than flash the sign-in form" and "probably
+// signed out, paint the sign-in form immediately instead of a spinner". Stale in either direction
+// is harmless: a leftover "1" after the cookie expired just costs one brief spinner before the
+// form shows; a missing hint after clearing site data just costs one brief form flash before the
+// redirect — exactly what happened everywhere before this hint existed.
 const SESSION_HINT_KEY = "oa_has_session";
 
 export function hasSessionHint(): boolean {

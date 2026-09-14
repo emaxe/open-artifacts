@@ -1,0 +1,41 @@
+import { useState } from "react";
+import { cn } from "../../lib/cn";
+import { copyToClipboard } from "../../lib/clipboard";
+import { CheckIcon, CopyIcon } from "./icons";
+
+// Mirrors apps/web/src/components/ui/CopyButton.tsx verbatim.
+export interface CopyButtonProps {
+  value: string;
+  label?: string;
+  copiedLabel?: string;
+  className?: string;
+}
+
+export function CopyButton({ value, label = "Копировать", copiedLabel = "Скопировано", className }: CopyButtonProps) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    const ok = await copyToClipboard(value);
+    if (!ok) {
+      // Clipboard access can be denied outright (permissions, hostile embedder) — fail silently,
+      // the value is still visible/selectable on the page for a manual copy.
+      return;
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-control border border-border bg-panel px-2.5 py-1 text-xs font-medium text-fg hover:bg-panel-muted",
+        className,
+      )}
+    >
+      {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
+      {copied ? copiedLabel : label}
+    </button>
+  );
+}

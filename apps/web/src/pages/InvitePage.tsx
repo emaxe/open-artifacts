@@ -16,7 +16,7 @@ import { OrgIdentity } from "../components/OrgIdentity";
  * The canonical landing page for an invite link (/invite/:token). Covers every state a visitor
  * can arrive in: signed out with or without an account yet, signed in as the invited person, or
  * signed in as someone else — plus a resolved (accepted/declined/revoked) or expired invite.
- * Old `/register?invite=TOKEN` links redirect here (see RegisterPage.tsx).
+ * Old `/register?invite=TOKEN` (and `/?invite=TOKEN`) links redirect here (see pages/auth/AuthPage.tsx).
  */
 export function InvitePage() {
   const { token } = useParams();

@@ -1,8 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./lib/auth";
 import { Layout } from "./components/Layout";
-import { LoginPage } from "./pages/LoginPage";
-import { RegisterPage } from "./pages/RegisterPage";
+import { AuthPage } from "./pages/auth/AuthPage";
 
 import { ActivatePage } from "./pages/ActivatePage";
 import { InvitePage } from "./pages/InvitePage";
@@ -10,8 +9,7 @@ import { InvitesPage } from "./pages/InvitesPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { PersonalKeysPage } from "./pages/PersonalKeysPage";
-import { RootRoute } from "./pages/RootRoute";
-import { LandingPage } from "./pages/landing/LandingPage";
+import { HomePage } from "./pages/HomePage";
 import { TeamLayout } from "./components/TeamLayout";
 import { ArtifactsPage } from "./pages/ArtifactsPage";
 import { ArtifactDetailPage } from "./pages/ArtifactDetailPage";
@@ -30,19 +28,22 @@ export function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Public marketing landing, with an inline sign-in/sign-up card. Handles the redirect
-              to a signed-in user's own workspace itself — see RootRoute.tsx — so it must stay
-              outside Layout's auth-gated block. */}
-          <Route path="/" element={<RootRoute />} />
-          {/* Explicit path to the same landing content, reachable even while signed in (e.g. a
-              logged-in user wants to re-read the marketing copy or share the page). */}
-          <Route path="/welcome" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          {/* Sign-in/sign-up screen. Handles the redirect to a signed-in user's own workspace
+              itself (see pages/auth/AuthPage.tsx), so it must stay outside Layout's auth-gated
+              block. /login and /register both render the same screen — /login MUST keep existing
+              as a route: apps/api/src/routes/public.ts redirects here (?next=/s/:token) for a
+              restricted share, and /register keeps old ?invite=/?mode=register links working. The
+              marketing site that used to live at "/" moved to https://emaxe.github.io/open-artifacts/
+              (apps/landing) — /welcome now just bounces back to "/" for old bookmarks/links. */}
+          <Route path="/" element={<AuthPage />} />
+          <Route path="/login" element={<AuthPage />} />
+          <Route path="/register" element={<AuthPage />} />
+          <Route path="/welcome" element={<Navigate to="/" replace />} />
           <Route path="/activate" element={<ActivatePage />} />
           {/* Public: works signed-out (registration) or signed-in (accept/decline) — never gated behind Layout's auth redirect. */}
           <Route path="/invite/:token" element={<InvitePage />} />
           <Route element={<Layout />}>
+            <Route path="/home" element={<HomePage />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/invites" element={<InvitesPage />} />
             <Route path="/settings" element={<SettingsPage />} />

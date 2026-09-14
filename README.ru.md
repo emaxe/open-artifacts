@@ -6,6 +6,7 @@
   <a href="https://www.npmjs.com/package/@emaxe/oa"><img src="https://img.shields.io/npm/v/@emaxe/oa.svg?color=blue&logo=npm" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/@emaxe/oa"><img src="https://img.shields.io/npm/dm/@emaxe/oa.svg?color=blue&logo=npm" alt="npm downloads"></a>
   <a href="https://skills.sh/emaxe/open-artifacts"><img src="https://skills.sh/b/emaxe/open-artifacts" alt="skills.sh"></a>
+  <a href="https://emaxe.github.io/open-artifacts/"><img src="https://img.shields.io/badge/Website-emaxe.github.io-blue?logo=github" alt="Website"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-%3E%3D20-brightgreen?logo=node.js" alt="Node.js"></a>
   <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white" alt="Docker"></a>
@@ -34,7 +35,7 @@ Self-hosted (автономный) сервис хостинга артефак�
 - 🤖 **Стандартный AI Agent Skill**: Полная поддержка стандарта `skills.sh` (`npx skills add emaxe/open-artifacts`) с автоматической установкой CLI и авторизацией через Device Flow.
 - 🎨 **Встроенные дизайн-системы**: Четыре готовых дизайн-шаблона (дашборды, документы, промо/презентации, диаграммы) идут вместе со скиллом — агент сам выбирает подходящий перед публикацией, поэтому артефакты выглядят единообразно.
 - 🔑 **Гибкая аутентификация**: Интерактивная привязка устройств через OAuth Device Flow (`oa login`) и фоновые сервисные токены (`OA_TOKEN`).
-- 🖥️ **Двуязычная стартовая страница**: На `/` неавторизованный посетитель видит рекламную страницу (английский/русский, переключатель в шапке), которая объясняет продукт и позволяет войти или зарегистрироваться прямо в hero-блоке, без перехода на отдельную страницу. Авторизованные посетители сразу попадают в своё рабочее пространство; та же страница остаётся доступна по адресу `/welcome`.
+- 🖥️ **Двуязычный экран входа**: На `/` неавторизованный посетитель видит двухпанельный экран входа/регистрации (английский/русский, переключатель в шапке) — без рекламного текста на собственном инстансе. Авторизованные посетители сразу попадают в своё рабочее пространство. Рекламная страница продукта живёт отдельно — **[emaxe.github.io/open-artifacts](https://emaxe.github.io/open-artifacts/)** (исходники: `apps/landing/`), опубликована на GitHub Pages и не содержит собственной авторизации.
 - 👥 **Организации, команды и роли**: Разделение на организации/команды, управление пользователями, переключатель команд и роли (`superadmin`, `admin`, `member`).
 - 🔗 **Управление доступом к ссылкам**: Ссылки только для команды, защита паролем, публичные ссылки (с необязательным названием для собственного удобства) и автоматическое истечение срока действия (1 час, 1 день, 7 дней, 30 дней) — команда и суперадмин управляют режимом по умолчанию и могут полностью запретить публичные ссылки. На каждой странице шаринга есть панель (название, тип, версия), которая для тех, кто может управлять артефактом, разворачивается в автора, команду и переключатель версий только для просмотра.
 - 🖼️ **Вложенные файлы**: Картинки и другие файлы можно загружать в S3-совместимое хранилище (по умолчанию в `docker-compose.yml` уже есть MinIO) и прикреплять к артефакту — раздача идёт через прокси приложения, бакет никогда не публикуется напрямую. Агент может проверить оставшуюся квоту (`oa quota` или MCP-инструмент `get_storage_quota`) перед загрузкой. Квоты хранилища задаются на инстанс и на команду (на команду и на один артефакт, по умолчанию без ограничений); файлы удаляются автоматически вместе с артефактом.
@@ -66,8 +67,9 @@ docker compose up -d
 ## Архитектура проекта
 
 ```
-apps/api/              REST API на Hono + MCP сервер + Postgres (Drizzle) + Раздача статики
-apps/web/              React SPA (Vite) — интерфейс администратора и пользователя
+apps/api/               REST API на Hono + MCP сервер + Postgres (Drizzle) + Раздача статики
+apps/web/               React SPA (Vite) — экран входа + интерфейс администратора и пользователя
+apps/landing/           Статический рекламный сайт (Vite, без бэкенда) — публикуется на GitHub Pages
 packages/shared/       Схемы Zod + общая бизнес-логика (права доступа, CSP, парсинг TTL)
 packages/cli/          CLI утилита `oa` для агентов (npm-пакет @emaxe/oa)
 skills/open-artifacts/ Навык для агентов (SKILL.md) + дизайн-шаблоны (references/design/) под skills.sh
@@ -93,8 +95,9 @@ cd apps/api && DATABASE_URL=postgres://postgres:postgres@localhost:5433/open_art
   pnpm exec drizzle-kit push
 
 # 4. Запуск серверов разработки
-pnpm dev:api   # API и MCP сервер на http://localhost:3000
-pnpm dev:web   # Веб-интерфейс React на http://localhost:5173 (проксирует /api на :3000)
+pnpm dev:api      # API и MCP сервер на http://localhost:3000
+pnpm dev:web      # Веб-интерфейс React на http://localhost:5173 (проксирует /api на :3000)
+pnpm dev:landing  # Рекламный сайт на http://localhost:5174 (apps/landing, бэкенд не нужен)
 ```
 
 Разработка и отладка CLI:

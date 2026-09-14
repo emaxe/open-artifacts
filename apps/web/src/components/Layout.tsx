@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet, Navigate } from "react-router-dom";
+import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { GlobalSidebar } from "./GlobalSidebar";
 import { LogoMark } from "./Logo";
@@ -19,10 +19,13 @@ function MenuIcon({ size = 20 }: { size?: number }) {
 
 export function Layout() {
   const { me, loading } = useAuth();
+  const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   if (loading) return <Spinner />;
-  if (!me) return <Navigate to="/login" replace />;
+  // "/" is the sign-in screen itself (see pages/auth/AuthPage.tsx) — carry the deep link through
+  // ?next= so a sign-in redirects back here instead of dropping the visitor in their workspace.
+  if (!me) return <Navigate to={`/?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
 
   return (
     <div className="flex min-h-screen">
