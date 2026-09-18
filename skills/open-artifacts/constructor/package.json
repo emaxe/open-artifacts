@@ -1,0 +1,10 @@
+{
+  "name": "@open-artifacts/constructor",
+  "version": "0.10.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "js-yaml": "^5.4.2",
+    "marked": "^18.0.13"
+  }
+}

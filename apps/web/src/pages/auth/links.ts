@@ -8,4 +8,4 @@ export const EXTERNAL_LINKS = {
 /** No build-time version injection — this is the one hand-maintained constant on the page; bump
  * it alongside the version in package.json/CHANGELOG.md on release (see apps/landing's own copy
  * of this constant for the other half of that chore). */
-export const APP_VERSION = "0.9.0";
+export const APP_VERSION = "0.10.0";

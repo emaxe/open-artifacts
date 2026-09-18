@@ -1,0 +1,14 @@
+/* === THEME DELTA: diagram — architecture & flow diagrams === */
+
+main { max-width: 1000px; }
+
+.mermaid-figure {
+  text-align: center;
+  padding: var(--sp-5) 0;
+}
+.mermaid-figure .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.hero { text-align: center; }

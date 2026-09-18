@@ -1,0 +1,36 @@
+/* === THEME DELTA: promo — landing pages & announcements === */
+
+main { max-width: 1000px; }
+
+.hero {
+  padding: var(--sp-8) 0;
+  text-align: center;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 8%, transparent) 0%,
+    transparent 60%
+  );
+  border-radius: var(--radius);
+  padding-left: var(--sp-5);
+  padding-right: var(--sp-5);
+  margin-bottom: var(--sp-6);
+}
+.hero__title { font-size: var(--t-3xl); font-weight: 800; }
+.hero__subtitle { font-size: var(--t-xl); max-width: 600px; margin: 0 auto var(--sp-4); }
+.hero__badge {
+  display: block;
+  margin: 0 auto var(--sp-3);
+  width: fit-content;
+}
+
+.list-card {
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+a.list-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,.12);
+}
+
+.kpi-tile {
+  text-align: center;
+}

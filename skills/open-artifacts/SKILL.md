@@ -1,6 +1,6 @@
 ---
 name: open-artifacts
-description: Publish HTML/Markdown/Mermaid/SVG content to a self-hosted Open Artifacts instance and get back a shareable link, in the team's configured default mode. Use when you've generated a report, dashboard, diagram, or any standalone document and need to hand a human a URL instead of pasting raw content into chat.
+description: Publish HTML/Markdown/Mermaid/SVG content to a self-hosted Open Artifacts instance and get back a shareable link. By default, always use Constructor Mode (constructor/build.mjs) to assemble professional reports, dashboards, and documents from declarative YAML/JSON blocks or existing Markdown files. Use whenever you have generated a report, analysis, dashboard, or diagram and need to hand the user a shareable URL.
 ---
 
 # Open Artifacts
@@ -51,8 +51,7 @@ command -v oa >/dev/null 2>&1 && oa --version
 If this still fails, npm's global bin directory likely isn't on `PATH` — check `npm config get
 prefix` and add `<prefix>/bin` to `PATH`, or fall back to the raw HTTP reference.
 
-**3. Check whether you're already authenticated** (don't make the human re-approve a device flow
-they already completed):
+**3. Check your login state:**
 ```bash
 oa whoami
 ```
@@ -90,7 +89,37 @@ the saved default.
 
 ## Recipes
 
-**Publish something new and share it (link mode: the team's default — see "Link modes" above):**
+**Default workflow: Build and publish using Constructor Mode (recommended for all reports, dashboards, and documents):**
+```bash
+# Option A: You already have a markdown report -> pass it as source:
+cat > /tmp/report.yaml << 'EOF'
+title: "Q3 Performance Report"
+theme: document
+source: /tmp/my-report.md
+EOF
+
+# Option B: Assemble modular blocks (KPIs, charts, tables):
+cat > /tmp/report.yaml << 'EOF'
+title: "Q3 Analytics"
+theme: data
+blocks:
+  - type: hero
+    title: "Q3 Analytics"
+  - type: kpi-row
+    items:
+      - label: Revenue
+        value: "$4.2M"
+        delta: "+18%"
+        trend: up
+  - type: markdown-file
+    path: /tmp/my-report.md
+EOF
+
+# Build & publish in one step:
+node skills/open-artifacts/constructor/build.mjs /tmp/report.yaml --share
+```
+
+**Publish an existing raw HTML/file directly with `oa push`:**
 ```bash
 oa push report.html --title "Q3 Revenue Report" --share
 # -> prints the artifact id and a share URL, e.g.:
@@ -134,12 +163,8 @@ rather than show it to a human.
 
 ## Content kinds
 
-- `html` — a self-contained HTML file: inline `<style>`/`<script>`, no relative-path assets of your
-  own. An artifact CAN have real image/file attachments — see "Files: images and attachments"
-  below — but they're uploaded separately and referenced by an absolute `/af/...` URL the server
-  gives you back, never by a bundled sibling file.
-  Default if you don't pass `--kind` and the file extension isn't recognized.
-- `markdown` — rendered server-side to HTML.
+- `html` — a self-contained HTML file. **Always generate HTML artifacts using Constructor Mode (below)** by writing a YAML/JSON spec or referencing a Markdown report, then running `build.mjs`. Do not write raw HTML from scratch unless the human explicitly asks for raw HTML.
+- `markdown` — rendered server-side to HTML. (For rich reports, prefer Constructor Mode with theme support).
 - `mermaid` — a raw Mermaid diagram definition, rendered client-side.
 - `svg` — rendered directly.
 
@@ -186,7 +211,171 @@ programmatic content, put it in the artifact's own `content` instead.
 Uploading is a binary/multipart operation, so it's **CLI/REST only** — see "If you're an MCP
 client instead" below for what MCP can and can't do here.
 
+## Constructor Mode (default)
+
+**By default, always use Constructor Mode** to publish HTML artifacts. It is faster, uses
+fewer tokens, and produces consistent, accessible, dark-mode-ready pages without writing raw
+HTML. Only switch to raw HTML when explicitly asked ("write raw HTML", "give me the full
+source") or when the layout genuinely cannot be expressed with the available blocks.
+
+### How it works
+
+1. Write a YAML specification file describing the artifact as a list of blocks
+2. Run the builder script — it compiles the spec into a self-contained HTML file
+3. Push the HTML with `oa push`
+
+The builder lives at `constructor/build.mjs` (next to this `SKILL.md`). Run it with Node.js —
+no install step needed for the builder itself. Two optional npm packages (`js-yaml`, `marked`)
+are used if available; if not, the builder falls back to built-in parsing and minimal Markdown.
+
+### Quick start
+
+```bash
+# 1. Write the spec
+cat > /tmp/artifact.yaml << 'EOF'
+title: "My Report"
+theme: data
+
+blocks:
+  - type: hero
+    title: "My Report"
+    subtitle: "Q3 2026 summary"
+
+  - type: kpi-row
+    items:
+      - label: Revenue
+        value: "$4.2M"
+        delta: "+18%"
+        trend: up
+      - label: Customers
+        value: "1 240"
+        delta: "+5%"
+        trend: up
+
+  - type: table
+    caption: "Top accounts"
+    sortable: true
+    columns: ["Account", "ARR", "Status"]
+    rows:
+      - ["Acme Corp", "$420k", "Active"]
+      - ["Globex", "$380k", "Active"]
+EOF
+
+# 2. Build and publish
+node constructor/build.mjs /tmp/artifact.yaml --share
+```
+
+### Publishing a ready-made Markdown report
+
+If you already have a finished Markdown document (report, analysis, post-mortem), use one
+of these three shortcuts instead of writing blocks manually:
+
+**Option A — Passthrough (fewest tokens, whole file becomes the artifact):**
+```yaml
+title: "Q3 Analysis"
+theme: document
+source: /tmp/q3-report.md
+```
+```bash
+node constructor/build.mjs /tmp/spec.yaml --share
+```
+
+**Option B — `markdown-file` block (MD file + optional framing blocks above it):**
+```yaml
+title: "Q3 Full Report"
+theme: document
+blocks:
+  - type: hero
+    title: "Q3 Analysis Report"
+    meta: "Generated 2026-09-18"
+  - type: kpi-row
+    items:
+      - label: Revenue
+        value: "$4.2M"
+        delta: "+18%"
+        trend: up
+  - type: divider
+    label: "Full Report"
+  - type: markdown-file
+    path: /tmp/q3-report.md
+```
+
+**Option C — `markdown` block (inline MD in YAML, for shorter content):**
+```yaml
+blocks:
+  - type: markdown
+    content: |
+      ## Summary
+      Revenue grew **18% QoQ**. Key drivers: enterprise expansion, 3 new Fortune 500 logos.
+```
+
+YAML frontmatter (`---…---`) is stripped automatically from `source` and `markdown-file`.
+
+### Theme selection
+
+| Theme | Use when |
+|-------|----------|
+| `default` | Generic content, one-offs, mixed layouts |
+| `data` | KPI dashboards, analytics, dense tables |
+| `document` | Long prose: reports, RFCs, post-mortems, **MD reports** |
+| `promo` | Landing pages, announcements, pitch decks |
+| `diagram` | Architecture diagrams, flow charts |
+
+### Block catalogue
+
+| Type | Purpose |
+|------|---------|
+| `hero` | Page header with title, subtitle, badge |
+| `kpi-row` | Row of KPI tiles with delta and trend |
+| `stats-grid` | Grid of large-number stat cards |
+| `table` | Sortable, striped HTML table |
+| `chart-bar` | Bar chart (Chart.js) |
+| `chart-line` | Line chart (Chart.js) |
+| `chart-pie` | Pie / donut chart (Chart.js) |
+| `mermaid-diagram` | Embedded Mermaid diagram |
+| `text-section` | Heading + short Markdown prose |
+| `markdown` | Full Markdown content inline in YAML |
+| `markdown-file` | Load a .md file from disk |
+| `alert` | Info / warning / error / success callout |
+| `code-block` | Syntax-highlighted code |
+| `image` | Image with caption |
+| `two-columns` | Two-column layout (supports nested blocks) |
+| `tabs` | Tabbed content switcher |
+| `timeline` | Vertical event timeline |
+| `progress-bars` | Horizontal progress bars |
+| `list-cards` | Grid of content cards |
+| `badge-row` | Row of color-coded badges |
+| `divider` | Section separator with optional label |
+| `spacer` | Vertical whitespace |
+| `raw` | **Escape hatch: arbitrary HTML/CSS/JS** |
+
+Full field reference for every block: `constructor/BLOCKS-SPEC.md` (next to this file).
+
+### `raw` block — arbitrary HTML/CSS/JS
+
+Use when no other block fits. All theme CSS variables are available inside it:
+```yaml
+- type: raw
+  css: |
+    .my-box { background: var(--surface-2); padding: var(--sp-4); border-radius: var(--radius); }
+  html: |
+    <div class="my-box">Any HTML here</div>
+  scripts: |
+    console.log('runs in browser');
+  cdn_scripts:
+    - https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js
+```
+
+### When NOT to use Constructor Mode
+
+- The human explicitly asked for raw/full HTML output
+- The layout requires a highly custom structure that `two-columns` + `raw` can't express
+- You're updating an existing raw HTML artifact (use `oa get` + edit + `oa push`)
+
+In those cases, read **"Design: read a template before you write"** below and write HTML directly.
+
 ## Design: read a template before you write
+
 
 Published artifacts are read by humans in a browser, so the design is part of the deliverable, not
 a polish pass. **Before you write the first line of markup, open and read the matching files below
@@ -201,6 +390,7 @@ once with: `find . ~/.claude ~/.config ~/.cursor -path '*open-artifacts/referenc
 
 | What you're about to publish | Read (after `DESIGN-core.md`) |
 |---|---|
+| Most cases: KPIs, dashboards, docs, diagrams, MD reports | **Use Constructor Mode** (above) — don't write raw HTML |
 | KPI tiles, metrics, charts, dense or sortable tables, an analytics summary | `references/design/DESIGN-data.md` |
 | Long-form prose: research note, post-mortem, RFC, spec, runbook, API reference | `references/design/DESIGN-document.md` |
 | Landing or launch page, feature announcement, pitch, slide deck | `references/design/DESIGN-promo.md` |
@@ -278,6 +468,15 @@ not an ESM one.
 
 If you don't have the CLI available (no Node/npm), see `references/api.md` for raw HTTP/curl
 examples covering the same operations.
+
+## Constructor: full reference
+
+The block catalogue, builder specification, and theme guides are located directly in `constructor/`:
+- `constructor/BLOCKS-SPEC.md` — every block's fields, defaults, and YAML examples
+- `constructor/BUILDER-SPEC.md` — how `build.mjs` works, CLI flags, error handling
+- `constructor/THEMES-SPEC.md` — CSS theme files: what they contain and how to extend them
+
+Read these files if you hit a case the quick-start above doesn't cover.
 
 ## If you're an MCP client instead of a shell-based agent
 

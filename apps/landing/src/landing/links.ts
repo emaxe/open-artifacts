@@ -9,4 +9,4 @@ export const EXTERNAL_LINKS = {
 
 /** No SSR + no build-time version injection into apps/web — this is the one hand-maintained
  * constant on the page; bump it alongside the version in package.json/CHANGELOG.md on release. */
-export const APP_VERSION = "0.8.0";
+export const APP_VERSION = "0.10.0";

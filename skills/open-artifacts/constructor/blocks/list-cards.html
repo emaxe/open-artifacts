@@ -1,0 +1,12 @@
+<div class="list-cards" style="grid-template-columns: repeat({{_cols}}, 1fr);">
+  {{#each items}}
+  {{#if this.href}}<a class="list-card" href="{{this.href}}">{{/if}}
+  {{#if not_href}}<div class="list-card">{{/if}}
+    {{#if this.icon}}<span class="list-card__icon" aria-hidden="true">{{this.icon}}</span>{{/if}}
+    <div class="list-card__title">{{this.title}}</div>
+    {{#if this.body}}<div class="list-card__body">{{{this._body_html}}}</div>{{/if}}
+    {{#if this.badge}}<span class="list-card__badge" style="{{#if this.badge_color}}background:var(--{{this.badge_color}});{{/if}}">{{this.badge}}</span>{{/if}}
+  {{#if this.href}}</a>{{/if}}
+  {{#if not_href}}</div>{{/if}}
+  {{/each}}
+</div>

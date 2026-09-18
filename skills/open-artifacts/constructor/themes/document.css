@@ -1,0 +1,28 @@
+/* === THEME DELTA: document — long-form prose === */
+
+main {
+  max-width: 720px;
+  padding-top: var(--sp-7);
+}
+
+body { line-height: 1.8; }
+
+.markdown-body p,
+.text-section p { line-height: 1.85; margin-bottom: var(--sp-4); }
+
+.markdown-body h2,
+.text-section h2 {
+  margin-top: var(--sp-8);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.markdown-body h2:first-child,
+.text-section h2:first-child { margin-top: 0; }
+
+/* lead paragraph style */
+.text-section--lead > p:first-child,
+.markdown-body > p:first-child {
+  font-size: var(--t-lg);
+  color: var(--fg-muted);
+}

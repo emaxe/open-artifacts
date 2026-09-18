@@ -16,7 +16,7 @@ Official CLI for [Open Artifacts](https://github.com/emaxe/open-artifacts) — a
 ---
 
 ### Topics & Tags
-`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `model-context-protocol` • `self-hosted` • `cli` • `open-artifacts` • `developer-tools`
+`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `model-context-protocol` • `self-hosted` • `cli` • `open-artifacts` • `developer-tools` • `constructor` • `yaml` • `block-builder`
 
 ---
 

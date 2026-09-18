@@ -1,0 +1,66 @@
+<div class="image-block image-block--{{align}}{{#if zoomable}} image-block--zoomable{{/if}}" style="{{#if width}}max-width: {{width}};{{/if}}">
+  <figure>
+    <img src="{{src}}" alt="{{alt}}" {{#if width}}style="width:{{width}};max-width:100%;"{{/if}}{{#if zoomable}} data-zoomable="true" tabindex="0" role="button" aria-label="Zoom image: {{alt}}"{{/if}}>
+    {{#if caption}}<figcaption>{{caption}}</figcaption>{{/if}}
+  </figure>
+</div>
+{{#if zoomable}}
+<script>
+(function(){
+  if (window.__lightboxSetup) return;
+  window.__lightboxSetup = true;
+
+  var overlay = document.createElement('div');
+  overlay.className = 'lightbox-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Full screen image view');
+  overlay.innerHTML = '<button class="lightbox-close" aria-label="Close full screen view">&times;</button><img class="lightbox-img" src="" alt="">';
+  document.body.appendChild(overlay);
+
+  var img = overlay.querySelector('.lightbox-img');
+  var closeBtn = overlay.querySelector('.lightbox-close');
+
+  function openLightbox(src, alt) {
+    img.src = src;
+    img.alt = alt || '';
+    overlay.classList.add('lightbox-overlay--active');
+    document.body.style.overflow = 'hidden';
+    closeBtn.focus();
+  }
+
+  function closeLightbox() {
+    overlay.classList.remove('lightbox-overlay--active');
+    document.body.style.overflow = '';
+    setTimeout(function() { img.src = ''; }, 220);
+  }
+
+  overlay.addEventListener('click', function(e) {
+    if (e.target !== img) closeLightbox();
+  });
+
+  closeBtn.addEventListener('click', closeLightbox);
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && overlay.classList.contains('lightbox-overlay--active')) {
+      closeLightbox();
+    }
+  });
+
+  document.addEventListener('click', function(e) {
+    var target = e.target;
+    if (target.tagName === 'IMG' && target.dataset.zoomable === 'true') {
+      openLightbox(target.src, target.alt);
+    }
+  });
+
+  document.addEventListener('keydown', function(e) {
+    var target = e.target;
+    if ((e.key === 'Enter' || e.key === ' ') && target.tagName === 'IMG' && target.dataset.zoomable === 'true') {
+      e.preventDefault();
+      openLightbox(target.src, target.alt);
+    }
+  });
+}());
+</script>
+{{/if}}

@@ -13,7 +13,7 @@ import { useAuthCopy } from "../../pages/auth/AuthI18n";
 // half of that chore).
 const LINES: { prompt?: string; text: string; className?: string }[] = [
   { prompt: "$", text: "npx skills add emaxe/open-artifacts" },
-  { text: "✓ Installed skill \"open-artifacts\" (@emaxe/oa 0.8.0)", className: "text-success" },
+  { text: "✓ Installed skill \"open-artifacts\" (@emaxe/oa 0.10.0)", className: "text-success" },
   { prompt: "$", text: "oa login --server https://your-server" },
   { text: "Verification code: ABCD-1234", className: "text-muted" },
   { text: "Open https://your-server/activate?code=ABCD-1234 to continue…", className: "text-muted" },

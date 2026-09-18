@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.10.0] - 2026-09-18
+
+### Added
+- Synchronized version with Open Artifacts 0.10.0 release.
+- Added keywords and metadata for Constructor Mode integration (`constructor`, `yaml`, `block-builder`).
+- Full support for one-step compilation and publishing via `skills/open-artifacts/constructor/build.mjs`.
+
+---
+
 ## [0.5.0] - 2026-09-13
 
 ### Added

@@ -1,0 +1,12 @@
+<ul class="timeline" role="list">
+  {{#each items}}
+  <li class="timeline__item">
+    <div class="timeline__dot timeline__dot--{{this.status}}" aria-hidden="true"></div>
+    <div class="timeline__content">
+      {{#if this.date}}<div class="timeline__date">{{this.date}}</div>{{/if}}
+      <div class="timeline__title">{{this.title}}</div>
+      {{#if this.body}}<div class="timeline__body">{{{this._body_html}}}</div>{{/if}}
+    </div>
+  </li>
+  {{/each}}
+</ul>

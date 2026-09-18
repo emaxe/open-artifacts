@@ -1,0 +1,7 @@
+<div class="alert alert--{{kind}}" role="alert">
+  <span class="alert__icon" aria-hidden="true">{{#if icon}}{{icon}}{{/if}}{{#if not_icon}}{{_default_icon}}{{/if}}</span>
+  <div class="alert__content">
+    {{#if title}}<div class="alert__title">{{title}}</div>{{/if}}
+    {{#if body}}<p class="alert__body">{{{_body_html}}}</p>{{/if}}
+  </div>
+</div>

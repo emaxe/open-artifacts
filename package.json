@@ -1,7 +1,7 @@
 {
   "name": "open-artifacts",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.10.0",
   "packageManager": "pnpm@11.1.2",
   "keywords": [
     "ai-agents",
@@ -19,7 +19,11 @@
     "developer-tools",
     "open-artifacts",
     "llm",
-    "s3"
+    "s3",
+    "constructor",
+    "yaml",
+    "block-builder",
+    "report-generator"
   ],
   "engines": {
     "node": ">=20"

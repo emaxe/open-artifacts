@@ -1,0 +1,10 @@
+<div class="kpi-row" style="{{#if cols}}--kpi-cols: {{cols}};{{/if}}" role="list">
+  {{#each items}}
+  <div class="kpi-tile" role="listitem">
+    {{#if this.icon}}<span class="kpi-icon" aria-hidden="true">{{this.icon}}</span>{{/if}}
+    <div class="kpi-label">{{this.label}}</div>
+    <div class="kpi-value">{{this.value}}{{#if this.suffix}}<span class="kpi-suffix">{{this.suffix}}</span>{{/if}}</div>
+    {{#if this.delta}}<div class="kpi-delta kpi-delta--{{this.trend}}">{{this.delta}}</div>{{/if}}
+  </div>
+  {{/each}}
+</div>

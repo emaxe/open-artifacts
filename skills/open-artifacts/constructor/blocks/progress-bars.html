@@ -1,0 +1,11 @@
+<div class="progress-bars" role="list">
+  {{#each items}}
+  <div class="progress-item" role="listitem">
+    <div class="progress-label">{{this.label}}</div>
+    {{#if this.show_value}}<div class="progress-value">{{this.value}}{{#if this._pct}}%{{/if}}</div>{{/if}}
+    <div class="progress-track" role="progressbar" aria-valuenow="{{this.value}}" aria-valuemin="0" aria-valuemax="{{this._max}}">
+      <div class="progress-fill" style="width:{{this._pct}}%;background:var(--{{this._color}});"></div>
+    </div>
+  </div>
+  {{/each}}
+</div>

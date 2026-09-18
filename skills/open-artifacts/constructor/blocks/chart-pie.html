@@ -1,0 +1,39 @@
+<div class="chart-block">
+  {{#if title}}<div class="chart-title">{{title}}</div>{{/if}}
+  <div class="chart-canvas-wrapper" style="position:relative;height:{{height}}px">
+    <canvas id="chart-{{_id}}" role="img" aria-label="{{title}}"></canvas>
+  </div>
+</div>
+<script>
+(function(){
+  function initChart() {
+    if (typeof Chart === 'undefined') {
+      setTimeout(initChart, 40);
+      return;
+    }
+    var canvas = document.getElementById('chart-{{_id}}');
+    if (!canvas) return;
+    var root = document.documentElement;
+    var cs = getComputedStyle(root);
+    var cVars = ['--c1','--c2','--c3','--c4','--c5','--c6'];
+    var palette = cVars.map(function(v){ return cs.getPropertyValue(v).trim(); });
+    new Chart(canvas, {
+      type: '{{#if donut}}doughnut{{else}}pie{{/if}}',
+      data: {
+        labels: {{{_labels_json}}},
+        datasets: [{ data: {{{_data_json}}}, backgroundColor: palette, borderColor: cs.getPropertyValue('--surface').trim(), borderWidth: 2 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: cs.getPropertyValue('--fg').trim(), padding: 16 } } }
+      }
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initChart);
+  } else {
+    initChart();
+  }
+}());
+</script>

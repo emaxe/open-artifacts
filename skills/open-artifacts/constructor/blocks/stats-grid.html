@@ -1,0 +1,9 @@
+<div class="stats-grid" style="grid-template-columns: repeat({{cols}}, 1fr);" role="list">
+  {{#each items}}
+  <div class="stats-card" role="listitem">
+    {{#if this.icon}}<span class="stats-icon" aria-hidden="true">{{this.icon}}</span>{{/if}}
+    <div class="stats-value" style="{{#if this.color}}color: var(--{{this.color}});{{/if}}">{{this.value}}</div>
+    <div class="stats-label">{{this.label}}</div>
+  </div>
+  {{/each}}
+</div>

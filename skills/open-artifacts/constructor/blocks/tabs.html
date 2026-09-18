@@ -1,0 +1,45 @@
+<div class="tabs" role="region">
+  <div class="tabs__nav" role="tablist">
+    {{#each items}}
+    <button class="tabs__btn" role="tab"
+            id="tab-{{../_id}}-{{@index}}"
+            aria-controls="panel-{{../_id}}-{{@index}}"
+            aria-selected="{{#if @first}}true{{else}}false{{/if}}">{{this.label}}</button>
+    {{/each}}
+  </div>
+  {{#each items}}
+  <div class="tabs__panel"
+       id="panel-{{../_id}}-{{@index}}"
+       role="tabpanel"
+       aria-labelledby="tab-{{../_id}}-{{@index}}"
+       aria-hidden="{{#if @first}}false{{else}}true{{/if}}">
+    {{{this._blocks_html}}}
+  </div>
+  {{/each}}
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('[id^="tab-{{_id}}-0"]').closest('.tabs__nav');
+  var tabs = nav ? nav.querySelectorAll('[role="tab"]') : [];
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var panelId = tab.getAttribute('aria-controls');
+      tabs.forEach(function(t) {
+        t.setAttribute('aria-selected', 'false');
+        var p = document.getElementById(t.getAttribute('aria-controls'));
+        if (p) p.setAttribute('aria-hidden', 'true');
+      });
+      var panel = document.getElementById(panelId);
+      if (panel) {
+        panel.setAttribute('aria-hidden', 'false');
+        window.dispatchEvent(new Event('resize'));
+        if (window.__renderMermaid) {
+          window.__renderMermaid(panel);
+        } else if (window.mermaid) {
+          try { mermaid.run({ nodes: panel.querySelectorAll('.mermaid') }); } catch(e) {}
+        }
+      }
+    });
+  });
+}());
+</script>

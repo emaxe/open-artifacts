@@ -16,7 +16,7 @@
 ---
 
 ### Топики и теги
-`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `model-context-protocol` • `self-hosted` • `cli` • `open-artifacts` • `developer-tools`
+`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `model-context-protocol` • `self-hosted` • `cli` • `open-artifacts` • `developer-tools` • `constructor` • `yaml` • `block-builder`
 
 ---
 

@@ -1,0 +1,58 @@
+<div class="chart-block">
+  {{#if title}}<div class="chart-title">{{title}}</div>{{/if}}
+  <div class="chart-canvas-wrapper" style="position:relative;height:{{height}}px">
+    <canvas id="chart-{{_id}}" role="img" aria-label="{{title}}"></canvas>
+  </div>
+</div>
+<script>
+(function(){
+  function initChart() {
+    if (typeof Chart === 'undefined') {
+      setTimeout(initChart, 40);
+      return;
+    }
+    var canvas = document.getElementById('chart-{{_id}}');
+    if (!canvas) return;
+    var root = document.documentElement;
+    var cs = getComputedStyle(root);
+    var colors = ['--c1','--c2','--c3','--c4','--c5','--c6'];
+    var palette = colors.map(function(v){ return cs.getPropertyValue(v).trim(); });
+    var colorMap = {c1:palette[0],c2:palette[1],c3:palette[2],c4:palette[3],c5:palette[4],c6:palette[5],accent:cs.getPropertyValue('--accent').trim(),pos:cs.getPropertyValue('--pos').trim(),neg:cs.getPropertyValue('--neg').trim(),warn:cs.getPropertyValue('--warn').trim()};
+    var fill = {{{_fill}}};
+    var tension = {{{_tension}}};
+    var datasets = {{{_datasets_json}}};
+    datasets.forEach(function(ds, i){
+      var c = colorMap[ds._color] || palette[i % palette.length];
+      ds.borderColor = c;
+      ds.backgroundColor = fill ? c.replace(')', ', 0.15)').replace('rgb(', 'rgba(') : 'transparent';
+      ds.fill = fill;
+      ds.tension = tension;
+      ds.pointRadius = 4;
+      delete ds._color;
+    });
+    new Chart(canvas, {
+      type: 'line',
+      data: { labels: {{{_labels_json}}}, datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: datasets.length > 1 } },
+        scales: {
+          x: { grid: { color: cs.getPropertyValue('--border').trim() }, ticks: { color: cs.getPropertyValue('--fg-muted').trim() } },
+          y: {
+            {{#if y_min}}min: {{y_min}},{{/if}}
+            {{#if y_max}}max: {{y_max}},{{/if}}
+            grid: { color: cs.getPropertyValue('--border').trim() },
+            ticks: { color: cs.getPropertyValue('--fg-muted').trim() }
+          }
+        }
+      }
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initChart);
+  } else {
+    initChart();
+  }
+}());
+</script>

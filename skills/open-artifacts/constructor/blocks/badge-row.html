@@ -1,0 +1,5 @@
+<div class="badge-row{{#if align}} badge-row--{{align}}{{/if}}" role="list">
+  {{#each items}}
+  <span class="badge" role="listitem" style="{{#if this.color}}background:var(--{{this.color}});{{/if}}">{{this.label}}</span>
+  {{/each}}
+</div>

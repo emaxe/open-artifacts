@@ -1,0 +1,15 @@
+/* === THEME DELTA: data — analytics dashboards === */
+
+main { max-width: 1100px; }
+
+.kpi-row { gap: var(--sp-3); }
+.kpi-tile { padding: var(--sp-3) var(--sp-4); }
+.kpi-value { font-size: var(--t-lg); }
+
+th { border-bottom-color: var(--accent); }
+tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+
+.chart-block { box-shadow: var(--shadow); }
+
+.stats-grid { gap: var(--sp-3); }
+.stats-card { padding: var(--sp-4); }

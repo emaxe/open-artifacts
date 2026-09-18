@@ -1,0 +1,49 @@
+<div class="table-wrapper">
+  {{#if caption}}<div class="table-caption">{{caption}}</div>{{/if}}
+  <table class="{{#if striped}}striped{{/if}} {{#if compact}}compact{{/if}}" role="table">
+    <thead>
+      <tr>
+        {{#each columns}}
+        <th {{#if ../sortable}}data-sort="{{@index}}"{{/if}}>{{this}}</th>
+        {{/each}}
+      </tr>
+    </thead>
+    <tbody>
+      {{#each rows}}
+      <tr>
+        {{#each this}}<td>{{this}}</td>{{/each}}
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</div>
+{{#if sortable}}
+<script>
+(function(){
+  var table = document.currentScript.previousElementSibling.querySelector('table');
+  if (!table) return;
+  var dir = {};
+  table.querySelectorAll('th[data-sort]').forEach(function(th) {
+    th.addEventListener('click', function() {
+      var col = +th.dataset.sort;
+      var asc = dir[col] !== 'asc';
+      dir[col] = asc ? 'asc' : 'desc';
+      table.querySelectorAll('th[data-sort]').forEach(function(t) {
+        t.classList.remove('asc','desc');
+      });
+      th.classList.add(dir[col]);
+      var tbody = table.querySelector('tbody');
+      var rows = Array.from(tbody.querySelectorAll('tr'));
+      rows.sort(function(a, b) {
+        var av = a.cells[col] ? a.cells[col].textContent.trim() : '';
+        var bv = b.cells[col] ? b.cells[col].textContent.trim() : '';
+        var n = parseFloat(av.replace(/[^0-9.-]/g,'')) - parseFloat(bv.replace(/[^0-9.-]/g,''));
+        if (!isNaN(n)) return asc ? n : -n;
+        return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+      rows.forEach(function(r) { tbody.appendChild(r); });
+    });
+  });
+}());
+</script>
+{{/if}}

@@ -1,0 +1,172 @@
+title: "Open Artifacts Constructor Demo"
+theme: data
+lang: en
+
+blocks:
+  - type: hero
+    title: "Quarterly Analytics Dashboard"
+    subtitle: "Built declaratively with Constructor Mode"
+    badge: "Interactive Demo"
+    meta: "Updated: 2026-09-18 • Team Alpha"
+
+  - type: alert
+    kind: info
+    title: "Constructor Mode Active"
+    body: "This entire page was assembled from a simple YAML specification without writing raw boilerplate HTML."
+
+  - type: image
+    src: "../assets/brand/open-artifacts-logo.png"
+    alt: "Open Artifacts Logo"
+    caption: "Open Artifacts — self-hosted agent deliverables platform (click to zoom full screen)"
+    width: "280px"
+    align: center
+    zoomable: true
+
+  - type: kpi-row
+    items:
+      - label: "Total Revenue"
+        value: "$4,250,000"
+        delta: "+18.4%"
+        trend: up
+        icon: "💰"
+      - label: "Active Clients"
+        value: "1,240"
+        delta: "+5.1%"
+        trend: up
+        icon: "👥"
+      - label: "Monthly Churn"
+        value: "1.18%"
+        delta: "-0.2%"
+        trend: down
+        icon: "📉"
+      - label: "System Health"
+        value: "99.98%"
+        delta: "Nominal"
+        trend: neutral
+        icon: "⚡"
+
+  - type: two-columns
+    ratio: "1:1"
+    left:
+      - type: chart-bar
+        title: "Monthly Revenue ($k)"
+        labels: ["Apr", "May", "Jun", "Jul", "Aug", "Sep"]
+        datasets:
+          - label: "Actual"
+            data: [580, 620, 690, 740, 780, 840]
+            color: c1
+          - label: "Target"
+            data: [550, 600, 650, 700, 750, 800]
+            color: c2
+
+    right:
+      - type: chart-pie
+        title: "Revenue by Customer Tier"
+        donut: true
+        labels: ["Enterprise", "Mid-Market", "SMB", "Self-Serve"]
+        data: [52, 26, 14, 8]
+
+  - type: divider
+    label: "Detailed Breakdown"
+
+  - type: tabs
+    items:
+      - label: "Top Accounts"
+        blocks:
+          - type: table
+            caption: "Key accounts by ARR (click column header to sort)"
+            sortable: true
+            columns: ["Account Name", "Tier", "ARR", "Growth", "Status"]
+            rows:
+              - ["Acme Global", "Enterprise", "$420,000", "+24%", "Healthy"]
+              - ["Globex Tech", "Enterprise", "$380,000", "+12%", "Healthy"]
+              - ["Initech Corp", "Mid-Market", "$210,000", "-4%", "Review"]
+              - ["Umbrella Ltd", "Enterprise", "$510,000", "+31%", "Healthy"]
+              - ["Soylent Corp", "SMB", "$95,000", "+8%", "Healthy"]
+
+      - label: "Architecture Diagram"
+        blocks:
+          - type: mermaid-diagram
+            caption: "Open Artifacts Event Processing Pipeline"
+            definition: |
+              graph LR
+                Agent[AI Agent] -->|YAML Spec| Constructor[build.mjs]
+                Constructor -->|HTML + Themes| Engine[Open Artifacts Server]
+                Engine -->|Sandbox iframe| User[Human Browser]
+                Engine -->|Attachments| Storage[(S3 / MinIO)]
+
+      - label: "Delivery Milestones"
+        blocks:
+          - type: timeline
+            items:
+              - date: "Q1 2026"
+                title: "Core Platform Launch"
+                status: done
+                body: "Basic sandboxed artifact preview and sharing."
+              - date: "Q2 2026"
+                title: "CLI & MCP Server Integration"
+                status: done
+                body: "Published `@emaxe/oa` CLI and native streamable HTTP MCP server."
+              - date: "Q3 2026"
+                title: "Constructor Mode"
+                status: active
+                body: "Zero-boilerplate declarative artifact builder with 23 modular blocks."
+              - date: "Q4 2026"
+                title: "Ecosystem Expansion"
+                status: pending
+                body: "Community template marketplace and live collaborative annotations."
+
+  - type: progress-bars
+    items:
+      - label: "Quarterly Target Progress"
+        value: 92
+        color: pos
+      - label: "Enterprise Pipeline Coverage"
+        value: 78
+        color: accent
+      - label: "Customer Retention Score"
+        value: 86
+        color: c5
+
+  - type: markdown
+    content: |
+      ### Executive Summary & Analysis
+
+      Our performance this quarter exceeded internal forecasts across every major vector. 
+      The primary growth catalyst was the rollout of **enterprise multi-tenancy** and the streamlined **Constructor workflow**.
+
+      > *"By reducing artifact generation overhead to structured data, agent iteration velocity has increased tenfold while token consumption dropped by ~80%."*
+
+      For additional technical documentation, refer to the [Local Docs](file:///Users/maksimklisin/Desktop/_JS/open-artifacts/docs/constructor/PLAN.md).
+
+  - type: raw
+    html: |
+      <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin: 16px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: gap;">
+        <div>
+          <strong style="display: block; font-size: var(--t-base);">Interactive Raw Component</strong>
+          <span style="color: var(--fg-muted); font-size: var(--t-sm);">Demonstrates custom inline JS and CSS theme token binding</span>
+        </div>
+        <button id="demo-btn" style="background: var(--accent); color: var(--accent-fg); border: none; padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600;">
+          Clicks: <span id="click-count">0</span>
+        </button>
+      </div>
+    scripts: |
+      const btn = document.getElementById('demo-btn');
+      const counter = document.getElementById('click-count');
+      let count = 0;
+      btn.addEventListener('click', () => {
+        count++;
+        counter.textContent = count;
+      });
+
+  - type: badge-row
+    align: center
+    items:
+      - label: "Open Artifacts v0.10.0"
+        color: accent
+      - label: "Theme: data"
+        color: c1
+      - label: "23 Block Types"
+        color: pos
+      - label: "Auto Dark Mode"
+        color: c6

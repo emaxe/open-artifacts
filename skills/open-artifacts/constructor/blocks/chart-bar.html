@@ -1,0 +1,49 @@
+<div class="chart-block">
+  {{#if title}}<div class="chart-title">{{title}}</div>{{/if}}
+  <div class="chart-canvas-wrapper" style="position:relative;height:{{height}}px">
+    <canvas id="chart-{{_id}}" role="img" aria-label="{{title}}"></canvas>
+  </div>
+</div>
+<script>
+(function(){
+  function initChart() {
+    if (typeof Chart === 'undefined') {
+      setTimeout(initChart, 40);
+      return;
+    }
+    var canvas = document.getElementById('chart-{{_id}}');
+    if (!canvas) return;
+    var root = document.documentElement;
+    var cs = getComputedStyle(root);
+    var colors = ['--c1','--c2','--c3','--c4','--c5','--c6','--accent'];
+    var palette = colors.map(function(v){ return cs.getPropertyValue(v).trim(); });
+    var colorMap = {c1:palette[0],c2:palette[1],c3:palette[2],c4:palette[3],c5:palette[4],c6:palette[5],accent:palette[6],pos:cs.getPropertyValue('--pos').trim(),neg:cs.getPropertyValue('--neg').trim(),warn:cs.getPropertyValue('--warn').trim()};
+    var datasets = {{{_datasets_json}}};
+    datasets.forEach(function(ds, i){
+      var c = colorMap[ds._color] || palette[i % palette.length];
+      ds.backgroundColor = c;
+      ds.borderColor = c;
+      delete ds._color;
+    });
+    new Chart(canvas, {
+      type: 'bar',
+      data: { labels: {{{_labels_json}}}, datasets: datasets },
+      options: {
+        indexAxis: {{#if horizontal}}'y'{{else}}'x'{{/if}},
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: datasets.length > 1 } },
+        scales: {
+          x: { stacked: {{#if stacked}}true{{else}}false{{/if}}, grid: { color: cs.getPropertyValue('--border').trim() }, ticks: { color: cs.getPropertyValue('--fg-muted').trim() } },
+          y: { stacked: {{#if stacked}}true{{else}}false{{/if}}, grid: { color: cs.getPropertyValue('--border').trim() }, ticks: { color: cs.getPropertyValue('--fg-muted').trim() } }
+        }
+      }
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initChart);
+  } else {
+    initChart();
+  }
+}());
+</script>
