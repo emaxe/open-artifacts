@@ -321,15 +321,26 @@ function stripFrontmatter(md) {
 
 ---
 
-## Обработка ошибок
+## Валидация спецификации и обработка ошибок
+
+Сборщик `build.mjs` выполняет предварительную валидацию спецификации перед сборкой:
+1. **Model-friendly aliases**: автоматически маппит распространенные синонимы полей (например `variant` → `kind`, `text` → `body`, `headers` → `columns`, `code` → `definition`).
+2. **Семантическая проверка пустоты**: блоки, лишенные смыслового контента (например, `alert` без `body`/`text` и без `title`), отклоняются с кодом 1, чтобы избежать публикации пустых значков.
+3. **Did you mean?**: при опечатках в свойствах сборщик вычисляет расстояние Левенштейна и подсказывает правильное имя.
+4. **Флаги строгости**:
+   - `--strict`: трактовать любые неизвестные свойства как фатальные ошибки (exit 1).
+   - `--lenient`: игнорировать ошибки валидации и продолжать сборку.
 
 | Ситуация | Поведение |
 |----------|-----------| 
 | Файл спецификации не найден | `Error: spec file not found: path/to/spec.yaml` → exit 1 |
-| Невалидный YAML | `Error: YAML parse error: <js-yaml message>` → exit 1 |
+| Невалидный YAML / JSON | `Error: YAML/JSON parse error: <message>` → exit 1 |
+| Ошибка валидации структуры (пустой alert, нет обязательных полей) | `❌ Spec validation failed: [Block #N]: ...` → exit 1 |
+| Неизвестное свойство блока | Предупреждение + предложение "Did you mean?" (в `--strict` режиме → exit 1) |
+| Использование синонимов (`variant` вместо `kind`, `text` вместо `body`) | Автоматический маппинг в каноническое поле + лог `ℹ Spec: auto-mapped N alias(es)` |
 | `spec.source` файл не найден | `Error: source file not found: path/to/report.md` → exit 1 |
 | `markdown-file` файл не найден | `Error: markdown-file not found: path/to/file.md (block #N)` → exit 1 |
-| Неизвестный тип блока | `Error: Unknown block type "xyz" (block #3)` → exit 1 |
+| Неизвестный тип блока | `❌ Spec validation failed: Unknown block type "xyz"` + предложение похожих → exit 1 |
 | Шаблон блока не найден | `Error: Template not found: blocks/xyz.html` → exit 1 |
 | `oa push` завершился с ошибкой | Выводит stderr oa и exit 1 |
 | `--share` без `--push` | Автоматически добавляет `--push` |

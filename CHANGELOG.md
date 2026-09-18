@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic YAML frontmatter stripping.
 - **Independent CSS Themes**: 5 swappable themes (`default`, `data`, `document`, `promo`, `diagram`) separating presentation from content.
 - **Direct Build & Publish**: Built-in CLI flags (`--push`, `--share`, `--lifetime`, `--org`) to compile and publish in one command: `node constructor/build.mjs report.yaml --share`.
+- **Spec Validation & Model-friendly Aliases**: Built-in schema validation, semantic emptiness checks (prevents silent failures and empty icons), typo detection with "Did you mean?" suggestions, and seamless auto-normalization of familiar LLM aliases (`variant` → `kind`, `text`/`content` → `body`, `headers` → `columns`, `code` → `definition`, string arrays in `badge-row`, etc.). Supported with `--strict` and `--lenient` CLI flags.
 
 ---
 

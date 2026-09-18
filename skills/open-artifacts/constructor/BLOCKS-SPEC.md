@@ -10,6 +10,7 @@
 - Поля помечены `*` если **обязательные**
 - Типы: `string`, `number`, `boolean`, `enum(a|b|c)`, `Block[]` (вложенные блоки), `Item[]`
 - `color` — одно из: `accent | pos | neg | warn | c1…c6 | muted` — маппится в CSS-переменную
+- **Model-friendly aliases**: конструктор поддерживает синонимы полей, привычные LLM (например, `variant` для `kind`, `text`/`content` для `body`, `headers` для `columns`, `code` для `definition`, `title` для `heading`). Сборщик `build.mjs` автоматически валидирует схему и нормализует синонимы.
 
 ---
 
@@ -369,20 +370,20 @@ source: /tmp/q3-analysis.md   # путь к MD-файлу, blocks не нужн�
 
 ## `alert`
 
-Блок предупреждения / заметки / успеха.
+Блок предупреждения / заметки / успеха. Обязательно наличие хотя бы одного из полей `body` (или `text`) либо `title` (иначе алерт не имеет контента).
 
-
-| Поле | Тип | Дефолт | Описание |
-|------|-----|--------|----------|
-| `kind` | enum(info\|warning\|error\|success) | info | Тип |
-| `title` | string | — | Заголовок |
-| `body` | string | — | Текст (Markdown) |
+| Поле | Тип | Дефолт | Алиасы (синонимы) | Описание |
+|------|-----|--------|-------------------|----------|
+| `kind` | enum(info\|warning\|error\|success) | info | `variant`, `type`, `status`, `severity` | Тип (также понимает `warn` → `warning`, `danger` → `error`) |
+| `title` | string | — | `heading`, `header` | Заголовок |
+| `body` | string | — | `text`, `content`, `message`, `description` | Текст (Markdown) |
+| `icon` | string | авто | — | Кастомная иконка/эмодзи (дефолт: ℹ️, ⚠️, ❌, ✅) |
 
 ```yaml
 - type: alert
-  kind: warning
+  kind: warning # или variant: warning
   title: "Data lag"
-  body: "Figures for Sep 30 may shift by up to 2% once invoices are reconciled."
+  body: "Figures for Sep 30 may shift by up to 2% once invoices are reconciled." # или text: "..."
 ```
 
 ---

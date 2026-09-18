@@ -17,6 +17,8 @@
  *   --password <pwd>     Create password-protected share link
  *   --themes-dir <path>  Path to themes directory
  *   --blocks-dir <path>  Path to blocks directory
+ *   --strict             Fail build on any unknown fields or alias warnings
+ *   --lenient            Proceed with build even if validation errors are found
  *   --verbose            Debug output
  *   --help               Show help
  */
@@ -157,6 +159,8 @@ Options:
   --password <pwd>     Password-protected share link
   --themes-dir <path>  Custom themes directory
   --blocks-dir <path>  Custom blocks directory
+  --strict             Fail on any unknown fields or unmapped properties
+  --lenient            Proceed with build even if validation errors are found
   --verbose            Verbose output
   --help               This help
 
@@ -227,6 +231,721 @@ function parseRatio(ratio) {
   const parts = String(ratio || '1:1').split(':');
   if (parts.length !== 2) return ['1fr', '1fr'];
   return [`${parts[0]}fr`, `${parts[1]}fr`];
+}
+
+// ─── Spec Validator & Normalizer ───────────────────────────────────────────
+
+function levenshteinDistance(s1, s2) {
+  if (s1 === s2) return 0;
+  if (!s1.length) return s2.length;
+  if (!s2.length) return s1.length;
+  const v0 = new Array(s2.length + 1);
+  const v1 = new Array(s2.length + 1);
+  for (let i = 0; i <= s2.length; i++) v0[i] = i;
+  for (let i = 0; i < s1.length; i++) {
+    v1[0] = i + 1;
+    for (let j = 0; j < s2.length; j++) {
+      const cost = s1[i] === s2[j] ? 0 : 1;
+      v1[j + 1] = Math.min(v1[j] + 1, v0[j + 1] + 1, v0[j] + cost);
+    }
+    for (let j = 0; j <= s2.length; j++) v0[j] = v1[j];
+  }
+  return v1[s2.length];
+}
+
+function findBestSuggestion(unknown, candidates) {
+  const norm = String(unknown).toLowerCase().replace(/[-_]/g, '');
+  let best = null;
+  let bestDist = Infinity;
+  for (const cand of candidates) {
+    const normCand = cand.toLowerCase().replace(/[-_]/g, '');
+    const d = levenshteinDistance(norm, normCand);
+    if (d < bestDist && (d <= 2 || (norm.length > 4 && d <= 3))) {
+      bestDist = d;
+      best = cand;
+    }
+  }
+  return best;
+}
+
+const BLOCK_TYPE_ALIASES = {
+  callout: 'alert',
+  note: 'alert',
+  warning: 'alert',
+  cards: 'list-cards',
+  card: 'list-cards',
+  kpi: 'kpi-row',
+  kpis: 'kpi-row',
+  stats: 'stats-grid',
+  grid: 'stats-grid',
+  code: 'code-block',
+  codeblock: 'code-block',
+  diagram: 'mermaid-diagram',
+  mermaid: 'mermaid-diagram',
+  text: 'text-section',
+  section: 'text-section',
+  progress: 'progress-bars',
+  bar: 'chart-bar',
+  line: 'chart-line',
+  pie: 'chart-pie',
+  columns: 'two-columns',
+  badges: 'badge-row',
+};
+
+const BLOCK_DEFINITIONS = {
+  hero: {
+    canonical: ['type', 'title', 'subtitle', 'badge', 'badge_color', 'align', 'meta', 'class', 'id'],
+    aliases: {
+      heading: 'title',
+      header: 'title',
+      description: 'subtitle',
+      text: 'subtitle',
+      body: 'subtitle',
+      tag: 'badge',
+      label: 'badge',
+      date: 'meta',
+      author: 'meta',
+      footer: 'meta',
+    },
+    validate(b) {
+      const errs = [];
+      if (!b.title || !String(b.title).trim()) {
+        errs.push('Hero block requires non-empty "title" (or "heading").');
+      }
+      return errs;
+    }
+  },
+  'kpi-row': {
+    canonical: ['type', 'items', 'cols', 'class', 'id'],
+    aliases: {
+      cards: 'items',
+      kpis: 'items',
+      stats: 'items',
+    },
+    itemCanonical: ['label', 'value', 'delta', 'trend', 'suffix', 'icon', 'color', 'class'],
+    itemAliases: {
+      title: 'label',
+      name: 'label',
+      key: 'label',
+      val: 'value',
+      number: 'value',
+      stat: 'value',
+      change: 'delta',
+      diff: 'delta',
+      direction: 'trend',
+      unit: 'suffix',
+    },
+    normalizeItem(it) {
+      if (it && it.trend) {
+        const tr = String(it.trend).toLowerCase();
+        if (['positive', 'increase', 'growing', 'gain'].includes(tr)) it.trend = 'up';
+        else if (['negative', 'decrease', 'falling', 'loss'].includes(tr)) it.trend = 'down';
+        else if (['flat', 'none', 'same'].includes(tr)) it.trend = 'neutral';
+      }
+    },
+    validate(b) {
+      const errs = [];
+      if (!Array.isArray(b.items) || b.items.length === 0) {
+        errs.push('kpi-row block requires a non-empty "items" array.');
+      }
+      return errs;
+    }
+  },
+  'stats-grid': {
+    canonical: ['type', 'items', 'cols', 'class', 'id'],
+    aliases: {
+      cards: 'items',
+      stats: 'items',
+    },
+    itemCanonical: ['label', 'value', 'icon', 'color', 'class'],
+    itemAliases: {
+      title: 'label',
+      name: 'label',
+      key: 'label',
+      val: 'value',
+      number: 'value',
+      stat: 'value',
+    },
+    validate(b) {
+      const errs = [];
+      if (!Array.isArray(b.items) || b.items.length === 0) {
+        errs.push('stats-grid block requires a non-empty "items" array.');
+      }
+      return errs;
+    }
+  },
+  table: {
+    canonical: ['type', 'columns', 'rows', 'caption', 'sortable', 'striped', 'compact', 'highlight_col', 'class', 'id'],
+    aliases: {
+      headers: 'columns',
+      cols: 'columns',
+      head: 'columns',
+      data: 'rows',
+      items: 'rows',
+      values: 'rows',
+      title: 'caption',
+    },
+    validate(b) {
+      const errs = [];
+      if (!b.columns && !b.rows) {
+        errs.push('table block requires "columns" (or "headers") and/or "rows".');
+      }
+      return errs;
+    }
+  },
+  'chart-bar': {
+    canonical: ['type', 'title', 'labels', 'datasets', 'height', 'stacked', 'horizontal', 'class', 'id'],
+    aliases: {
+      caption: 'title',
+      header: 'title',
+      series: 'datasets',
+    },
+    itemArrayField: 'datasets',
+    itemCanonical: ['label', 'data', 'color'],
+    itemAliases: {
+      name: 'label',
+      title: 'label',
+      values: 'data',
+    },
+    validate(b) {
+      const errs = [];
+      if (!Array.isArray(b.labels) || b.labels.length === 0) {
+        errs.push('chart-bar block requires a non-empty "labels" array.');
+      }
+      if (!Array.isArray(b.datasets) || b.datasets.length === 0) {
+        errs.push('chart-bar block requires a non-empty "datasets" array.');
+      }
+      return errs;
+    }
+  },
+  'chart-line': {
+    canonical: ['type', 'title', 'labels', 'datasets', 'height', 'fill', 'tension', 'y_min', 'y_max', 'class', 'id'],
+    aliases: {
+      caption: 'title',
+      header: 'title',
+      series: 'datasets',
+    },
+    itemArrayField: 'datasets',
+    itemCanonical: ['label', 'data', 'color'],
+    itemAliases: {
+      name: 'label',
+      title: 'label',
+      values: 'data',
+    },
+    validate(b) {
+      const errs = [];
+      if (!Array.isArray(b.labels) || b.labels.length === 0) {
+        errs.push('chart-line block requires a non-empty "labels" array.');
+      }
+      if (!Array.isArray(b.datasets) || b.datasets.length === 0) {
+        errs.push('chart-line block requires a non-empty "datasets" array.');
+      }
+      return errs;
+    }
+  },
+  'chart-pie': {
+    canonical: ['type', 'title', 'labels', 'data', 'donut', 'height', 'class', 'id'],
+    aliases: {
+      caption: 'title',
+      header: 'title',
+      values: 'data',
+      datasets: 'data',
+    },
+    validate(b) {
+      const errs = [];
+      if (!Array.isArray(b.labels) || b.labels.length === 0) {
+        errs.push('chart-pie block requires a non-empty "labels" array.');
+      }
+      if (!Array.isArray(b.data) || b.data.length === 0) {
+        errs.push('chart-pie block requires a non-empty "data" (or "values") array.');
+      }
+      return errs;
+    }
+  },
+  'mermaid-diagram': {
+    canonical: ['type', 'definition', 'caption', 'class', 'id'],
+    aliases: {
+      code: 'definition',
+      diagram: 'definition',
+      content: 'definition',
+      chart: 'definition',
+      mermaid: 'definition',
+      title: 'caption',
+      description: 'caption',
+    },
+    validate(b) {
+      const errs = [];
+      if (!b.definition || !String(b.definition).trim()) {
+        errs.push('mermaid-diagram block requires non-empty "definition" (or "code" / "diagram").');
+      }
+      return errs;
+    }
+  },
+  'text-section': {
+    canonical: ['type', 'heading', 'level', 'body', 'lead', 'class', 'id'],
+    aliases: {
+      title: 'heading',
+      header: 'heading',
+      content: 'body',
+      text: 'body',
+      markdown: 'body',
+    },
+    validate(b) {
+      const errs = [];
+      if (!b.body || !String(b.body).trim()) {
+        errs.push('text-section block requires non-empty "body" (or "text" / "content").');
+      }
+      return errs;
+    }
+  },
+  alert: {
+    canonical: ['type', 'kind', 'title', 'body', 'icon', 'class', 'id'],
+    aliases: {
+      variant: 'kind',
+      status: 'kind',
+      severity: 'kind',
+      level: 'kind',
+      alert_type: 'kind',
+      text: 'body',
+      content: 'body',
+      message: 'body',
+      description: 'body',
+      heading: 'title',
+      header: 'title',
+    },
+    normalize(b) {
+      if (b.kind) {
+        const k = String(b.kind).toLowerCase();
+        if (k === 'warn') b.kind = 'warning';
+        else if (k === 'danger' || k === 'critical') b.kind = 'error';
+      }
+    },
+    validate(b) {
+      const errs = [];
+      const hasTitle = b.title && String(b.title).trim();
+      const hasBody = b.body && String(b.body).trim();
+      if (!hasTitle && !hasBody) {
+        errs.push('Alert block has neither "body" (or "text") nor "title" — it will render as an empty icon.');
+      }
+      if (b.kind) {
+        const validKinds = ['info', 'warning', 'error', 'success'];
+        if (!validKinds.includes(String(b.kind).toLowerCase())) {
+          errs.push(`Alert "kind" must be one of: ${validKinds.join(', ')} (got "${b.kind}").`);
+        }
+      }
+      return errs;
+    }
+  },
+  'code-block': {
+    canonical: ['type', 'lang', 'code', 'caption', 'line_numbers', 'class', 'id'],
+    aliases: {
+      language: 'lang',
+      content: 'code',
+      text: 'code',
+      source: 'code',
+      title: 'caption',
+    },
+    validate(b) {
+      const errs = [];
+      if (b.code == null || !String(b.code).trim()) {
+        errs.push('code-block requires non-empty "code" (or "content" / "source").');
+      }
+      return errs;
+    }
+  },
+  image: {
+    canonical: ['type', 'src', 'alt', 'caption', 'width', 'align', 'zoomable', 'class', 'id'],
+    aliases: {
+      url: 'src',
+      path: 'src',
+      image: 'src',
+      description: 'alt',
+      title: 'caption',
+      zoom: 'zoomable',
+      lightbox: 'zoomable',
+      fullscreen: 'zoomable',
+    },
+    normalize(b) {
+      if (b.src && !b.alt) {
+        b.alt = b.caption || path.basename(String(b.src)) || 'Image';
+      }
+    },
+    validate(b) {
+      const errs = [];
+      if (!b.src || !String(b.src).trim()) {
+        errs.push('image block requires non-empty "src" (or "url" / "path").');
+      }
+      return errs;
+    }
+  },
+  'two-columns': {
+    canonical: ['type', 'left', 'right', 'ratio', 'gap', 'breakpoint', 'class', 'id'],
+    aliases: {
+      col1: 'left',
+      left_column: 'left',
+      col2: 'right',
+      right_column: 'right',
+    },
+    validate(b) {
+      const errs = [];
+      if (!Array.isArray(b.left) && !Array.isArray(b.right)) {
+        errs.push('two-columns block requires "left" and "right" block arrays.');
+      }
+      return errs;
+    }
+  },
+  tabs: {
+    canonical: ['type', 'items', 'default', 'class', 'id'],
+    aliases: {
+      tabs: 'items',
+    },
+    itemCanonical: ['label', 'blocks'],
+    itemAliases: {
+      title: 'label',
+      name: 'label',
+      content: 'blocks',
+      children: 'blocks',
+    },
+    validate(b) {
+      const errs = [];
+      if (!Array.isArray(b.items) || b.items.length === 0) {
+        errs.push('tabs block requires a non-empty "items" array.');
+      }
+      return errs;
+    }
+  },
+  timeline: {
+    canonical: ['type', 'items', 'class', 'id'],
+    aliases: {
+      events: 'items',
+      steps: 'items',
+    },
+    itemCanonical: ['date', 'title', 'body', 'status', 'icon'],
+    itemAliases: {
+      time: 'date',
+      timestamp: 'date',
+      period: 'date',
+      day: 'date',
+      heading: 'title',
+      header: 'title',
+      name: 'title',
+      label: 'title',
+      text: 'body',
+      content: 'body',
+      description: 'body',
+    },
+    normalizeItem(it) {
+      if (it && it.status) {
+        const s = String(it.status).toLowerCase();
+        if (['completed', 'finish', 'finished'].includes(s)) it.status = 'done';
+        else if (['in_progress', 'current', 'running', 'progress'].includes(s)) it.status = 'active';
+        else if (['todo', 'waiting', 'queue', 'planned'].includes(s)) it.status = 'pending';
+      }
+    },
+    validate(b) {
+      const errs = [];
+      if (!Array.isArray(b.items) || b.items.length === 0) {
+        errs.push('timeline block requires a non-empty "items" array.');
+      }
+      return errs;
+    }
+  },
+  'progress-bars': {
+    canonical: ['type', 'items', 'class', 'id'],
+    aliases: {
+      bars: 'items',
+      progress: 'items',
+    },
+    itemCanonical: ['label', 'value', 'max', 'unit', 'color', 'show_value'],
+    itemAliases: {
+      title: 'label',
+      name: 'label',
+      percent: 'value',
+      percentage: 'value',
+      total: 'max',
+      suffix: 'unit',
+    },
+    validate(b) {
+      const errs = [];
+      if (!Array.isArray(b.items) || b.items.length === 0) {
+        errs.push('progress-bars block requires a non-empty "items" array.');
+      }
+      return errs;
+    }
+  },
+  'list-cards': {
+    canonical: ['type', 'items', 'cols', 'class', 'id'],
+    aliases: {
+      cards: 'items',
+    },
+    itemCanonical: ['title', 'body', 'badge', 'badge_color', 'href', 'icon'],
+    itemAliases: {
+      heading: 'title',
+      header: 'title',
+      name: 'title',
+      text: 'body',
+      content: 'body',
+      description: 'body',
+      tag: 'badge',
+      label: 'badge',
+      url: 'href',
+      link: 'href',
+    },
+    validate(b) {
+      const errs = [];
+      if (!Array.isArray(b.items) || b.items.length === 0) {
+        errs.push('list-cards block requires a non-empty "items" array.');
+      }
+      return errs;
+    }
+  },
+  'badge-row': {
+    canonical: ['type', 'items', 'align', 'class', 'id'],
+    aliases: {
+      badges: 'items',
+      tags: 'items',
+    },
+    itemCanonical: ['label', 'color'],
+    itemAliases: {
+      text: 'label',
+      name: 'label',
+      value: 'label',
+      title: 'label',
+      tag: 'label',
+    },
+    normalize(b) {
+      if (Array.isArray(b.items)) {
+        b.items = b.items.map(it => (typeof it === 'string' ? { label: it } : it));
+      }
+    },
+    validate(b) {
+      const errs = [];
+      if (!Array.isArray(b.items) || b.items.length === 0) {
+        errs.push('badge-row block requires a non-empty "items" array.');
+      }
+      return errs;
+    }
+  },
+  divider: {
+    canonical: ['type', 'label', 'class', 'id'],
+    aliases: {
+      text: 'label',
+      title: 'label',
+    }
+  },
+  spacer: {
+    canonical: ['type', 'size', 'class', 'id'],
+    aliases: {
+      height: 'size',
+    }
+  },
+  raw: {
+    canonical: ['type', 'html', 'css', 'scripts', 'cdn_scripts', 'class', 'id'],
+    aliases: {
+      content: 'html',
+      body: 'html',
+      js: 'scripts',
+      script: 'scripts',
+      style: 'css',
+      styles: 'css',
+    }
+  },
+  markdown: {
+    canonical: ['type', 'content', 'class', 'id'],
+    aliases: {
+      text: 'content',
+      body: 'content',
+      md: 'content',
+      markdown: 'content',
+    },
+    validate(b) {
+      const errs = [];
+      if (b.content == null || !String(b.content).trim()) {
+        errs.push('markdown block requires non-empty "content" (or "text" / "body").');
+      }
+      return errs;
+    }
+  },
+  'markdown-file': {
+    canonical: ['type', 'path', 'strip_frontmatter', 'class', 'id'],
+    aliases: {
+      file: 'path',
+      src: 'path',
+      source: 'path',
+    },
+    validate(b) {
+      const errs = [];
+      if (!b.path || !String(b.path).trim()) {
+        errs.push('markdown-file block requires non-empty "path" (or "file" / "src").');
+      }
+      return errs;
+    }
+  }
+};
+
+function normalizeAndValidateBlock(rawBlock, index, pathPrefix, options, report) {
+  if (typeof rawBlock !== 'object' || rawBlock === null) {
+    report.errors.push(`${pathPrefix}Block #${index + 1} must be a mapping/object (got ${typeof rawBlock}).`);
+    return rawBlock;
+  }
+
+  const b = { ...rawBlock };
+  const loc = `${pathPrefix}Block #${index + 1}`;
+
+  // 1. Resolve type
+  if (!b.type) {
+    report.errors.push(`${loc}: Missing required "type" property.`);
+    return b;
+  }
+
+  const rawType = String(b.type).toLowerCase();
+  if (BLOCK_TYPE_ALIASES[rawType]) {
+    const targetType = BLOCK_TYPE_ALIASES[rawType];
+    report.mappedAliases.push(`${loc}: auto-mapped block type "${rawType}" → "${targetType}"`);
+    b.type = targetType;
+  } else {
+    b.type = rawType;
+  }
+
+  const def = BLOCK_DEFINITIONS[b.type];
+  if (!def) {
+    const knownTypes = Object.keys(BLOCK_DEFINITIONS);
+    const suggestion = findBestSuggestion(b.type, knownTypes);
+    const sugText = suggestion ? ` Did you mean "${suggestion}"?` : '';
+    report.errors.push(`${loc}: Unknown block type "${b.type}".${sugText} (Allowed: ${knownTypes.join(', ')})`);
+    return b;
+  }
+
+  // 2. Resolve block-level aliases
+  const aliases = def.aliases || {};
+  const canonical = new Set(def.canonical || []);
+  const allKnown = new Set([...canonical, ...Object.keys(aliases)]);
+
+  for (const [key, val] of Object.entries(rawBlock)) {
+    if (key === 'type' || key.startsWith('not_') || key.startsWith('_')) continue;
+
+    if (aliases[key]) {
+      const target = aliases[key];
+      if (b[target] === undefined || b[target] === null || b[target] === '') {
+        b[target] = val;
+      }
+      report.mappedAliases.push(`${loc} (${b.type}): auto-mapped "${key}" → "${target}"`);
+    } else if (!canonical.has(key)) {
+      const suggestion = findBestSuggestion(key, [...allKnown]);
+      const sugText = suggestion ? ` Did you mean "${suggestion}"?` : '';
+      const msg = `${loc} (${b.type}): Unknown property "${key}".${sugText} (Allowed: ${def.canonical.join(', ')})`;
+      if (options.strict) {
+        report.errors.push(msg);
+      } else {
+        report.warnings.push(msg);
+      }
+    }
+  }
+
+  // 3. Custom block normalizer
+  if (def.normalize) {
+    def.normalize(b);
+  }
+
+  // 4. Normalize items in arrays (e.g. kpi-row, stats-grid, list-cards, progress-bars, timeline, badge-row)
+  const itemArrayField = def.itemArrayField || 'items';
+  if (Array.isArray(b[itemArrayField]) && (def.itemCanonical || def.itemAliases)) {
+    const itCan = new Set(def.itemCanonical || []);
+    const itAliases = def.itemAliases || {};
+    const itKnown = new Set([...itCan, ...Object.keys(itAliases)]);
+
+    b[itemArrayField] = b[itemArrayField].map((it, itIdx) => {
+      if (typeof it !== 'object' || it === null) return it;
+      const normalizedItem = { ...it };
+      for (const [k, v] of Object.entries(it)) {
+        if (k.startsWith('_') || k.startsWith('not_')) continue;
+        if (itAliases[k]) {
+          const target = itAliases[k];
+          if (normalizedItem[target] === undefined || normalizedItem[target] === null || normalizedItem[target] === '') {
+            normalizedItem[target] = v;
+          }
+          report.mappedAliases.push(`${loc} (${b.type}) item #${itIdx + 1}: auto-mapped "${k}" → "${target}"`);
+        } else if (!itCan.has(k)) {
+          const suggestion = findBestSuggestion(k, [...itKnown]);
+          const sugText = suggestion ? ` Did you mean "${suggestion}"?` : '';
+          const msg = `${loc} (${b.type}) item #${itIdx + 1}: Unknown property "${k}".${sugText}`;
+          if (options.strict) report.errors.push(msg);
+          else report.warnings.push(msg);
+        }
+      }
+      if (def.normalizeItem) def.normalizeItem(normalizedItem);
+      return normalizedItem;
+    });
+  }
+
+  // 5. Nested blocks (two-columns, tabs)
+  if (b.type === 'two-columns') {
+    if (Array.isArray(b.left)) {
+      b.left = b.left.map((child, i) => normalizeAndValidateBlock(child, i, `${loc} (left) → `, options, report));
+    }
+    if (Array.isArray(b.right)) {
+      b.right = b.right.map((child, i) => normalizeAndValidateBlock(child, i, `${loc} (right) → `, options, report));
+    }
+  }
+
+  if (b.type === 'tabs' && Array.isArray(b.items)) {
+    b.items.forEach((tab, tIdx) => {
+      if (Array.isArray(tab.blocks)) {
+        tab.blocks = tab.blocks.map((child, i) =>
+          normalizeAndValidateBlock(child, i, `${loc} (tab "${tab.label || tIdx + 1}") → `, options, report)
+        );
+      }
+    });
+  }
+
+  // 6. Validation rules
+  if (def.validate) {
+    const errs = def.validate(b);
+    if (errs && errs.length) {
+      errs.forEach(err => report.errors.push(`${loc} (${b.type}): ${err}`));
+    }
+  }
+
+  return b;
+}
+
+function validateAndNormalizeSpec(spec, options = {}) {
+  const report = {
+    errors: [],
+    warnings: [],
+    mappedAliases: [],
+    blockCount: 0,
+  };
+
+  if (!spec || typeof spec !== 'object') {
+    report.errors.push('Spec must be an object/mapping.');
+    return { normalizedSpec: spec, report };
+  }
+
+  const normalized = { ...spec };
+
+  // Check top-level aliases
+  if (normalized.heading && !normalized.title) {
+    normalized.title = normalized.heading;
+    report.mappedAliases.push('Spec: auto-mapped root "heading" → "title"');
+  }
+
+  if (normalized.source) {
+    // passthrough mode
+    return { normalizedSpec: normalized, report };
+  }
+
+  if (!Array.isArray(normalized.blocks)) {
+    report.errors.push('Spec must contain a "blocks" array (or "source" file).');
+    return { normalizedSpec: normalized, report };
+  }
+
+  normalized.blocks = normalized.blocks.map((b, i) =>
+    normalizeAndValidateBlock(b, i, '', options, report)
+  );
+  report.blockCount = normalized.blocks.length;
+
+  return { normalizedSpec: normalized, report };
 }
 
 // ─── Template engine ─────────────────────────────────────────────────────────
@@ -404,13 +1123,19 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
   switch (b.type) {
 
     case 'hero':
+      b.title = b.title || b.heading || b.header || '';
+      b.subtitle = b.subtitle || b.description || b.text || b.body || '';
       b.align_center = b.align === 'center';
       b.not_align_center = !b.align_center;
       break;
 
     case 'kpi-row':
       (b.items || []).forEach(item => {
+        item.label = item.label || item.title || item.name || item.key || '';
+        item.value = item.value != null ? String(item.value) : (item.val != null ? String(item.val) : '');
+        item.delta = item.delta || item.change || item.diff || '';
         item.trend = item.trend || 'neutral';
+        item.suffix = item.suffix || item.unit || '';
         item.not_icon = !item.icon;
         item.not_delta = !item.delta;
         item.not_suffix = !item.suffix;
@@ -420,6 +1145,8 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
     case 'stats-grid':
       b._cols = b.cols || 3;
       (b.items || []).forEach(item => {
+        item.label = item.label || item.title || item.name || '';
+        item.value = item.value != null ? String(item.value) : (item.val != null ? String(item.val) : '');
         item.not_icon = !item.icon;
         item.not_color = !item.color;
         item.color = colorVar(item.color);
@@ -427,12 +1154,16 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
       break;
 
     case 'table':
+      b.columns = b.columns || b.headers || b.cols || b.head || [];
+      b.rows = b.rows || b.data || b.items || b.values || [];
+      b.caption = b.caption || b.title || '';
       b.striped = b.striped !== false; // default true
       break;
 
     case 'chart-bar':
       _chartIdx++;
       b._id = `cb-${_chartIdx}`;
+      b.title = b.title || b.caption || b.header || '';
       b.height = b.height || 300;
       b.horizontal = !!b.horizontal;
       b.not_horizontal = !b.horizontal;
@@ -440,8 +1171,8 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
       b.not_stacked = !b.stacked;
       b._labels_json = JSON.stringify(b.labels || []);
       b._datasets_json = JSON.stringify((b.datasets || []).map(ds => ({
-        label: ds.label || '',
-        data: ds.data || [],
+        label: ds.label || ds.name || ds.title || '',
+        data: ds.data || ds.values || [],
         _color: colorVar(ds.color),
         borderWidth: 1,
       })));
@@ -450,13 +1181,14 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
     case 'chart-line':
       _chartIdx++;
       b._id = `cl-${_chartIdx}`;
+      b.title = b.title || b.caption || b.header || '';
       b.height = b.height || 300;
       b._fill = b.fill ? 'true' : 'false';
       b._tension = b.tension != null ? String(b.tension) : '0.3';
       b._labels_json = JSON.stringify(b.labels || []);
       b._datasets_json = JSON.stringify((b.datasets || []).map(ds => ({
-        label: ds.label || '',
-        data: ds.data || [],
+        label: ds.label || ds.name || ds.title || '',
+        data: ds.data || ds.values || [],
         _color: colorVar(ds.color),
       })));
       break;
@@ -464,37 +1196,51 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
     case 'chart-pie':
       _chartIdx++;
       b._id = `cp-${_chartIdx}`;
+      b.title = b.title || b.caption || b.header || '';
       b.height = b.height || 280;
       b.donut = !!b.donut;
       b.not_donut = !b.donut;
+      b.data = b.data || b.values || [];
       b._labels_json = JSON.stringify(b.labels || []);
       b._data_json = JSON.stringify(b.data || []);
       break;
 
     case 'mermaid-diagram':
-      // definition passed as raw
+      b.definition = b.definition || b.code || b.diagram || b.content || b.chart || b.mermaid || '';
+      b.caption = b.caption || b.title || '';
       break;
 
     case 'text-section':
       b.level = b.level || 2;
+      b.heading = b.heading || b.title || b.header || '';
+      b.body = b.body || b.content || b.text || b.markdown || '';
       b._body_html = b.body ? marked.parse(b.body) : '';
       b.not_heading = !b.heading;
       break;
 
     case 'alert':
-      b.kind = b.kind || 'info';
+      b.kind = b.kind || b.variant || b.status || b.severity || b.level || b.alert_type || 'info';
+      if (b.kind === 'warn') b.kind = 'warning';
+      if (b.kind === 'danger' || b.kind === 'critical') b.kind = 'error';
       const icons = { info: 'ℹ️', warning: '⚠️', error: '❌', success: '✅' };
       b._default_icon = icons[b.kind] || 'ℹ️';
       b.icon = b.icon || b._default_icon;
       b.not_icon = !b.icon;
+      b.title = b.title || b.heading || b.header || '';
+      b.body = b.body || b.text || b.content || b.message || b.description || '';
       b._body_html = b.body ? marked.parse(b.body) : '';
       break;
 
     case 'code-block':
-      b.lang = b.lang || '';
+      b.lang = b.lang || b.language || '';
+      b.code = b.code ?? b.content ?? b.text ?? b.source ?? '';
+      b.caption = b.caption || b.title || '';
       break;
 
     case 'image':
+      b.src = b.src || b.url || b.path || b.image || '';
+      b.caption = b.caption || b.title || '';
+      b.alt = b.alt || b.description || b.caption || (b.src ? path.basename(String(b.src)) : 'Image');
       b.align = b.align || 'center';
       b.not_width = !b.width;
       b.not_caption = !b.caption;
@@ -525,6 +1271,8 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
       _tabIdx++;
       b._id = `t-${_tabIdx}`;
       (b.items || []).forEach((item, i) => {
+        item.label = item.label || item.title || item.name || '';
+        item.blocks = item.blocks || item.content || item.children || [];
         item['@index'] = i;
         item['@first'] = i === 0;
         item.not_first = i !== 0;
@@ -534,6 +1282,9 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
 
     case 'timeline':
       (b.items || []).forEach(item => {
+        item.date = item.date || item.time || item.timestamp || item.period || '';
+        item.title = item.title || item.heading || item.header || item.name || item.label || '';
+        item.body = item.body || item.text || item.content || item.description || '';
         item.status = item.status || 'pending';
         item._body_html = item.body ? marked.parse(item.body) : '';
         item.not_body = !item.body;
@@ -543,9 +1294,12 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
 
     case 'progress-bars':
       (b.items || []).forEach(item => {
-        const max = item.max || 100;
+        item.label = item.label || item.title || item.name || '';
+        item.value = Number(item.value ?? item.percent ?? item.percentage ?? 0);
+        const max = item.max || item.total || 100;
         item._max = max;
         item._pct = Math.min(100, Math.round((item.value / max) * 100));
+        item.unit = item.unit || item.suffix || '';
         item._color = colorVar(item.color);
         item.show_value = item.show_value !== false;
         item.not_show_value = !item.show_value;
@@ -555,6 +1309,10 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
     case 'list-cards':
       b._cols = b.cols || 3;
       (b.items || []).forEach(item => {
+        item.title = item.title || item.heading || item.header || item.name || '';
+        item.body = item.body || item.text || item.content || item.description || '';
+        item.badge = item.badge || item.tag || item.label || '';
+        item.href = item.href || item.url || item.link || '';
         item.not_href = !item.href;
         item.not_icon = !item.icon;
         item.not_badge = !item.badge;
@@ -566,17 +1324,23 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
 
     case 'badge-row':
       b.align = b.align || '';
+      if (Array.isArray(b.items)) {
+        b.items = b.items.map(it => (typeof it === 'string' ? { label: it } : it));
+      }
       (b.items || []).forEach(item => {
+        item.label = item.label || item.text || item.name || item.value || '';
         item.color = colorVar(item.color);
         item.not_color = !item.color;
       });
       break;
 
     case 'divider':
+      b.label = b.label || b.text || b.title || '';
       b.not_label = !b.label;
       break;
 
     case 'spacer':
+      b.size = b.size || b.height || 'sp-5';
       b._size = resolveSize(b.size);
       break;
 
@@ -592,6 +1356,9 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
     default:
       break;
   }
+
+  // Update not_* mirrors after normalization
+  Object.keys(b).forEach(k => { b[`not_${k}`] = !b[k]; });
 
   return b;
 }
@@ -819,6 +1586,43 @@ async function main() {
       css += '\n' + fs.readFileSync(themeFile, 'utf8');
     } else {
       console.warn(`[warn] theme file not found: ${themeFile}, using default`);
+    }
+  }
+
+  // ── Spec Validation & Normalization ───────────────────────────────────────
+  const { normalizedSpec, report } = validateAndNormalizeSpec(spec, {
+    strict: !!args['--strict'],
+    lenient: !!args['--lenient'],
+    verbose,
+  });
+  spec = normalizedSpec;
+
+  if (report.mappedAliases.length > 0) {
+    if (verbose) {
+      console.log(`ℹ Spec: auto-mapped ${report.mappedAliases.length} model-friendly alias(es):`);
+      report.mappedAliases.forEach(m => console.log(`  • ${m}`));
+    } else {
+      console.log(`ℹ Spec: auto-mapped ${report.mappedAliases.length} model-friendly field alias(es) (use --verbose to view details)`);
+    }
+  }
+
+  if (report.warnings.length > 0) {
+    console.warn(`⚠️ Spec warnings (${report.warnings.length}):`);
+    report.warnings.forEach(w => console.warn(`  • ${w}`));
+  }
+
+  if (report.errors.length > 0) {
+    console.error(`\n❌ Spec validation failed with ${report.errors.length} error${report.errors.length > 1 ? 's' : ''}:`);
+    report.errors.forEach(err => console.error(`  • ${err}`));
+    if (!args['--lenient']) {
+      console.error('\nBuild aborted. Fix the spec issues above, or run with --lenient to force build anyway.\n');
+      process.exit(1);
+    } else {
+      console.warn('\n[warn] --lenient active: proceeding despite validation errors.\n');
+    }
+  } else if (!spec.source && report.blockCount > 0) {
+    if (verbose) {
+      console.log(`✓ Spec validated: ${report.blockCount} block(s) ok`);
     }
   }
 

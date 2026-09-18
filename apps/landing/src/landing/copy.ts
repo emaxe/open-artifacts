@@ -45,7 +45,7 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
     meta: {
       title: "Open Artifacts — публикуйте артефакты AI-агентов по ссылке",
       description:
-        "Self-hosted хостинг артефактов для AI-агентов: любой агент публикует HTML, Markdown, Mermaid или SVG в изолированной песочнице и получает ссылку. MIT, свой сервер, встроенный MCP.",
+        "Self-hosted хостинг артефактов для AI-агентов: конструктор дашбордов из YAML/JSON, публикация HTML, Markdown, Mermaid или SVG в изолированной песочнице. MIT, свой сервер, встроенный MCP.",
     },
     nav: {
       features: "Возможности",
@@ -57,9 +57,10 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
       badge: "Open source · MIT · Self-hosted",
       title: "Артефакты ваших AI-агентов — одной ссылкой, на вашем сервере",
       subtitle:
-        "Claude Code, Cursor, Codex, Windsurf и любой другой агент публикует интерактивный HTML, Markdown, Mermaid или SVG через CLI, REST или встроенный MCP-сервер — и получает ссылку, которую безопасно открыть в браузере.",
+        "Claude Code, Cursor, Codex, Windsurf и любой другой агент собирает дашборды через конструктор или публикует интерактивный HTML, Markdown, Mermaid и SVG через CLI, REST или MCP — и получает ссылку, которую безопасно открыть в браузере.",
       bullets: [
         "Песочница нулевого доверия: без доступа к сессии и API хоста",
+        "Режим конструктора: 23 готовых блока, YAML/JSON, экономия 80% токенов",
         "Свой сервер, свои данные — MIT-лицензия, docker compose up -d",
         "MCP, REST и CLI из коробки — подключается за одну команду",
       ],
@@ -69,25 +70,26 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
     compat: {
       heading: "Работает с любым агентом, который умеет вызывать CLI, REST или MCP",
       agents: ["Claude Code", "Cursor", "Codex", "Windsurf", "Antigravity", "OpenCode"],
-      badges: ["MCP-сервер", "npm @emaxe/oa", "Docker", "MIT"],
+      badges: ["MCP-сервер", "Конструктор (YAML)", "npm @emaxe/oa", "Docker", "MIT"],
     },
     problem: {
       heading: "Агент написал интерактивный HTML. А дальше что?",
       before: [
+        "Писать 500 строк сырого HTML — агент тратит тысячи токенов и ломает верстку",
         "Вставить в чат — теряется интерактивность",
         "Залить на чужой хостинг — чужие условия, чужие данные",
         "Открыть локальный файл — некому переслать ссылку",
       ],
       afterHeading: "С Open Artifacts",
-      after: "Одна команда — `oa push` — и агент получает ссылку, которую сразу можно переслать: контент отрендерен, безопасен и живёт на вашем сервере.",
+      after: "Одна команда — `oa push` или `node constructor/build.mjs report.yaml --share` — и агент получает ссылку. Конструктор сам компилирует адаптивный дашборд из YAML с графиками, KPI и тёмной темой, экономя до 80% токенов.",
     },
     how: {
       heading: "Как это работает",
       subtitle: "От установки до готовой ссылки — три шага",
       steps: [
-        { title: "Подключите агента", body: "npx skills add emaxe/open-artifacts — агент сам ставит CLI и знает, как публиковать." },
+        { title: "Подключите агента", body: "npx skills add emaxe/open-artifacts — агент сам ставит CLI, получает конструктор и знает, как публиковать." },
         { title: "Авторизуйтесь", body: "oa login — код подтверждения и переход по ссылке активации, без ручного управления токенами." },
-        { title: "Публикуйте", body: "oa push report.html --share — версия сохранена, ссылка готова, политика доступа применена автоматически." },
+        { title: "Публикуйте напрямую или через конструктор", body: "oa push report.html --share или node constructor/build.mjs report.yaml --share — ссылка готова за секунды, политика доступа применена автоматически." },
       ],
       terminalCaption: "Реальные команды CLI — вывод не переведён специально, это то, что вы увидите в терминале.",
       terminalReplay: "Повторить",
@@ -100,7 +102,7 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
         { title: "4 формата контента", body: "Интерактивный HTML, GitHub-flavored Markdown, диаграммы Mermaid и SVG — каждый со своим рендерингом и защитой." },
         { title: "Встроенный MCP-сервер", body: "13 инструментов на /mcp: publish, версии, шаринг, квоты — подключается к Claude Desktop, Cursor и Claude Code без доп. сервисов." },
         { title: "CLI и skills.sh", body: "oa login/push/share/quota и агентский skill с автоустановкой — публикация встроена в рабочий процесс агента." },
-        { title: "4 дизайн-системы", body: "Готовые шаблоны — дашборды, документы, промо и диаграммы — так что артефакты разных агентов выглядят единообразно." },
+        { title: "Режим конструктора (23 блока)", body: "Вместо сырого HTML агент пишет компактный YAML/JSON из 23 блоков (KPI, графики Chart.js, таблицы, таймлайн, алерты) и 5 тем. Сборка за миллисекунды с валидацией схемы и экономией до 80% токенов." },
         { title: "История версий и откат", body: "Каждая публикация — новая версия с сообщением коммита; откат к любой прежней версии в один клик." },
         { title: "Команды, роли, приглашения", body: "Owner/admin/member/viewer, личные и командные рабочие пространства, приглашения по одноразовой ссылке." },
         { title: "Гибкий шаринг", body: "Ссылки team / с паролем / public, срок жизни, закрепление версии, отзыв — политику задаёт команда и инстанс." },
@@ -125,7 +127,7 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
     },
     demo: {
       heading: "То, что увидит получатель ссылки",
-      body: "Ниже — настоящий sandboxed iframe с демонстрационным артефактом: та же модель изоляции, что и в продакшене.",
+      body: "Ниже — настоящий sandboxed iframe с артефактом, собранным через режим конструктора: та же модель изоляции, адаптивность и поддержка тёмной темы, что и в продакшене.",
       frameTitle: "Демонстрационный артефакт",
       fakeUrl: "https://ваш-сервер/s/9kQ2xR",
       note: "sandbox=\"allow-scripts\", без allow-same-origin",
@@ -172,6 +174,7 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
     },
     stats: [
       { value: 4, suffix: "", label: "формата контента" },
+      { value: 23, suffix: "", label: "блока в конструкторе" },
       { value: 13, suffix: "", label: "инструментов MCP" },
       { value: 3, suffix: "", label: "режима ссылок" },
       { value: 1, suffix: "", label: "команда для self-host" },
@@ -194,7 +197,7 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
     meta: {
       title: "Open Artifacts — publish AI agent artifacts as a link",
       description:
-        "Self-hosted artifact hosting for AI agents: any agent publishes HTML, Markdown, Mermaid, or SVG into a sandboxed viewer and gets back a link. MIT-licensed, your own server, a built-in MCP server.",
+        "Self-hosted artifact hosting for AI agents: declarative YAML/JSON constructor, publish HTML, Markdown, Mermaid, or SVG into a sandboxed viewer. MIT, your own server, built-in MCP.",
     },
     nav: {
       features: "Features",
@@ -206,9 +209,10 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
       badge: "Open source · MIT · Self-hosted",
       title: "Your AI agents' artifacts — one link, on your own server",
       subtitle:
-        "Claude Code, Cursor, Codex, Windsurf, and any other agent publish interactive HTML, Markdown, Mermaid, or SVG over the CLI, REST, or a built-in MCP server — and get back a link that's safe to open in a browser.",
+        "Claude Code, Cursor, Codex, Windsurf, and any other agent build dashboards with Constructor Mode or publish interactive HTML, Markdown, Mermaid, and SVG over CLI, REST, or MCP — and get back a link that's safe to open in a browser.",
       bullets: [
         "Zero-trust sandbox: no access to the host's session or API",
+        "Constructor Mode: 23 declarative blocks, YAML/JSON, saves 80% of tokens",
         "Your server, your data — MIT-licensed, docker compose up -d",
         "MCP, REST, and a CLI out of the box — one command to connect",
       ],
@@ -218,25 +222,26 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
     compat: {
       heading: "Works with any agent that can call a CLI, REST, or MCP",
       agents: ["Claude Code", "Cursor", "Codex", "Windsurf", "Antigravity", "OpenCode"],
-      badges: ["MCP server", "npm @emaxe/oa", "Docker", "MIT"],
+      badges: ["MCP server", "Constructor (YAML)", "npm @emaxe/oa", "Docker", "MIT"],
     },
     problem: {
       heading: "Your agent just wrote an interactive HTML page. Now what?",
       before: [
+        "Writing 500 lines of raw HTML — the agent burns thousands of tokens and breaks mobile layouts",
         "Paste it into chat — the interactivity is gone",
         "Upload it to someone else's host — their terms, your data",
         "Open the local file — there's no link to send anyone",
       ],
       afterHeading: "With Open Artifacts",
-      after: "One command — `oa push` — and the agent gets back a link that's ready to send: rendered, sandboxed, and living on your own server.",
+      after: "One command — `oa push` or `node constructor/build.mjs report.yaml --share` — and the agent gets back a ready link. The constructor compiles a responsive dashboard from YAML with charts, KPIs, and dark mode, saving up to 80% of tokens.",
     },
     how: {
       heading: "How it works",
       subtitle: "From install to a shareable link in three steps",
       steps: [
-        { title: "Connect the agent", body: "npx skills add emaxe/open-artifacts — the agent installs the CLI itself and learns how to publish." },
+        { title: "Connect the agent", body: "npx skills add emaxe/open-artifacts — the agent installs the CLI, gets the constructor, and learns how to publish." },
         { title: "Authenticate", body: "oa login — a verification code and an activation link, no manual token handling." },
-        { title: "Publish", body: "oa push report.html --share — a version is saved, a link is ready, access policy applied automatically." },
+        { title: "Publish directly or via Constructor", body: "oa push report.html --share or node constructor/build.mjs report.yaml --share — link ready in seconds, access policy applied automatically." },
       ],
       terminalCaption: "Real CLI commands — the output is intentionally left untranslated, it's exactly what you'd see in your terminal.",
       terminalReplay: "Replay",
@@ -249,7 +254,7 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
         { title: "4 content formats", body: "Interactive HTML, GitHub-flavored Markdown, Mermaid diagrams, and SVG — each with its own rendering and hardening." },
         { title: "Built-in MCP server", body: "13 tools at /mcp: publish, versions, sharing, quotas — connects to Claude Desktop, Cursor, and Claude Code with no extra service." },
         { title: "CLI and skills.sh", body: "oa login/push/share/quota plus an agent skill with auto-install — publishing is baked into the agent's own workflow." },
-        { title: "4 design systems", body: "Ready-made templates — dashboards, documents, promo, and diagrams — so artifacts from different agents look consistent." },
+        { title: "Constructor Mode (23 blocks)", body: "Instead of raw HTML, agents write concise YAML/JSON from 23 modular blocks (KPIs, Chart.js charts, tables, timelines, tabs, alerts) and 5 themes. Compiles in milliseconds with schema validation, saving up to 80% of tokens." },
         { title: "Version history & rollback", body: "Every publish is a new version with a commit-style message; roll back to any earlier version in one click." },
         { title: "Teams, roles, invites", body: "Owner/admin/member/viewer roles, personal and team workspaces, one-time invite links." },
         { title: "Flexible sharing", body: "Team, password-protected, or public links, expiry, version pinning, and revocation — policy set by the team and the instance." },
@@ -274,7 +279,7 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
     },
     demo: {
       heading: "What the recipient of a link actually sees",
-      body: "Below is a real sandboxed iframe with a demo artifact — the exact same isolation model used in production.",
+      body: "Below is a real sandboxed iframe with an artifact compiled via Constructor Mode — the exact same isolation model, responsiveness, and dark mode used in production.",
       frameTitle: "Demo artifact",
       fakeUrl: "https://your-server/s/9kQ2xR",
       note: "sandbox=\"allow-scripts\", no allow-same-origin",
@@ -321,6 +326,7 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
     },
     stats: [
       { value: 4, suffix: "", label: "content formats" },
+      { value: 23, suffix: "", label: "constructor blocks" },
       { value: 13, suffix: "", label: "MCP tools" },
       { value: 3, suffix: "", label: "share link modes" },
       { value: 1, suffix: "", label: "command to self-host" },

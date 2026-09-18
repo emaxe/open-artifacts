@@ -323,31 +323,33 @@ YAML frontmatter (`---…---`) is stripped automatically from `source` and `mark
 
 ### Block catalogue
 
-| Type | Purpose |
-|------|---------|
-| `hero` | Page header with title, subtitle, badge |
-| `kpi-row` | Row of KPI tiles with delta and trend |
-| `stats-grid` | Grid of large-number stat cards |
-| `table` | Sortable, striped HTML table |
-| `chart-bar` | Bar chart (Chart.js) |
-| `chart-line` | Line chart (Chart.js) |
-| `chart-pie` | Pie / donut chart (Chart.js) |
-| `mermaid-diagram` | Embedded Mermaid diagram |
-| `text-section` | Heading + short Markdown prose |
-| `markdown` | Full Markdown content inline in YAML |
-| `markdown-file` | Load a .md file from disk |
-| `alert` | Info / warning / error / success callout |
-| `code-block` | Syntax-highlighted code |
-| `image` | Image with caption |
-| `two-columns` | Two-column layout (supports nested blocks) |
-| `tabs` | Tabbed content switcher |
-| `timeline` | Vertical event timeline |
-| `progress-bars` | Horizontal progress bars |
-| `list-cards` | Grid of content cards |
-| `badge-row` | Row of color-coded badges |
-| `divider` | Section separator with optional label |
-| `spacer` | Vertical whitespace |
-| `raw` | **Escape hatch: arbitrary HTML/CSS/JS** |
+All blocks support both canonical names and common model-friendly aliases (e.g. `variant` for `kind`, `text`/`content` for `body`, `headers` for `columns`, `code` for `definition`). The builder validates fields and auto-maps aliases automatically.
+
+| Type | Key Fields & Aliases | Purpose |
+|------|----------------------|---------|
+| `hero` | `title`* (or `heading`), `subtitle` (or `description`), `badge`, `meta` | Page header banner |
+| `kpi-row` | `items`* [`label`* (or `title`), `value`*, `delta`, `trend` (up\|down\|neutral), `icon`] | Row of KPI metric tiles |
+| `stats-grid` | `items`* [`label`, `value`, `icon`, `color`], `cols` | Large-number stat card grid |
+| `table` | `columns`* (or `headers`), `rows`* (or `data`), `sortable`, `striped`, `caption` | Sortable HTML table |
+| `chart-bar` | `labels`*, `datasets`* [`label`, `data`*, `color`], `title`, `horizontal`, `stacked` | Bar chart (Chart.js) |
+| `chart-line` | `labels`*, `datasets`* [`label`, `data`*, `color`], `title`, `fill`, `tension` | Line chart (Chart.js) |
+| `chart-pie` | `labels`*, `data`* (or `values`), `title`, `donut` (boolean) | Pie / donut chart |
+| `mermaid-diagram` | `definition`* (or `code` / `diagram`), `caption` | Embedded Mermaid diagram |
+| `text-section` | `heading` (or `title`), `body`* (or `text` / `content`), `level` | Heading + short Markdown prose |
+| `markdown` | `content`* (or `text` / `body` / `md`, inline Markdown) | Full Markdown inline in YAML |
+| `markdown-file` | `path`* (or `file` / `src`, path to .md file) | Embed Markdown file from disk |
+| `alert` | `kind` (or `variant`: `info\|warning\|error\|success`), `body`* (or `text`), `title`, `icon` | Callout / alert box (requires body or title) |
+| `code-block` | `code`* (or `source`), `lang` (or `language`), `caption`, `line_numbers` | Syntax-highlighted code |
+| `image` | `src`* (or `url`), `alt`*, `caption`, `width`, `align`, `zoomable` | Image with lightbox support |
+| `two-columns` | `left`* (Block[]), `right`* (Block[]), `ratio` (e.g. `2:1`), `gap` | Two-column layout |
+| `tabs` | `items`* [`label`*, `blocks`* (Block[])] | Tabbed content switcher |
+| `timeline` | `items`* [`date`*, `title`*, `body`, `status` (done\|active\|pending)] | Vertical event timeline |
+| `progress-bars` | `items`* [`label`*, `value`* (0..100), `max`, `unit`, `color`] | Horizontal progress bars |
+| `list-cards` | `items`* [`title`*, `body`, `badge`, `href`, `icon`], `cols` | Grid of content cards |
+| `badge-row` | `items`* (list of strings `["A","B"]` or objects `[{label, color}]`), `align` | Row of color-coded badges |
+| `divider` | `label` (optional text in separator) | Section separator line |
+| `spacer` | `size` (sp-1..sp-8, default `sp-5`) | Vertical whitespace |
+| `raw` | `html`, `css`, `scripts`, `cdn_scripts` | **Escape hatch: arbitrary HTML/CSS/JS** |
 
 Full field reference for every block: `constructor/BLOCKS-SPEC.md` (next to this file).
 

@@ -14,7 +14,9 @@ const LINES: { prompt?: string; text: string; className?: string }[] = [
   { text: "Verification code: ABCD-1234", className: "text-muted" },
   { text: "Open https://your-server/activate?code=ABCD-1234 to continue…", className: "text-muted" },
   { text: "✓ Signed in as you@example.com", className: "text-success" },
-  { prompt: "$", text: "oa push report.html --title \"Q3 Summary\" --share" },
+  { prompt: "$", text: "node constructor/build.mjs report.yaml --share" },
+  { text: "✓ Spec validated: 8 blocks ok", className: "text-muted" },
+  { text: "✓ Built: report.html (18.8 KB)", className: "text-success" },
   { text: "✓ Created artifact a1b2c3 (v1)", className: "text-success" },
   { text: "🔗 https://your-server/s/9kQ2xR", className: "text-accent" },
 ];
