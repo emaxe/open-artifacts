@@ -162,7 +162,7 @@ blocks:
   - type: badge-row
     align: center
     items:
-      - label: "Open Artifacts v0.10.0"
+      - label: "Open Artifacts v0.11.0"
         color: accent
       - label: "Theme: data"
         color: c1

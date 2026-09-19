@@ -1,7 +1,7 @@
 {
   "name": "open-artifacts",
   "private": true,
-  "version": "0.10.0",
+  "version": "0.11.0",
   "packageManager": "pnpm@11.1.2",
   "keywords": [
     "ai-agents",

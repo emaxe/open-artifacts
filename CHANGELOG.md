@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.11.0] - 2026-09-19
+
+### Changed
+- **Redesigned the top panel of the shared-artifact viewer (`/s/:token`)**: the panel is now a single, always one-line row (logo, title, kind badge, version/date/author/team) with the actions on the right. Size, view count, expiry, the version note and the description moved into a details block that starts collapsed and is opened with a chevron (managers only; the choice is remembered). "Download source" and "Open in workspace" are grouped under a "⋯" menu when both are present. The version picker and the visibility control are now compact chips with icons, and the layout stays on one line down to phone width.
+- **The visibility control applies on click.** It is now a list of "Team only / Password protected / Public" rows with a one-line explanation each: picking one saves it immediately (a spinner, then a checkmark), updates the panel in place and no longer reloads the page, so the artifact keeps its scroll position and state. "Password protected" reveals a password field with a "Set password" button (Enter works too). A mode the team forbids is shown disabled with the reason.
+- Popovers close on Escape and on an outside click, return focus to their trigger, support arrow keys / Home / End in the visibility list, and announce their result to screen readers.
+- The panel's details block is collapsed by default, and its remembered state uses a new `oa.viewer.details` key (the old `oa.viewer.panelCollapsed` is ignored).
+
+### Fixed
+- **Visibility control appeared to do nothing.** The panel had `max-height: 40vh; overflow-y: auto`, which clipped the popover so the "Apply" button was out of reach, and picking an option in the `<select>` only revealed the password field without saving anything. The version picker was clipped the same way. Popovers are now anchored to their own trigger and are never clipped by the panel.
+
 ## [0.10.0] - 2026-09-18
 
 ### Added

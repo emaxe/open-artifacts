@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.11.0] - 2026-09-19
+
+### Changed
+- Synchronized version with Open Artifacts 0.11.0 release. No CLI behavior changes; the release redesigns the shared-artifact viewer panel on the server side.
+
+---
+
 ## [0.10.0] - 2026-09-18
 
 ### Added
