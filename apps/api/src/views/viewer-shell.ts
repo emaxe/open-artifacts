@@ -65,7 +65,7 @@ interface ManagerFields extends MemberFields {
   shareId: string;
   shareMode: ShareMode;
   /** Modes the team's policy currently allows choosing; `"public"` is absent when forbidden — see
-   *  the visibility control, which renders it anyway as a disabled option rather than hiding it. */
+   *  the visibility control, which renders it anyway as a disabled row rather than hiding it. */
   allowedModes: ShareMode[];
 }
 
@@ -73,6 +73,8 @@ export type ViewerShellModel =
   | ({ audience: "anon" } & BaseFields)
   | ({ audience: "member" } & BaseFields & MemberFields)
   | ({ audience: "manager" } & BaseFields & ManagerFields);
+
+type ManagerModel = Extract<ViewerShellModel, { audience: "manager" }>;
 
 const KIND_LABELS: Record<ArtifactKind, string> = {
   html: "HTML",
@@ -88,6 +90,47 @@ const SHARE_MODE_LABELS: Record<ShareMode, string> = {
   password: "Password protected",
   public: "Public",
 };
+
+const SHARE_MODE_HINTS: Record<ShareMode, string> = {
+  team: "Signed-in members of this team",
+  password: "Anyone with the link and the password",
+  public: "Anyone with the link",
+};
+
+const SHARE_MODE_ICONS: Record<ShareMode, IconName> = {
+  team: "users",
+  password: "lock",
+  public: "globe",
+};
+
+/** Row order in the visibility menu: narrowest audience first. */
+const SHARE_MODES = ["team", "password", "public"] as const satisfies readonly ShareMode[];
+
+/**
+ * Inline 14px stroke icons. Static markup only — never interpolated with server data, and no
+ * `style` attributes anywhere (the shell's CSP allows inline styles only via the nonce'd `<style>`).
+ */
+const ICON_PATHS = {
+  users:
+    '<circle cx="6" cy="5.5" r="2.5"/><path d="M1.5 13c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4"/><path d="M10.5 3.2a2.5 2.5 0 0 1 0 4.6"/><path d="M12.5 9.4c1.4.5 2.5 1.7 2.5 3.6"/>',
+  lock: '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/>',
+  globe:
+    '<circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13"/><path d="M8 1.5c2 2 3 4.2 3 6.5s-1 4.5-3 6.5c-2-2-3-4.2-3-6.5s1-4.5 3-6.5z"/>',
+  chevron: '<path d="m4 6 4 4 4-4"/>',
+  dots: '<circle cx="3.5" cy="8" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="12.5" cy="8" r="1"/>',
+  check: '<path d="m3.5 8.5 3 3 6-7"/>',
+} as const;
+
+type IconName = keyof typeof ICON_PATHS;
+
+function svg(name: IconName): string {
+  const fill = name === "dots" ? "currentColor" : "none";
+  return `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false" fill="${fill}" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[name]}</svg>`;
+}
+
+function icon(name: IconName, extraClass = ""): string {
+  return `<span class="oa-icon${extraClass ? ` ${extraClass}` : ""}">${svg(name)}</span>`;
+}
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -118,40 +161,76 @@ function formatDateTime(d: Date): string {
  * localStorage keys and mirrors the exact contract `apps/web/src/lib/theme.tsx` uses for
  * `oa_theme`, so a visitor who is also a logged-in user of the product sees their own theme choice
  * honored here too, with no flash of the wrong theme.
+ *
+ * The details block is collapsed unless the visitor explicitly opened it before (`oa.viewer.details`
+ * = 'open'). That is a fresh key rather than a re-read of the old `oa.viewer.panelCollapsed`, whose
+ * meaning was the opposite (expanded by default) — reusing it would flip everyone's saved choice.
  */
-const HEAD_BOOT_SCRIPT = `(function(){try{var t=localStorage.getItem('oa_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}try{if(localStorage.getItem('oa.viewer.panelCollapsed')==='1'){document.documentElement.setAttribute('data-oa-panel','collapsed');}}catch(e){}})();`;
+const HEAD_BOOT_SCRIPT = `(function(){try{var t=localStorage.getItem('oa_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}var open=false;try{open=localStorage.getItem('oa.viewer.details')==='open';}catch(e){}if(!open){document.documentElement.setAttribute('data-oa-panel','collapsed');}})();`;
 
 /**
  * Runs at the end of `<body>` on the viewer shell only. Also contains zero server-supplied data —
- * both behaviors read only `window.location`/the DOM, which is precisely what keeps this script
- * safe to serve alongside artifact/team/user-supplied strings elsewhere on the same page: there is
- * no template hole here for an escaping mistake to land in.
+ * everything it reads comes from `window.location` or from the DOM it is attached to (including the
+ * visibility control's row labels and icons, which it copies rather than duplicating), which is
+ * precisely what keeps this script safe to serve alongside artifact/team/user-supplied strings
+ * elsewhere on the same page: there is no template hole here for an escaping mistake to land in.
  */
 const PANEL_SCRIPT = `(function(){
-  var toggle=document.getElementById('oa-toggle');
-  function sync(){
-    var collapsed=document.documentElement.getAttribute('data-oa-panel')==='collapsed';
-    if(toggle){toggle.setAttribute('aria-expanded',String(!collapsed));toggle.textContent=collapsed?'Expand panel':'Collapse panel';}
+  var root=document.documentElement;
+  var live=document.getElementById('oa-live');
+  function announce(msg){
+    if(!live)return;
+    live.textContent='';
+    setTimeout(function(){live.textContent=msg;},30);
   }
-  sync();
+
+  var toggle=document.getElementById('oa-toggle');
   if(toggle){
+    var syncToggle=function(){
+      var collapsed=root.getAttribute('data-oa-panel')==='collapsed';
+      var label=collapsed?'Show details':'Hide details';
+      toggle.setAttribute('aria-expanded',String(!collapsed));
+      toggle.setAttribute('aria-label',label);
+      toggle.setAttribute('title',label);
+    };
+    syncToggle();
     toggle.addEventListener('click',function(){
-      var collapsed=document.documentElement.getAttribute('data-oa-panel')==='collapsed';
-      if(collapsed){document.documentElement.removeAttribute('data-oa-panel');}else{document.documentElement.setAttribute('data-oa-panel','collapsed');}
-      try{localStorage.setItem('oa.viewer.panelCollapsed',collapsed?'0':'1');}catch(e){}
-      sync();
+      var collapsed=root.getAttribute('data-oa-panel')==='collapsed';
+      if(collapsed){root.removeAttribute('data-oa-panel');}else{root.setAttribute('data-oa-panel','collapsed');}
+      try{localStorage.setItem('oa.viewer.details',collapsed?'open':'closed');}catch(e){}
+      syncToggle();
     });
   }
-  // The version picker and the visibility control are both right-anchored <details> popovers in
-  // the same header; browsers don't auto-close sibling <details>, so two open at once would
-  // overlap. Closing the others whenever one opens keeps at most one on screen.
-  var popovers=document.querySelectorAll('.oa-versions,.oa-share-mode');
-  Array.prototype.forEach.call(popovers,function(d){
+
+  // Every popover in the header (versions, visibility, "more") is a <details>; browsers don't
+  // auto-close them, so this keeps at most one open, and closes it on an outside click, on Escape
+  // (returning focus to its trigger) and when focus moves into the artifact iframe — clicks inside
+  // a cross-origin iframe never bubble up to this document, but the window does lose focus.
+  var pops=Array.prototype.slice.call(document.querySelectorAll('.oa-pop'));
+  pops.forEach(function(d){
     d.addEventListener('toggle',function(){
       if(!d.open)return;
-      Array.prototype.forEach.call(popovers,function(o){if(o!==d)o.open=false;});
+      pops.forEach(function(o){if(o!==d)o.open=false;});
     });
   });
+  function closeAll(){pops.forEach(function(d){d.open=false;});}
+  document.addEventListener('click',function(e){
+    pops.forEach(function(d){if(d.open&&!d.contains(e.target))d.open=false;});
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Escape')return;
+    pops.forEach(function(d){
+      if(!d.open)return;
+      var hadFocus=d.contains(document.activeElement);
+      d.open=false;
+      var s=d.querySelector('summary');
+      if(hadFocus&&s)s.focus();
+    });
+  });
+  window.addEventListener('blur',function(){
+    if(document.activeElement&&document.activeElement.tagName==='IFRAME')closeAll();
+  });
+
   function legacyCopy(text){
     var ta=document.createElement('textarea');
     ta.value=text;
@@ -175,6 +254,7 @@ const PANEL_SCRIPT = `(function(){
         e.preventDefault();
         var original=copyBtn.textContent;
         copyBtn.textContent='Copied!';
+        announce('Link copied');
         setTimeout(function(){copyBtn.textContent=original;},1500);
       }
       // navigator.clipboard is unavailable on insecure origins (plain HTTP) and its write can
@@ -189,46 +269,149 @@ const PANEL_SCRIPT = `(function(){
       }
     });
   }
-  var modeDetails=document.querySelector('.oa-share-mode');
-  if(modeDetails){
-    var modeSelect=document.getElementById('oa-mode-select');
-    var modePw=document.getElementById('oa-mode-pw');
-    var modeApply=document.getElementById('oa-mode-apply');
-    var modeErr=document.getElementById('oa-mode-err');
-    function syncPwVisibility(){
-      modePw.hidden=modeSelect.value!=='password';
+
+  // Visibility control: picking a row saves it straight away (team / public), or — for a password,
+  // which the API refuses without one — reveals the password field and saves on "Set password".
+  // The panel is updated in place from the row that was clicked; nothing reloads, so the artifact
+  // iframe keeps its scroll position and state.
+  (function(details){
+    if(!details)return;
+    var shareId=details.dataset.shareId;
+    var rows=Array.prototype.slice.call(details.querySelectorAll('.oa-mode-opt'));
+    var pwWrap=details.querySelector('.oa-mode-pw');
+    var pwInput=document.getElementById('oa-mode-pw');
+    var pwApply=document.getElementById('oa-mode-pw-apply');
+    var pwRow=details.querySelector('.oa-mode-opt[data-mode="password"]');
+    var statusEl=document.getElementById('oa-mode-status');
+    var errEl=document.getElementById('oa-mode-err');
+    var sumIcon=document.getElementById('oa-mode-summary-icon');
+    var sumLabel=document.getElementById('oa-mode-summary-label');
+    var busy=false;
+
+    function enabledRows(){return rows.filter(function(r){return !r.disabled;});}
+    function showError(msg){
+      errEl.textContent=msg;
+      errEl.setAttribute('data-visible','true');
     }
-    syncPwVisibility();
-    modeSelect.addEventListener('change',syncPwVisibility);
-    modeApply.addEventListener('click',function(){
-      modeErr.removeAttribute('data-visible');
-      modeApply.disabled=true;
-      fetch('/api/v1/shares/'+encodeURIComponent(modeDetails.dataset.shareId),{
+    function clearFeedback(){
+      errEl.removeAttribute('data-visible');
+      statusEl.textContent='';
+    }
+    function setBusy(on,row){
+      busy=on;
+      if(on){details.setAttribute('data-busy','true');}else{details.removeAttribute('data-busy');}
+      rows.forEach(function(r){r.removeAttribute('data-busy');});
+      if(on&&row)row.setAttribute('data-busy','true');
+      pwApply.disabled=on;
+      pwInput.disabled=on;
+    }
+    function onSaved(row){
+      setBusy(false);
+      rows.forEach(function(r){
+        var on=r===row;
+        r.setAttribute('aria-checked',String(on));
+        r.tabIndex=on?0:-1;
+      });
+      var label=row.querySelector('.oa-mode-label').textContent;
+      sumIcon.replaceChildren(row.querySelector('.oa-mode-icon svg').cloneNode(true));
+      sumLabel.textContent=label;
+      pwInput.value='';
+      pwWrap.hidden=true;
+      statusEl.textContent='Visibility updated';
+      announce('Visibility changed to '+label);
+      setTimeout(function(){
+        if(!details.open)return;
+        var hadFocus=details.contains(document.activeElement);
+        details.open=false;
+        if(hadFocus)details.querySelector('summary').focus();
+      },900);
+    }
+    function save(mode,password,row){
+      if(busy)return;
+      clearFeedback();
+      setBusy(true,row);
+      statusEl.textContent='Saving\\u2026';
+      var payload={mode:mode};
+      if(password)payload.password=password;
+      function failed(msg){
+        setBusy(false);
+        statusEl.textContent='';
+        showError(msg);
+      }
+      fetch('/api/v1/shares/'+encodeURIComponent(shareId),{
         method:'PATCH',
         credentials:'same-origin',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({mode:modeSelect.value,password:modePw.hidden?undefined:modePw.value}),
+        body:JSON.stringify(payload),
       }).then(function(res){
-        if(res.ok){window.location.reload();return;}
+        if(res.ok){onSaved(row);return;}
         return res.json().catch(function(){return {};}).then(function(body){
-          modeErr.textContent=(body&&body.error&&body.error.message)||'Could not change visibility.';
-          modeErr.setAttribute('data-visible','true');
-          modeApply.disabled=false;
+          failed((body&&body.error&&body.error.message)||'Could not change visibility.');
         });
-      }).catch(function(){
-        modeErr.textContent='Could not change visibility.';
-        modeErr.setAttribute('data-visible','true');
-        modeApply.disabled=false;
+      }).catch(function(){failed('Could not change visibility.');});
+    }
+    function submitPassword(){
+      var value=pwInput.value;
+      if(value.length<4){
+        showError('Password must be at least 4 characters.');
+        pwInput.focus();
+        return;
+      }
+      save('password',value,pwRow);
+    }
+
+    rows.forEach(function(r){
+      r.addEventListener('click',function(){
+        if(busy||r.disabled)return;
+        clearFeedback();
+        var mode=r.getAttribute('data-mode');
+        if(mode==='password'){
+          pwWrap.hidden=false;
+          pwInput.focus();
+          return;
+        }
+        if(r.getAttribute('aria-checked')==='true')return;
+        save(mode,'',r);
+      });
+      r.addEventListener('focus',function(){
+        rows.forEach(function(o){o.tabIndex=o===r?0:-1;});
       });
     });
-  }
+    pwApply.addEventListener('click',submitPassword);
+    pwInput.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){e.preventDefault();submitPassword();}
+    });
+    details.addEventListener('keydown',function(e){
+      var list=enabledRows();
+      var i=list.indexOf(document.activeElement);
+      if(i<0||!list.length)return;
+      var next=-1;
+      if(e.key==='ArrowDown')next=(i+1)%list.length;
+      else if(e.key==='ArrowUp')next=(i-1+list.length)%list.length;
+      else if(e.key==='Home')next=0;
+      else if(e.key==='End')next=list.length-1;
+      if(next<0)return;
+      e.preventDefault();
+      list[next].focus();
+    });
+    details.addEventListener('toggle',function(){
+      if(details.open){
+        var current=details.querySelector('.oa-mode-opt[aria-checked="true"]:not([disabled])')||enabledRows()[0];
+        if(current)current.focus();
+      }else if(!busy){
+        clearFeedback();
+        pwInput.value='';
+        pwWrap.hidden=true;
+      }
+    });
+  })(document.querySelector('.oa-share-mode'));
 })();`;
 
 function documentShell(opts: { title: string; nonce: string; bodyClass?: string; headExtra?: string; body: string }): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${opts.title}</title><style nonce="${opts.nonce}">${VIEWER_CSS}</style><script nonce="${opts.nonce}">${HEAD_BOOT_SCRIPT}</script>${opts.headExtra ?? ""}</head><body${opts.bodyClass ? ` class="${opts.bodyClass}"` : ""}>${opts.body}</body></html>`;
 }
 
-function renderVersionPicker(vm: Extract<ViewerShellModel, { audience: "manager" }>): string {
+function renderVersionPicker(vm: ManagerModel): string {
   const items = vm.versions
     .map((v) => {
       const tag = v.isPinned ? " (pinned)" : v.isCurrent ? " (current)" : "";
@@ -237,88 +420,121 @@ function renderVersionPicker(vm: Extract<ViewerShellModel, { audience: "manager"
     })
     .join("");
   const more = vm.versionsTruncated ? `<div class="oa-versions-more">Showing the most recent versions only.</div>` : "";
-  return `<details class="oa-versions"><summary class="oa-btn">Version ${vm.versionNo} ▾</summary><div class="oa-versions-menu">${items}${more}</div></details>`;
+  return `<details class="oa-pop oa-versions"><summary class="oa-btn oa-chip" title="Switch version"><span>Version ${vm.versionNo}</span>${icon("chevron", "oa-chevron")}</summary><div class="oa-pop-menu oa-versions-menu"><p class="oa-pop-title">Versions</p>${items}${more}</div></details>`;
 }
 
 /**
  * Visibility control for a manager: who can open THIS link, changeable in place (same token, same
  * URL — see `PATCH /shares/:id`). The only server data it carries into the DOM is `data-share-id`
- * (escaped) plus `selected`/`disabled` on its own `<option>`s; the click handler that reads and
- * submits it lives entirely in PANEL_SCRIPT, which per its own docblock must never gain a
- * server-supplied value of its own.
+ * (escaped) plus `aria-checked` / `tabindex` / `disabled` on its own statically-labelled rows; the
+ * handlers that read and submit it live entirely in PANEL_SCRIPT, which per its own docblock must
+ * never gain a server-supplied value of its own.
+ *
+ * A mode the team's policy forbids is rendered as a disabled row (with the reason) rather than
+ * hidden, so a manager can see it exists and why it can't be picked.
  */
-function renderShareModeControl(vm: Extract<ViewerShellModel, { audience: "manager" }>): string {
-  const options = (["team", "password", "public"] as const)
-    .map((mode) => {
-      const allowed = vm.allowedModes.includes(mode);
-      const selected = mode === vm.shareMode ? " selected" : "";
-      const disabled = allowed ? "" : " disabled";
-      const label = allowed ? SHARE_MODE_LABELS[mode] : `${SHARE_MODE_LABELS[mode]} (disabled for this team)`;
-      return `<option value="${mode}"${selected}${disabled}>${escapeHtml(label)}</option>`;
-    })
-    .join("");
-  return `<details class="oa-share-mode" data-share-id="${escapeHtml(vm.shareId)}">
-<summary class="oa-btn">Visibility: ${escapeHtml(SHARE_MODE_LABELS[vm.shareMode])} ▾</summary>
-<div class="oa-share-mode-menu">
-<select id="oa-mode-select">${options}</select>
-<input type="password" id="oa-mode-pw" placeholder="New password" autocomplete="new-password" hidden>
-<button type="button" id="oa-mode-apply" class="oa-btn oa-btn-primary">Apply</button>
-<p class="oa-error" id="oa-mode-err"></p>
+function renderShareModeControl(vm: ManagerModel): string {
+  const isAllowed = (mode: ShareMode) => vm.allowedModes.includes(mode);
+  // Roving tabindex: exactly one row is a Tab stop — the current mode, or the first pickable one
+  // when the current mode is itself no longer allowed (a disabled row cannot take focus).
+  const tabStop = isAllowed(vm.shareMode) ? vm.shareMode : SHARE_MODES.find(isAllowed);
+
+  const rows = SHARE_MODES.map((mode) => {
+    const allowed = isAllowed(mode);
+    const hint = allowed ? SHARE_MODE_HINTS[mode] : "Disabled for this team";
+    return `<button type="button" class="oa-mode-opt" role="menuitemradio" data-mode="${mode}" aria-checked="${mode === vm.shareMode}" tabindex="${mode === tabStop ? 0 : -1}"${allowed ? "" : " disabled"}>${icon(SHARE_MODE_ICONS[mode], "oa-mode-icon")}<span class="oa-mode-label">${escapeHtml(SHARE_MODE_LABELS[mode])}</span><span class="oa-mode-hint">${escapeHtml(hint)}</span>${icon("check", "oa-mode-check")}</button>`;
+  }).join("");
+
+  return `<details class="oa-pop oa-share-mode" data-share-id="${escapeHtml(vm.shareId)}">
+<summary class="oa-btn oa-chip" title="Who can open this link"><span class="oa-sr-only">Visibility: </span><span class="oa-icon" id="oa-mode-summary-icon">${svg(SHARE_MODE_ICONS[vm.shareMode])}</span><span id="oa-mode-summary-label">${escapeHtml(SHARE_MODE_LABELS[vm.shareMode])}</span>${icon("chevron", "oa-chevron")}</summary>
+<div class="oa-pop-menu oa-mode-menu">
+<p class="oa-pop-title" id="oa-mode-title">Who can open this link</p>
+<div class="oa-mode-list" role="menu" aria-labelledby="oa-mode-title">${rows}</div>
+<div class="oa-mode-pw" hidden><input type="password" id="oa-mode-pw" placeholder="New password" aria-label="New password" autocomplete="new-password" maxlength="200"><button type="button" id="oa-mode-pw-apply" class="oa-btn oa-btn-primary">Set password</button></div>
+<p class="oa-pop-status" id="oa-mode-status"></p>
+<p class="oa-error" id="oa-mode-err" role="alert"></p>
 </div>
 </details>`;
+}
+
+interface SecondaryAction {
+  label: string;
+  href: string;
+  external?: boolean;
+}
+
+/**
+ * Secondary actions: a single one stays a plain button (a menu of one is just an extra click); two
+ * or more collapse into one "more" menu so the primary row keeps room for what matters.
+ */
+function renderSecondaryActions(actions: SecondaryAction[]): string {
+  const attrs = (a: SecondaryAction) => (a.external ? ` target="_blank" rel="noopener noreferrer"` : "");
+  if (actions.length === 0) return "";
+  if (actions.length === 1) {
+    const a = actions[0]!;
+    return `<a class="oa-btn" href="${escapeHtml(a.href)}"${attrs(a)}>${escapeHtml(a.label)}</a>`;
+  }
+  const items = actions.map((a) => `<a class="oa-menu-item" href="${escapeHtml(a.href)}"${attrs(a)}>${escapeHtml(a.label)}</a>`).join("");
+  return `<details class="oa-pop oa-more"><summary class="oa-btn oa-icon-btn" aria-label="More actions" title="More actions">${icon("dots")}</summary><div class="oa-pop-menu oa-more-menu">${items}</div></details>`;
 }
 
 export function renderViewerShell(vm: ViewerShellModel, nonce: string): string {
   const kindLabel = KIND_LABELS[vm.kind];
   const escapedTitle = escapeHtml(vm.title);
 
-  const metaItems: string[] = [
-    `<li>Version ${vm.versionNo}</li>`,
-    `<li><time datetime="${vm.versionDate.toISOString()}" title="${escapeHtml(formatDateTime(vm.versionDate))}">${escapeHtml(formatDateShort(vm.versionDate))}</time></li>`,
-  ];
+  // Primary meta rides in the title row and is clipped rather than wrapped; `data-hide` marks what
+  // the stylesheet drops first as the viewport narrows. A manager already sees the version on its
+  // picker chip, so it isn't repeated here.
+  const primaryMeta: string[] = [];
+  if (vm.audience !== "manager") primaryMeta.push(`<li>Version ${vm.versionNo}</li>`);
+  primaryMeta.push(
+    `<li data-hide="sm"><time datetime="${vm.versionDate.toISOString()}" title="${escapeHtml(formatDateTime(vm.versionDate))}">${escapeHtml(formatDateShort(vm.versionDate))}</time></li>`,
+  );
   if (vm.audience === "member" || vm.audience === "manager") {
-    metaItems.push(`<li>By ${escapeHtml(vm.authorName)}</li>`, `<li>${escapeHtml(vm.orgName)}</li>`);
+    primaryMeta.push(`<li data-hide="md">By ${escapeHtml(vm.authorName)}</li>`, `<li data-hide="md">${escapeHtml(vm.orgName)}</li>`);
   }
-  if (vm.audience === "manager") {
-    metaItems.push(
-      `<li data-secondary>${formatBytes(vm.sizeBytes)}</li>`,
-      `<li data-secondary>${vm.viewCount} view${vm.viewCount === 1 ? "" : "s"}</li>`,
-      `<li data-secondary>${vm.expiresAt ? `Expires ${escapeHtml(formatDateShort(vm.expiresAt))}` : "Never expires"}</li>`,
-    );
-    if (vm.versionMessage) metaItems.push(`<li data-secondary>“${escapeHtml(truncate(vm.versionMessage, 120))}”</li>`);
+
+  const secondary: SecondaryAction[] = [{ label: "Download source", href: vm.downloadHref }];
+  if ((vm.audience === "member" || vm.audience === "manager") && vm.cabinetHref) {
+    secondary.push({ label: "Open in workspace", href: vm.cabinetHref, external: true });
   }
 
   const actions: string[] = [];
   if (vm.audience === "manager") {
-    actions.push(renderVersionPicker(vm));
-    actions.push(renderShareModeControl(vm));
+    actions.push(renderShareModeControl(vm), renderVersionPicker(vm));
   }
   actions.push(`<a id="oa-copy" class="oa-btn" href="${escapeHtml(vm.canonicalHref)}">Copy link</a>`);
-  actions.push(`<a class="oa-btn" href="${escapeHtml(vm.downloadHref)}">Download source</a>`);
-  if ((vm.audience === "member" || vm.audience === "manager") && vm.cabinetHref) {
-    actions.push(`<a class="oa-btn" href="${escapeHtml(vm.cabinetHref)}" target="_blank" rel="noopener noreferrer">Open in workspace</a>`);
+  actions.push(renderSecondaryActions(secondary));
+
+  // Only a manager has anything to expand (size, views, expiry, version note, description), so only
+  // a manager gets the details block and its toggle; anon/member panels are a single fixed row.
+  let details = "";
+  if (vm.audience === "manager") {
+    const detailMeta: string[] = [
+      `<li>${formatBytes(vm.sizeBytes)}</li>`,
+      `<li>${vm.viewCount} view${vm.viewCount === 1 ? "" : "s"}</li>`,
+      `<li>${vm.expiresAt ? `Expires ${escapeHtml(formatDateShort(vm.expiresAt))}` : "Never expires"}</li>`,
+    ];
+    if (vm.versionMessage) detailMeta.push(`<li>“${escapeHtml(truncate(vm.versionMessage, 120))}”</li>`);
+    const description = vm.description ? `<p class="oa-desc">${escapeHtml(truncate(vm.description, 200))}</p>` : "";
+    details = `<div class="oa-panel-details" id="oa-panel-body"><ul class="oa-meta">${detailMeta.join("")}</ul>${description}</div>`;
+    actions.push(
+      `<button type="button" id="oa-toggle" class="oa-btn oa-icon-btn oa-toggle" aria-expanded="false" aria-controls="oa-panel-body" aria-label="Show details" title="Show details">${icon("chevron")}</button>`,
+    );
   }
-  actions.push(
-    `<button type="button" id="oa-toggle" class="oa-btn oa-toggle" aria-expanded="true" aria-controls="oa-panel-body">Collapse panel</button>`,
-  );
 
   const notice =
     vm.audience === "manager" && vm.nonDefaultNotice
       ? `<div class="oa-banner">You're viewing an older version — visitors of this link see the current one. <a href="${escapeHtml(vm.nonDefaultNotice.canonicalHref)}">Back to the shared version</a></div>`
       : "";
 
-  const description =
-    vm.audience === "manager" && vm.description
-      ? `<div class="oa-banner oa-panel-secondary">${escapeHtml(truncate(vm.description, 200))}</div>`
-      : "";
-
   const body = `${notice}<header class="oa-panel">
 <div class="oa-panel-row">
-<div class="oa-panel-title"><a class="oa-logo" href="/" aria-label="Open Artifacts home"><img src="/brand/logo-mark.png" alt="" width="18" height="18"></a><h1 title="${escapedTitle}">${escapedTitle}</h1><span class="oa-kind">${kindLabel}</span></div>
+<div class="oa-panel-title"><a class="oa-logo" href="/" aria-label="Open Artifacts home"><img src="/brand/logo-mark.png" alt="" width="18" height="18"></a><h1 title="${escapedTitle}">${escapedTitle}</h1><span class="oa-kind">${kindLabel}</span><ul class="oa-meta oa-meta-inline">${primaryMeta.join("")}</ul></div>
 <div class="oa-actions">${actions.join("")}</div>
 </div>
-<div class="oa-panel-row oa-panel-secondary" id="oa-panel-body"><ul class="oa-meta">${metaItems.join("")}</ul></div>
-${description}
+${details}
+<span id="oa-live" class="oa-sr-only" role="status" aria-live="polite"></span>
 </header>
 <iframe class="oa-frame" title="Shared artifact content" src="${escapeHtml(vm.embedSrc)}" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"></iframe>
 <script nonce="${nonce}">${PANEL_SCRIPT}</script>`;

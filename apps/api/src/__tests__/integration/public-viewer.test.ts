@@ -98,7 +98,7 @@ describe("GET /s/:token — audience-gated viewer panel", () => {
     // The logo is shown to every audience; the visibility control (a manager-only write action)
     // is not — an anonymous visitor gets neither the data nor the markup for it.
     expect(html).toContain('<a class="oa-logo" href="/"');
-    expect(html).not.toContain('<details class="oa-share-mode"');
+    expect(html).not.toContain('<details class="oa-pop oa-share-mode"');
   });
 
   it("shows the artifact's owner the full manager panel", async () => {
@@ -113,10 +113,11 @@ describe("GET /s/:token — audience-gated viewer panel", () => {
 
     expect(html).toContain(`/t/${owner.orgId}/artifacts/${artifactId}`);
     expect(html).toContain("Open in workspace");
-    expect(html).toContain('<details class="oa-versions"');
-    expect(html).toContain(`<details class="oa-share-mode" data-share-id="${share.id}">`);
-    // createShareForArtifact defaults to mode "public" — that's the option marked selected here.
-    expect(html).toContain('<option value="public" selected>Public</option>');
+    expect(html).toContain('<details class="oa-pop oa-versions"');
+    expect(html).toContain(`<details class="oa-pop oa-share-mode" data-share-id="${share.id}">`);
+    // createShareForArtifact defaults to mode "public" — that's the row marked as checked here.
+    expect(html).toMatch(/data-mode="public" aria-checked="true"/);
+    expect(html).toContain('<span id="oa-mode-summary-label">Public</span>');
   });
 
   it("shows an admin of the same team the full manager panel even though they don't own the artifact", async () => {
@@ -144,8 +145,8 @@ describe("GET /s/:token — audience-gated viewer panel", () => {
     // Member panel: sees who made it and which team, but has no write access to this private
     // artifact, so no dead link into a cabinet page that would just 403, and no version controls.
     expect(html).not.toContain("Open in workspace");
-    expect(html).not.toContain('<details class="oa-versions"');
-    expect(html).not.toContain('<details class="oa-share-mode"');
+    expect(html).not.toContain('<details class="oa-pop oa-versions"');
+    expect(html).not.toContain('<details class="oa-pop oa-share-mode"');
   });
 
   it("shows a plain teammate the cabinet link when the artifact is org-visible", async () => {
@@ -158,7 +159,7 @@ describe("GET /s/:token — audience-gated viewer panel", () => {
     const res = await app.request(`/s/${share.token}`, { headers: { Cookie: `oa_session=${member.sessionCookie}` } });
     const html = await res.text();
     expect(html).toContain(`/t/${owner.orgId}/artifacts/${artifactId}`);
-    expect(html).not.toContain('<details class="oa-versions"');
+    expect(html).not.toContain('<details class="oa-pop oa-versions"');
   });
 
   it("shows the minimal panel to a logged-in user from a completely unrelated team", async () => {
@@ -350,7 +351,13 @@ describe("GET /s/:token — CSP and caching headers", () => {
 });
 
 describe("GET /s/:token — visibility control (manager only)", () => {
-  it("renders 'public' as a disabled option once the team forbids public links", async () => {
+  // The single <button> row for the "public" mode, from its opening tag to its closing one.
+  const publicRow = (html: string) => {
+    const at = html.indexOf('data-mode="public"');
+    return html.slice(html.lastIndexOf("<button", at), html.indexOf("</button>", at));
+  };
+
+  it("renders 'public' as a disabled row once the team forbids public links", async () => {
     const app = buildTestApp();
     const owner = await registerAndLogin(app);
     const artifactId = await createArtifact(app, owner.orgId, owner.sessionCookie);
@@ -363,7 +370,8 @@ describe("GET /s/:token — visibility control (manager only)", () => {
 
     const res = await app.request(`/s/${share.token}`, { headers: { Cookie: `oa_session=${owner.sessionCookie}` } });
     const html = await res.text();
-    expect(html).toContain('<option value="public" disabled>Public (disabled for this team)</option>');
+    expect(publicRow(html)).toContain(" disabled");
+    expect(publicRow(html)).toContain("Disabled for this team");
   });
 
   it("leaves 'public' enabled when the team's policy allows it", async () => {
@@ -374,7 +382,8 @@ describe("GET /s/:token — visibility control (manager only)", () => {
 
     const res = await app.request(`/s/${share.token}`, { headers: { Cookie: `oa_session=${owner.sessionCookie}` } });
     const html = await res.text();
-    expect(html).toContain('<option value="public">Public</option>');
+    expect(publicRow(html)).not.toContain(" disabled");
+    expect(publicRow(html)).not.toContain("Disabled for this team");
   });
 });
 
@@ -516,6 +525,6 @@ describe("GET /s/:token — team-only shares", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("Team Only Doc");
-    expect(html).not.toContain('<details class="oa-versions"');
+    expect(html).not.toContain('<details class="oa-pop oa-versions"');
   });
 });

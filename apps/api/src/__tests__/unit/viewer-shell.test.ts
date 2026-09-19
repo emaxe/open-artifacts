@@ -99,13 +99,20 @@ describe("renderViewerShell — anon audience", () => {
   it("never structurally exposes manager/member-only data", () => {
     expect(html).not.toContain("/t/");
     expect(html).not.toContain("Open in workspace");
-    expect(html).not.toContain('<details class="oa-versions"');
+    expect(html).not.toContain('<details class="oa-pop oa-versions"');
     expect(html).not.toMatch(/By\s/);
   });
 
   it("shows a logo linking home, but no visibility control", () => {
     expect(html).toContain('<a class="oa-logo" href="/"');
-    expect(html).not.toContain('<details class="oa-share-mode"');
+    expect(html).not.toContain('<details class="oa-pop oa-share-mode"');
+  });
+
+  it("is a single fixed row: no details block or toggle, and one secondary action stays a plain button", () => {
+    expect(html).not.toContain('id="oa-toggle"');
+    expect(html).not.toContain('id="oa-panel-body"');
+    expect(html).not.toContain("More actions");
+    expect(html).toContain('<a class="oa-btn" href="/s/tok123/download?v=2">Download source</a>');
   });
 
   it("stamps every inline <style>/<script> with the given nonce", () => {
@@ -124,7 +131,7 @@ describe("renderViewerShell — member audience", () => {
     expect(html).toContain("Jane Doe");
     expect(html).toContain("Acme Team");
     expect(html).toContain("Open in workspace");
-    expect(html).not.toContain('<details class="oa-versions"');
+    expect(html).not.toContain('<details class="oa-pop oa-versions"');
   });
 
   it("still offers copy-link and download to a member (available to every audience)", () => {
@@ -135,11 +142,19 @@ describe("renderViewerShell — member audience", () => {
   it("omits the cabinet link entirely when cabinetHref is null (no read access)", () => {
     const out = renderViewerShell(memberVm({ cabinetHref: null }), NONCE);
     expect(out).not.toContain("Open in workspace");
+    // ...which leaves a single secondary action, so it goes back to a plain button.
+    expect(out).not.toContain("More actions");
+  });
+
+  it("groups download and workspace into one 'more' menu, without a details toggle", () => {
+    expect(html).toContain('<details class="oa-pop oa-more">');
+    expect(html).toContain('aria-label="More actions"');
+    expect(html).not.toContain('id="oa-toggle"');
   });
 
   it("shows the logo but no visibility control (a member cannot change it)", () => {
     expect(html).toContain('<a class="oa-logo" href="/"');
-    expect(html).not.toContain('<details class="oa-share-mode"');
+    expect(html).not.toContain('<details class="oa-pop oa-share-mode"');
   });
 });
 
@@ -149,7 +164,7 @@ describe("renderViewerShell — manager audience", () => {
     expect(html).toContain("2 KB");
     expect(html).toContain("7 views");
     expect(html).toContain("Never expires");
-    expect(html).toContain('<details class="oa-versions"');
+    expect(html).toContain('<details class="oa-pop oa-versions"');
     expect(html).toContain("Version 1");
     expect(html).toContain("Fixed the bug");
   });
@@ -184,27 +199,95 @@ describe("renderViewerShell — manager audience", () => {
     expect(html).toContain('<a class="oa-logo" href="/"');
   });
 
+  it("has a details toggle that starts collapsed and points at the details block", () => {
+    const html = renderViewerShell(managerVm(), NONCE);
+    expect(html).toContain('id="oa-toggle"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('aria-controls="oa-panel-body"');
+    expect(html).toContain('id="oa-panel-body"');
+  });
+
+  it("puts the secondary meta and the description inside the collapsible details block", () => {
+    const html = renderViewerShell(managerVm(), NONCE);
+    const details = html.slice(html.indexOf('id="oa-panel-body"'), html.indexOf("</header>"));
+    expect(details).toContain("2 KB");
+    expect(details).toContain("7 views");
+    expect(details).toContain("A description");
+  });
+
+  it("does not repeat the version in the inline meta (the picker chip already shows it)", () => {
+    const html = renderViewerShell(managerVm(), NONCE);
+    const inline = html.slice(html.indexOf('class="oa-meta oa-meta-inline"'), html.indexOf("</ul>", html.indexOf('class="oa-meta oa-meta-inline"')));
+    expect(inline).not.toContain("Version");
+  });
+
   describe("visibility control", () => {
-    it("carries the share id and marks the current mode selected", () => {
-      const html = renderViewerShell(managerVm({ shareId: "share-xyz", shareMode: "password" }), NONCE);
-      expect(html).toContain('<details class="oa-share-mode" data-share-id="share-xyz">');
-      expect(html).toContain('<option value="password" selected>Password protected</option>');
-      expect(html).toContain("Visibility: Password protected");
+    const row = (html: string, mode: string) => {
+      const start = html.indexOf(`data-mode="${mode}"`);
+      return html.slice(html.lastIndexOf("<button", start), html.indexOf("</button>", start));
+    };
+
+    it("carries the share id", () => {
+      const html = renderViewerShell(managerVm({ shareId: "share-xyz" }), NONCE);
+      expect(html).toContain('<details class="oa-pop oa-share-mode" data-share-id="share-xyz">');
+    });
+
+    it("marks only the current mode as checked and makes it the single tab stop", () => {
+      const html = renderViewerShell(managerVm({ shareMode: "password" }), NONCE);
+      expect(row(html, "password")).toContain('aria-checked="true"');
+      expect(row(html, "password")).toContain('tabindex="0"');
+      expect(row(html, "team")).toContain('aria-checked="false"');
+      expect(row(html, "team")).toContain('tabindex="-1"');
+      expect(row(html, "public")).toContain('aria-checked="false"');
+    });
+
+    it("shows the current mode on the trigger chip, with a screen-reader prefix", () => {
+      const html = renderViewerShell(managerVm({ shareMode: "password" }), NONCE);
+      expect(html).toContain('<span id="oa-mode-summary-label">Password protected</span>');
+      expect(html).toContain('<span class="oa-sr-only">Visibility: </span>');
+    });
+
+    it("offers a hidden password field and a 'Set password' button", () => {
+      const html = renderViewerShell(managerVm(), NONCE);
+      expect(html).toMatch(/<div class="oa-mode-pw" hidden>/);
+      expect(html).toContain('id="oa-mode-pw-apply"');
+      expect(html).toContain(">Set password<");
+    });
+
+    it("no longer relies on a native <select> + Apply button", () => {
+      const html = renderViewerShell(managerVm(), NONCE);
+      expect(html).not.toContain("<select");
+      expect(html).not.toContain('id="oa-mode-apply"');
     });
 
     it("renders 'public' as disabled with an explanation when the team's policy forbids it", () => {
       const html = renderViewerShell(managerVm({ allowedModes: ["team", "password"] }), NONCE);
-      expect(html).toContain('<option value="public" disabled>Public (disabled for this team)</option>');
+      expect(row(html, "public")).toContain(" disabled");
+      expect(row(html, "public")).toContain("Disabled for this team");
     });
 
     it("leaves 'public' enabled when the team's policy allows it", () => {
       const html = renderViewerShell(managerVm({ allowedModes: ["team", "password", "public"] }), NONCE);
-      expect(html).toContain('<option value="public">Public</option>');
+      expect(row(html, "public")).not.toContain(" disabled");
+      expect(row(html, "public")).not.toContain("Disabled for this team");
+    });
+
+    it("moves the tab stop to the first pickable row when the current mode is no longer allowed", () => {
+      const html = renderViewerShell(managerVm({ shareMode: "public", allowedModes: ["team", "password"] }), NONCE);
+      expect(row(html, "public")).toContain('aria-checked="true"');
+      expect(row(html, "public")).toContain('tabindex="-1"');
+      expect(row(html, "team")).toContain('tabindex="0"');
     });
 
     it("escapes a hostile share id instead of rendering it as markup", () => {
       const html = renderViewerShell(managerVm({ shareId: XSS }), NONCE);
       expect(html).not.toContain("<img src=x onerror=alert(1)>");
+    });
+
+    it("saves on selection: the panel script PATCHes the share and updates in place, without a reload", () => {
+      const html = renderViewerShell(managerVm(), NONCE);
+      expect(html).toContain("method:'PATCH'");
+      expect(html).not.toContain("location.reload");
     });
   });
 });
