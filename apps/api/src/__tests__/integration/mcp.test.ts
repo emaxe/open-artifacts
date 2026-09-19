@@ -189,6 +189,37 @@ describe("MCP server", () => {
     await clientWithOrg.close();
   });
 
+  it("annotates every tool with behaviour hints so a client can tell reads from destructive calls before invoking", async () => {
+    const app = buildTestApp();
+    const { orgId, sessionCookie } = await registerAndLogin(app);
+    const apiKey = await issueKey(app, orgId, sessionCookie, ["artifacts:read"]);
+
+    const port = await startServer();
+    const client = await connectClient(port, apiKey);
+    const { tools } = await client.listTools();
+    await client.close();
+
+    const readOnly = ["whoami", "list_orgs", "list_artifacts", "get_artifact", "get_storage_quota", "list_artifact_files", "list_shares"];
+    const write = ["create_artifact", "update_artifact", "create_share"];
+    const destructive = ["delete_artifact", "delete_artifact_file", "revoke_share"];
+
+    // Every registered tool must be classified here — adding a tool without deciding its hints fails this.
+    expect(tools.map((t) => t.name).sort()).toEqual([...readOnly, ...write, ...destructive].sort());
+
+    const byName = new Map(tools.map((t) => [t.name, t.annotations]));
+    for (const [name, annotations] of byName) {
+      expect(annotations, `${name} has no annotations`).toBeDefined();
+      expect(annotations!.openWorldHint, `${name} openWorldHint`).toBe(false);
+    }
+    for (const name of readOnly) expect(byName.get(name)!.readOnlyHint, `${name} readOnlyHint`).toBe(true);
+    for (const name of write) {
+      expect(byName.get(name)).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    }
+    for (const name of destructive) {
+      expect(byName.get(name)).toMatchObject({ readOnlyHint: false, destructiveHint: true, idempotentHint: true });
+    }
+  });
+
   it("rejects a request with no Authorization header before the MCP protocol even starts", async () => {
     const port = await startServer();
     const res = await fetch(`http://localhost:${port}/mcp`, {

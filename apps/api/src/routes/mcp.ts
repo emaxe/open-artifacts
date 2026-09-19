@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { AppBindings, Identity } from "../types.js";
 import type { Database } from "../db/client.js";
@@ -43,6 +43,18 @@ function ok(payload: unknown): CallToolResult {
 function toolError(message: string): CallToolResult {
   return { content: [{ type: "text", text: message }], isError: true };
 }
+
+/**
+ * Behaviour hints the MCP client can show before the agent calls a tool. Every tool here only
+ * touches this instance's own database/storage, never an external system, so `openWorldHint` is
+ * false throughout. `destructiveHint`/`idempotentHint` are omitted on read-only tools — the spec
+ * ignores them when `readOnlyHint` is true.
+ */
+const READ_ONLY: ToolAnnotations = { readOnlyHint: true, openWorldHint: false };
+/** Creates or changes something, but never removes it. `update_artifact` is not idempotent: each call appends a version. */
+const WRITE: ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
+/** Removes or revokes something. Repeating the call leaves the state unchanged (second call reports not-found or re-revokes). */
+const DESTRUCTIVE: ToolAnnotations = { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false };
 
 const artifactKindSchema = z.enum(["html", "markdown", "mermaid", "svg"]);
 const visibilitySchema = z.enum(["private", "org"]);
@@ -96,7 +108,7 @@ function createMcpServer(
 
   server.registerTool(
     "whoami",
-    { description: "Identify the current caller: agent/personal-key identity, its teams, and what scopes it carries." },
+    { description: "Identify the current caller: agent/personal-key identity, its teams, and what scopes it carries.", annotations: READ_ONLY },
     async (): Promise<CallToolResult> => {
       if (identity.kind === "agent") return ok({ kind: "agent", agentId: identity.agentId, orgId: identity.orgId, scopes: identity.scopes });
 
@@ -109,7 +121,10 @@ function createMcpServer(
 
   server.registerTool(
     "list_orgs",
-    { description: "List the teams this identity can act in — use this to ask the user which team to publish/list in when there's more than one." },
+    {
+      description: "List the teams this identity can act in — use this to ask the user which team to publish/list in when there's more than one.",
+      annotations: READ_ONLY,
+    },
     async (): Promise<CallToolResult> => {
       if (identity.kind === "agent") {
         const org = await db.query.orgs.findFirst({ where: eq(orgsTable.id, identity.orgId) });
@@ -123,6 +138,7 @@ function createMcpServer(
     "list_artifacts",
     {
       description: "List artifacts you can read in a team.",
+      annotations: READ_ONLY,
       inputSchema: { orgId: z.string().uuid().optional().describe("Team id — omit to use the connection's default team, or when you belong to only one") },
     },
     async ({ orgId }): Promise<CallToolResult> => {
@@ -154,6 +170,7 @@ function createMcpServer(
     "get_artifact",
     {
       description: "Fetch an artifact's metadata and current content by id.",
+      annotations: READ_ONLY,
       inputSchema: { id: z.string().uuid().describe("Artifact id") },
     },
     async ({ id }): Promise<CallToolResult> => {
@@ -190,6 +207,7 @@ function createMcpServer(
     "create_artifact",
     {
       description: "Publish a new artifact (HTML/Markdown/Mermaid/SVG). Returns its id — pass that to create_share to get a link a human can open.",
+      annotations: WRITE,
       inputSchema: {
         title: z.string().min(1).max(200),
         kind: artifactKindSchema,
@@ -238,6 +256,7 @@ function createMcpServer(
     "update_artifact",
     {
       description: "Update an artifact's content (creates a new version, keeps history) and/or its metadata.",
+      annotations: WRITE,
       inputSchema: {
         id: z.string().uuid(),
         content: z.string().min(1).optional(),
@@ -280,7 +299,7 @@ function createMcpServer(
 
   server.registerTool(
     "delete_artifact",
-    { description: "Delete an artifact.", inputSchema: { id: z.string().uuid() } },
+    { description: "Delete an artifact.", annotations: DESTRUCTIVE, inputSchema: { id: z.string().uuid() } },
     async ({ id }): Promise<CallToolResult> => {
       if (!requiresScope(identity, "artifacts:delete")) return toolError("Missing scope: artifacts:delete");
       const artifact = await getArtifact(db, id);
@@ -303,6 +322,7 @@ function createMcpServer(
         "operation, done via the REST API or the CLI's `oa files upload`, not over this text protocol); use " +
         "it only to decide whether the upload is worth attempting and to size it against `maxFileBytes`. " +
         "`limitBytes: null` means unlimited.",
+      annotations: READ_ONLY,
       inputSchema: {
         orgId: z.string().uuid().optional().describe("Team id — omit to use the connection's default team, or when you belong to only one"),
         artifactId: z.string().uuid().optional().describe("Narrow the answer to one artifact's own remaining quota, in addition to the team-wide number"),
@@ -328,7 +348,7 @@ function createMcpServer(
 
   server.registerTool(
     "list_artifact_files",
-    { description: "List files uploaded and attached to an artifact.", inputSchema: { artifactId: z.string().uuid() } },
+    { description: "List files uploaded and attached to an artifact.", annotations: READ_ONLY, inputSchema: { artifactId: z.string().uuid() } },
     async ({ artifactId }): Promise<CallToolResult> => {
       if (!requiresScope(identity, "artifacts:read")) return toolError("Missing scope: artifacts:read");
       const artifact = await getArtifact(db, artifactId);
@@ -345,7 +365,11 @@ function createMcpServer(
 
   server.registerTool(
     "delete_artifact_file",
-    { description: "Delete one file previously attached to an artifact.", inputSchema: { artifactId: z.string().uuid(), fileId: z.string().uuid() } },
+    {
+      description: "Delete one file previously attached to an artifact.",
+      annotations: DESTRUCTIVE,
+      inputSchema: { artifactId: z.string().uuid(), fileId: z.string().uuid() },
+    },
     async ({ artifactId, fileId }): Promise<CallToolResult> => {
       if (!requiresScope(identity, "artifacts:write")) return toolError("Missing scope: artifacts:write");
       const artifact = await getArtifact(db, artifactId);
@@ -368,6 +392,7 @@ function createMcpServer(
         "team's configured default (usually 'team') — that is almost always the right choice; only " +
         "name a mode when the human asked for that specific kind of link. The response echoes back " +
         "the mode that was actually used.",
+      annotations: WRITE,
       inputSchema: {
         artifactId: z.string().uuid(),
         mode: shareModeSchema
@@ -420,7 +445,7 @@ function createMcpServer(
 
   server.registerTool(
     "list_shares",
-    { description: "List share links created for an artifact.", inputSchema: { artifactId: z.string().uuid() } },
+    { description: "List share links created for an artifact.", annotations: READ_ONLY, inputSchema: { artifactId: z.string().uuid() } },
     async ({ artifactId }): Promise<CallToolResult> => {
       const artifact = await getArtifact(db, artifactId);
       if (!artifact) return toolError("Artifact not found");
@@ -445,7 +470,7 @@ function createMcpServer(
 
   server.registerTool(
     "revoke_share",
-    { description: "Revoke a share link so it stops working.", inputSchema: { shareId: z.string().uuid() } },
+    { description: "Revoke a share link so it stops working.", annotations: DESTRUCTIVE, inputSchema: { shareId: z.string().uuid() } },
     async ({ shareId }): Promise<CallToolResult> => {
       if (!requiresScope(identity, "shares:write")) return toolError("Missing scope: shares:write");
       const share = await db.query.shares.findFirst({ where: (s, { eq }) => eq(s.id, shareId) });
