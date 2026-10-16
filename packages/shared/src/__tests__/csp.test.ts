@@ -46,6 +46,7 @@ describe("buildViewerShellCsp", () => {
     expect(csp).toContain("style-src 'nonce-abc123'");
     expect(csp).toContain("img-src 'self'");
     expect(csp).toContain("frame-src 'self'");
+    expect(csp).toContain("font-src 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
   });
 

@@ -4,12 +4,13 @@
  * Run `pnpm --filter @open-artifacts/shared gen:tokens` after editing — it rewrites
  *   src/design/tokens.css   imported by apps/web and apps/landing (Vite resolves the font URLs)
  *   src/design/tokens.ts    `tokensCss` + `fontFaceCss()` inlined by the API viewer / artifact pages
+ *   apps/web/public/fonts   copy of the woff2 files, served at /fonts by the API
  * and a test keeps both in sync with this file.
  *
  * Direction: "Sand and moss" (taste-skill draw, seed 813168698). One ground, one ink, one moss accent,
  * tonal steps instead of lines/shadows. Dark theme keeps the same roles on a deep moss-black ground.
  */
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, copyFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -143,4 +144,8 @@ export function fontFaceCss(base = "/fonts/"): string {
 }
 `,
 );
+// The API's public viewer serves the same woff2 files from /fonts (apps/web/public is served at "/").
+const publicFonts = join(root, "..", "..", "..", "..", "apps", "web", "public", "fonts");
+mkdirSync(publicFonts, { recursive: true });
+for (const f of readdirSync(join(root, "fonts"))) copyFileSync(join(root, "fonts", f), join(publicFonts, f));
 console.log("tokens written to", root);

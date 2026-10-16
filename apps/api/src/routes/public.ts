@@ -17,6 +17,7 @@ import { parseVersionParam, resolveDisplayVersion } from "../services/viewer-ver
 import { buildViewerModel } from "../services/viewer-panel.js";
 import { contentDispositionValue } from "../services/download-name.js";
 import { renderViewerShell, renderPasswordFormPage, renderRestrictedPage, renderErrorPage } from "../views/viewer-shell.js";
+import { pickViewerLang, VIEWER_STRINGS } from "../views/viewer-i18n.js";
 
 export const publicRoutes = new Hono<AppBindings>();
 
@@ -53,22 +54,24 @@ publicRoutes.get("/s/:token", async (c) => {
   const token = c.req.param("token");
   const nonce = nanoid(16);
   c.header("Cache-Control", "private, no-store");
-  c.header("Vary", "Cookie");
+  c.header("Vary", "Cookie, Accept-Language");
   c.header("X-Content-Type-Options", "nosniff");
   c.header("Referrer-Policy", "no-referrer");
+  const lang = pickViewerLang(c.req.header("accept-language"));
+  const str = VIEWER_STRINGS[lang];
 
   const result = await resolveShareAndAccess(c, token);
   if (!result.share) {
     c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
-    return c.html(renderErrorPage("This link does not exist.", nonce), 404);
+    return c.html(renderErrorPage(str.notFound, nonce, lang), 404);
   }
   if (!result.artifact) {
     c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
-    return c.html(renderErrorPage("This link does not exist.", nonce), 404);
+    return c.html(renderErrorPage(str.notFound, nonce, lang), 404);
   }
   if (result.liveness !== "live") {
     c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
-    return c.html(renderErrorPage("This link is no longer available.", nonce), 410);
+    return c.html(renderErrorPage(str.noLongerAvailable, nonce, lang), 410);
   }
   const { share, artifact, ctx, access } = result;
 
@@ -77,11 +80,11 @@ publicRoutes.get("/s/:token", async (c) => {
       case "revoked":
       case "expired":
         c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
-        return c.html(renderErrorPage("This link is no longer available.", nonce), 410);
+        return c.html(renderErrorPage(str.noLongerAvailable, nonce, lang), 410);
       case "password_required":
       case "password_incorrect":
         c.header("Content-Security-Policy", buildViewerShellCsp({ nonce, allowConnectSelf: true }));
-        return c.html(renderPasswordFormPage(nonce));
+        return c.html(renderPasswordFormPage(nonce, lang));
       case "login_required": {
         const wantsHtml = (c.req.header("accept") ?? "").includes("text/html");
         if (!wantsHtml) return c.json({ error: { code: "login_required" } }, 401);
@@ -90,7 +93,7 @@ publicRoutes.get("/s/:token", async (c) => {
       case "not_a_member": {
         c.header("Content-Security-Policy", buildViewerShellCsp({ nonce }));
         const loginUrl = `/login?next=${encodeURIComponent(`/s/${token}`)}`;
-        return c.html(renderRestrictedPage(loginUrl, nonce), 403);
+        return c.html(renderRestrictedPage(loginUrl, nonce, lang), 403);
       }
     }
   }
@@ -103,14 +106,14 @@ publicRoutes.get("/s/:token", async (c) => {
   // 'none'; this response is `private, no-store` with `Vary: Cookie`, so there's no cache-confusion
   // risk in varying it per viewer.
   c.header("Content-Security-Policy", buildViewerShellCsp({ nonce, allowConnectSelf: ctx.canManage }));
-  if (!resolved) return c.html(renderErrorPage("No content available.", nonce), 404);
+  if (!resolved) return c.html(renderErrorPage(str.noContent, nonce, lang), 404);
 
   // Only the manager branch renders the visibility control, so only it needs the team's share
   // policy (whether `public` is currently choosable) — an extra DB read the anon/member majority
   // of this route's traffic never pays for.
   const policy = ctx.canManage ? await resolveSharePolicyForRequest(db, c.get("env"), artifact.orgId) : undefined;
   const vm = await buildViewerModel(db, { token, share, artifact, resolved, ctx, policy });
-  return c.html(renderViewerShell(vm, nonce));
+  return c.html(renderViewerShell(vm, nonce, lang));
 });
 
 publicRoutes.post("/s/:token/unlock", async (c) => {

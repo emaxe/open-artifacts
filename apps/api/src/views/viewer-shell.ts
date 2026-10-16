@@ -1,6 +1,7 @@
 import type { ArtifactKind, ShareMode } from "@open-artifacts/shared";
 import { escapeHtml, truncate } from "../services/html.js";
 import { VIEWER_CSS } from "./viewer-styles.js";
+import { VIEWER_STRINGS, type ViewerLang, type ViewerStrings } from "./viewer-i18n.js";
 
 /**
  * `manager` = full write access (`resolveOrgArtifactAccess.write`): the artifact's owner, an
@@ -83,20 +84,6 @@ const KIND_LABELS: Record<ArtifactKind, string> = {
   mermaid: "Mermaid",
 };
 
-// English-only, like the rest of this shell's chrome — a separate vocabulary from the Russian
-// SHARE_MODE_LABELS in apps/web/src/lib/labels.ts, which serves the cabinet UI instead.
-const SHARE_MODE_LABELS: Record<ShareMode, string> = {
-  team: "Team only",
-  password: "Password protected",
-  public: "Public",
-};
-
-const SHARE_MODE_HINTS: Record<ShareMode, string> = {
-  team: "Signed-in members of this team",
-  password: "Anyone with the link and the password",
-  public: "Anyone with the link",
-};
-
 const SHARE_MODE_ICONS: Record<ShareMode, IconName> = {
   team: "users",
   password: "lock",
@@ -147,12 +134,12 @@ function formatBytes(n: number): string {
   return `${rounded} ${units[i]}`;
 }
 
-function formatDateShort(d: Date): string {
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+function formatDateShort(d: Date, locale: string): string {
+  return d.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" });
 }
 
-function formatDateTime(d: Date): string {
-  return d.toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+function formatDateTime(d: Date, locale: string): string {
+  return d.toLocaleString(locale, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 /**
@@ -169,13 +156,15 @@ function formatDateTime(d: Date): string {
 const HEAD_BOOT_SCRIPT = `(function(){try{var t=localStorage.getItem('oa_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}var open=false;try{open=localStorage.getItem('oa.viewer.details')==='open';}catch(e){}if(!open){document.documentElement.setAttribute('data-oa-panel','collapsed');}})();`;
 
 /**
- * Runs at the end of `<body>` on the viewer shell only. Also contains zero server-supplied data —
+ * Runs at the end of `<body>` on the viewer shell only. Contains zero server-supplied data (the only
+ * interpolation is the static interface-string table from viewer-i18n.ts, JSON-encoded) —
  * everything it reads comes from `window.location` or from the DOM it is attached to (including the
  * visibility control's row labels and icons, which it copies rather than duplicating), which is
  * precisely what keeps this script safe to serve alongside artifact/team/user-supplied strings
  * elsewhere on the same page: there is no template hole here for an escaping mistake to land in.
  */
-const PANEL_SCRIPT = `(function(){
+function panelScript(m: ViewerStrings["script"]): string {
+  return `(function(){
   var root=document.documentElement;
   var live=document.getElementById('oa-live');
   function announce(msg){
@@ -188,7 +177,7 @@ const PANEL_SCRIPT = `(function(){
   if(toggle){
     var syncToggle=function(){
       var collapsed=root.getAttribute('data-oa-panel')==='collapsed';
-      var label=collapsed?'Show details':'Hide details';
+      var label=collapsed?${JSON.stringify(m.showDetails)}:${JSON.stringify(m.hideDetails)};
       toggle.setAttribute('aria-expanded',String(!collapsed));
       toggle.setAttribute('aria-label',label);
       toggle.setAttribute('title',label);
@@ -253,8 +242,8 @@ const PANEL_SCRIPT = `(function(){
       function onCopied(){
         e.preventDefault();
         var original=copyBtn.textContent;
-        copyBtn.textContent='Copied!';
-        announce('Link copied');
+        copyBtn.textContent=${JSON.stringify(m.copied)};
+        announce(${JSON.stringify(m.linkCopied)});
         setTimeout(function(){copyBtn.textContent=original;},1500);
       }
       // navigator.clipboard is unavailable on insecure origins (plain HTTP) and its write can
@@ -317,8 +306,8 @@ const PANEL_SCRIPT = `(function(){
       sumLabel.textContent=label;
       pwInput.value='';
       pwWrap.hidden=true;
-      statusEl.textContent='Visibility updated';
-      announce('Visibility changed to '+label);
+      statusEl.textContent=${JSON.stringify(m.visibilityUpdated)};
+      announce(${JSON.stringify(m.visibilityChangedTo)}+label);
       setTimeout(function(){
         if(!details.open)return;
         var hadFocus=details.contains(document.activeElement);
@@ -330,7 +319,7 @@ const PANEL_SCRIPT = `(function(){
       if(busy)return;
       clearFeedback();
       setBusy(true,row);
-      statusEl.textContent='Saving\\u2026';
+      statusEl.textContent=${JSON.stringify(m.saving)};
       var payload={mode:mode};
       if(password)payload.password=password;
       function failed(msg){
@@ -346,14 +335,14 @@ const PANEL_SCRIPT = `(function(){
       }).then(function(res){
         if(res.ok){onSaved(row);return;}
         return res.json().catch(function(){return {};}).then(function(body){
-          failed((body&&body.error&&body.error.message)||'Could not change visibility.');
+          failed((body&&body.error&&body.error.message)||${JSON.stringify(m.couldNotChange)});
         });
-      }).catch(function(){failed('Could not change visibility.');});
+      }).catch(function(){failed(${JSON.stringify(m.couldNotChange)});});
     }
     function submitPassword(){
       var value=pwInput.value;
       if(value.length<4){
-        showError('Password must be at least 4 characters.');
+        showError(${JSON.stringify(m.passwordTooShort)});
         pwInput.focus();
         return;
       }
@@ -406,21 +395,22 @@ const PANEL_SCRIPT = `(function(){
     });
   })(document.querySelector('.oa-share-mode'));
 })();`;
-
-function documentShell(opts: { title: string; nonce: string; bodyClass?: string; headExtra?: string; body: string }): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${opts.title}</title><style nonce="${opts.nonce}">${VIEWER_CSS}</style><script nonce="${opts.nonce}">${HEAD_BOOT_SCRIPT}</script>${opts.headExtra ?? ""}</head><body${opts.bodyClass ? ` class="${opts.bodyClass}"` : ""}>${opts.body}</body></html>`;
 }
 
-function renderVersionPicker(vm: ManagerModel): string {
+function documentShell(opts: { title: string; nonce: string; lang: ViewerLang; bodyClass?: string; headExtra?: string; body: string }): string {
+  return `<!doctype html><html lang="${VIEWER_STRINGS[opts.lang].htmlLang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${opts.title}</title><style nonce="${opts.nonce}">${VIEWER_CSS}</style><script nonce="${opts.nonce}">${HEAD_BOOT_SCRIPT}</script>${opts.headExtra ?? ""}</head><body${opts.bodyClass ? ` class="${opts.bodyClass}"` : ""}>${opts.body}</body></html>`;
+}
+
+function renderVersionPicker(vm: ManagerModel, str: ViewerStrings): string {
   const items = vm.versions
     .map((v) => {
-      const tag = v.isPinned ? " (pinned)" : v.isCurrent ? " (current)" : "";
+      const tag = v.isPinned ? ` (${str.pinned})` : v.isCurrent ? ` (${str.current})` : "";
       const msg = v.message ? `<span class="oa-version-msg">${escapeHtml(truncate(v.message, 80))}</span>` : "";
-      return `<a href="${escapeHtml(v.href)}" aria-current="${v.isActive}"><span>Version ${v.versionNo}${escapeHtml(tag)} — ${escapeHtml(formatDateShort(v.createdAt))}</span>${msg}</a>`;
+      return `<a href="${escapeHtml(v.href)}" aria-current="${v.isActive}"><span>${str.versionWord} ${v.versionNo}${escapeHtml(tag)} · ${escapeHtml(formatDateShort(v.createdAt, str.dateLocale))}</span>${msg}</a>`;
     })
     .join("");
-  const more = vm.versionsTruncated ? `<div class="oa-versions-more">Showing the most recent versions only.</div>` : "";
-  return `<details class="oa-pop oa-versions"><summary class="oa-btn oa-chip" title="Switch version"><span>Version ${vm.versionNo}</span>${icon("chevron", "oa-chevron")}</summary><div class="oa-pop-menu oa-versions-menu"><p class="oa-pop-title">Versions</p>${items}${more}</div></details>`;
+  const more = vm.versionsTruncated ? `<div class="oa-versions-more">${str.versionsMore}</div>` : "";
+  return `<details class="oa-pop oa-versions"><summary class="oa-btn oa-chip" title="${str.switchVersion}"><span>${str.versionWord} ${vm.versionNo}</span>${icon("chevron", "oa-chevron")}</summary><div class="oa-pop-menu oa-versions-menu"><p class="oa-pop-title">${str.versionsTitle}</p>${items}${more}</div></details>`;
 }
 
 /**
@@ -433,7 +423,7 @@ function renderVersionPicker(vm: ManagerModel): string {
  * A mode the team's policy forbids is rendered as a disabled row (with the reason) rather than
  * hidden, so a manager can see it exists and why it can't be picked.
  */
-function renderShareModeControl(vm: ManagerModel): string {
+function renderShareModeControl(vm: ManagerModel, str: ViewerStrings): string {
   const isAllowed = (mode: ShareMode) => vm.allowedModes.includes(mode);
   // Roving tabindex: exactly one row is a Tab stop — the current mode, or the first pickable one
   // when the current mode is itself no longer allowed (a disabled row cannot take focus).
@@ -441,16 +431,16 @@ function renderShareModeControl(vm: ManagerModel): string {
 
   const rows = SHARE_MODES.map((mode) => {
     const allowed = isAllowed(mode);
-    const hint = allowed ? SHARE_MODE_HINTS[mode] : "Disabled for this team";
-    return `<button type="button" class="oa-mode-opt" role="menuitemradio" data-mode="${mode}" aria-checked="${mode === vm.shareMode}" tabindex="${mode === tabStop ? 0 : -1}"${allowed ? "" : " disabled"}>${icon(SHARE_MODE_ICONS[mode], "oa-mode-icon")}<span class="oa-mode-label">${escapeHtml(SHARE_MODE_LABELS[mode])}</span><span class="oa-mode-hint">${escapeHtml(hint)}</span>${icon("check", "oa-mode-check")}</button>`;
+    const hint = allowed ? str.shareModeHints[mode] : str.disabledForTeam;
+    return `<button type="button" class="oa-mode-opt" role="menuitemradio" data-mode="${mode}" aria-checked="${mode === vm.shareMode}" tabindex="${mode === tabStop ? 0 : -1}"${allowed ? "" : " disabled"}>${icon(SHARE_MODE_ICONS[mode], "oa-mode-icon")}<span class="oa-mode-label">${escapeHtml(str.shareModes[mode])}</span><span class="oa-mode-hint">${escapeHtml(hint)}</span>${icon("check", "oa-mode-check")}</button>`;
   }).join("");
 
   return `<details class="oa-pop oa-share-mode" data-share-id="${escapeHtml(vm.shareId)}">
-<summary class="oa-btn oa-chip" title="Who can open this link"><span class="oa-sr-only">Visibility: </span><span class="oa-icon" id="oa-mode-summary-icon">${svg(SHARE_MODE_ICONS[vm.shareMode])}</span><span id="oa-mode-summary-label">${escapeHtml(SHARE_MODE_LABELS[vm.shareMode])}</span>${icon("chevron", "oa-chevron")}</summary>
+<summary class="oa-btn oa-chip" title="${str.visibilityTitle}"><span class="oa-sr-only">${str.visibilityPrefix}</span><span class="oa-icon" id="oa-mode-summary-icon">${svg(SHARE_MODE_ICONS[vm.shareMode])}</span><span id="oa-mode-summary-label">${escapeHtml(str.shareModes[vm.shareMode])}</span>${icon("chevron", "oa-chevron")}</summary>
 <div class="oa-pop-menu oa-mode-menu">
-<p class="oa-pop-title" id="oa-mode-title">Who can open this link</p>
+<p class="oa-pop-title" id="oa-mode-title">${str.whoCanOpen}</p>
 <div class="oa-mode-list" role="menu" aria-labelledby="oa-mode-title">${rows}</div>
-<div class="oa-mode-pw" hidden><input type="password" id="oa-mode-pw" placeholder="New password" aria-label="New password" autocomplete="new-password" maxlength="200"><button type="button" id="oa-mode-pw-apply" class="oa-btn oa-btn-primary">Set password</button></div>
+<div class="oa-mode-pw" hidden><input type="password" id="oa-mode-pw" placeholder="${str.newPassword}" aria-label="${str.newPassword}" autocomplete="new-password" maxlength="200"><button type="button" id="oa-mode-pw-apply" class="oa-btn oa-btn-primary">${str.setPassword}</button></div>
 <p class="oa-pop-status" id="oa-mode-status"></p>
 <p class="oa-error" id="oa-mode-err" role="alert"></p>
 </div>
@@ -467,7 +457,7 @@ interface SecondaryAction {
  * Secondary actions: a single one stays a plain button (a menu of one is just an extra click); two
  * or more collapse into one "more" menu so the primary row keeps room for what matters.
  */
-function renderSecondaryActions(actions: SecondaryAction[]): string {
+function renderSecondaryActions(actions: SecondaryAction[], str: ViewerStrings): string {
   const attrs = (a: SecondaryAction) => (a.external ? ` target="_blank" rel="noopener noreferrer"` : "");
   if (actions.length === 0) return "";
   if (actions.length === 1) {
@@ -475,10 +465,11 @@ function renderSecondaryActions(actions: SecondaryAction[]): string {
     return `<a class="oa-btn" href="${escapeHtml(a.href)}"${attrs(a)}>${escapeHtml(a.label)}</a>`;
   }
   const items = actions.map((a) => `<a class="oa-menu-item" href="${escapeHtml(a.href)}"${attrs(a)}>${escapeHtml(a.label)}</a>`).join("");
-  return `<details class="oa-pop oa-more"><summary class="oa-btn oa-icon-btn" aria-label="More actions" title="More actions">${icon("dots")}</summary><div class="oa-pop-menu oa-more-menu">${items}</div></details>`;
+  return `<details class="oa-pop oa-more"><summary class="oa-btn oa-icon-btn" aria-label="${str.moreActions}" title="${str.moreActions}">${icon("dots")}</summary><div class="oa-pop-menu oa-more-menu">${items}</div></details>`;
 }
 
-export function renderViewerShell(vm: ViewerShellModel, nonce: string): string {
+export function renderViewerShell(vm: ViewerShellModel, nonce: string, lang: ViewerLang = "en"): string {
+  const str = VIEWER_STRINGS[lang];
   const kindLabel = KIND_LABELS[vm.kind];
   const escapedTitle = escapeHtml(vm.title);
 
@@ -486,25 +477,25 @@ export function renderViewerShell(vm: ViewerShellModel, nonce: string): string {
   // the stylesheet drops first as the viewport narrows. A manager already sees the version on its
   // picker chip, so it isn't repeated here.
   const primaryMeta: string[] = [];
-  if (vm.audience !== "manager") primaryMeta.push(`<li>Version ${vm.versionNo}</li>`);
+  if (vm.audience !== "manager") primaryMeta.push(`<li>${str.versionWord} ${vm.versionNo}</li>`);
   primaryMeta.push(
-    `<li data-hide="sm"><time datetime="${vm.versionDate.toISOString()}" title="${escapeHtml(formatDateTime(vm.versionDate))}">${escapeHtml(formatDateShort(vm.versionDate))}</time></li>`,
+    `<li data-hide="sm"><time datetime="${vm.versionDate.toISOString()}" title="${escapeHtml(formatDateTime(vm.versionDate, str.dateLocale))}">${escapeHtml(formatDateShort(vm.versionDate, str.dateLocale))}</time></li>`,
   );
   if (vm.audience === "member" || vm.audience === "manager") {
-    primaryMeta.push(`<li data-hide="md">By ${escapeHtml(vm.authorName)}</li>`, `<li data-hide="md">${escapeHtml(vm.orgName)}</li>`);
+    primaryMeta.push(`<li data-hide="md">${str.by} ${escapeHtml(vm.authorName)}</li>`, `<li data-hide="md">${escapeHtml(vm.orgName)}</li>`);
   }
 
-  const secondary: SecondaryAction[] = [{ label: "Download source", href: vm.downloadHref }];
+  const secondary: SecondaryAction[] = [{ label: str.downloadSource, href: vm.downloadHref }];
   if ((vm.audience === "member" || vm.audience === "manager") && vm.cabinetHref) {
-    secondary.push({ label: "Open in workspace", href: vm.cabinetHref, external: true });
+    secondary.push({ label: str.openInWorkspace, href: vm.cabinetHref, external: true });
   }
 
   const actions: string[] = [];
   if (vm.audience === "manager") {
-    actions.push(renderShareModeControl(vm), renderVersionPicker(vm));
+    actions.push(renderShareModeControl(vm, str), renderVersionPicker(vm, str));
   }
-  actions.push(`<a id="oa-copy" class="oa-btn" href="${escapeHtml(vm.canonicalHref)}">Copy link</a>`);
-  actions.push(renderSecondaryActions(secondary));
+  actions.push(`<a id="oa-copy" class="oa-btn" href="${escapeHtml(vm.canonicalHref)}">${str.copyLink}</a>`);
+  actions.push(renderSecondaryActions(secondary, str));
 
   // Only a manager has anything to expand (size, views, expiry, version note, description), so only
   // a manager gets the details block and its toggle; anon/member panels are a single fixed row.
@@ -512,37 +503,38 @@ export function renderViewerShell(vm: ViewerShellModel, nonce: string): string {
   if (vm.audience === "manager") {
     const detailMeta: string[] = [
       `<li>${formatBytes(vm.sizeBytes)}</li>`,
-      `<li>${vm.viewCount} view${vm.viewCount === 1 ? "" : "s"}</li>`,
-      `<li>${vm.expiresAt ? `Expires ${escapeHtml(formatDateShort(vm.expiresAt))}` : "Never expires"}</li>`,
+      `<li>${str.view(vm.viewCount)}</li>`,
+      `<li>${vm.expiresAt ? `${str.expires} ${escapeHtml(formatDateShort(vm.expiresAt, str.dateLocale))}` : str.neverExpires}</li>`,
     ];
     if (vm.versionMessage) detailMeta.push(`<li>“${escapeHtml(truncate(vm.versionMessage, 120))}”</li>`);
     const description = vm.description ? `<p class="oa-desc">${escapeHtml(truncate(vm.description, 200))}</p>` : "";
     details = `<div class="oa-panel-details" id="oa-panel-body"><ul class="oa-meta">${detailMeta.join("")}</ul>${description}</div>`;
     actions.push(
-      `<button type="button" id="oa-toggle" class="oa-btn oa-icon-btn oa-toggle" aria-expanded="false" aria-controls="oa-panel-body" aria-label="Show details" title="Show details">${icon("chevron")}</button>`,
+      `<button type="button" id="oa-toggle" class="oa-btn oa-icon-btn oa-toggle" aria-expanded="false" aria-controls="oa-panel-body" aria-label="${str.showDetails}" title="${str.showDetails}">${icon("chevron")}</button>`,
     );
   }
 
   const notice =
     vm.audience === "manager" && vm.nonDefaultNotice
-      ? `<div class="oa-banner">You're viewing an older version — visitors of this link see the current one. <a href="${escapeHtml(vm.nonDefaultNotice.canonicalHref)}">Back to the shared version</a></div>`
+      ? `<div class="oa-banner">${str.olderVersionNotice} <a href="${escapeHtml(vm.nonDefaultNotice.canonicalHref)}">${str.backToShared}</a></div>`
       : "";
 
   const body = `${notice}<header class="oa-panel">
 <div class="oa-panel-row">
-<div class="oa-panel-title"><a class="oa-logo" href="/" aria-label="Open Artifacts home"><img src="/brand/logo-mark.png" alt="" width="18" height="18"></a><h1 title="${escapedTitle}">${escapedTitle}</h1><span class="oa-kind">${kindLabel}</span><ul class="oa-meta oa-meta-inline">${primaryMeta.join("")}</ul></div>
+<div class="oa-panel-title"><a class="oa-logo" href="/" aria-label="${str.homeAria}"><img src="/brand/logo-mark.png" alt="" width="18" height="18"></a><h1 title="${escapedTitle}">${escapedTitle}</h1><span class="oa-kind">${kindLabel}</span><ul class="oa-meta oa-meta-inline">${primaryMeta.join("")}</ul></div>
 <div class="oa-actions">${actions.join("")}</div>
 </div>
 ${details}
 <span id="oa-live" class="oa-sr-only" role="status" aria-live="polite"></span>
 </header>
-<iframe class="oa-frame" title="Shared artifact content" src="${escapeHtml(vm.embedSrc)}" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"></iframe>
-<script nonce="${nonce}">${PANEL_SCRIPT}</script>`;
+<iframe class="oa-frame" title="${str.frameTitle}" src="${escapeHtml(vm.embedSrc)}" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"></iframe>
+<script nonce="${nonce}">${panelScript(str.script)}</script>`;
 
-  return documentShell({ title: escapedTitle, nonce, bodyClass: "oa-viewer", body });
+  return documentShell({ title: escapedTitle, nonce, lang, bodyClass: "oa-viewer", body });
 }
 
-export function renderPasswordFormPage(nonce: string): string {
+export function renderPasswordFormPage(nonce: string, lang: ViewerLang = "en"): string {
+  const str = VIEWER_STRINGS[lang];
   const script = `document.getElementById('f').addEventListener('submit', function (e) {
   e.preventDefault();
   var password = document.getElementById('pw').value;
@@ -554,26 +546,27 @@ export function renderPasswordFormPage(nonce: string): string {
   }).catch(function () { err.setAttribute('data-visible', 'true'); });
 });`;
   const body = `<div class="oa-page"><div class="oa-card">
-<h1>Password required</h1>
-<p>This shared artifact is protected. Enter the password to view it.</p>
+<h1>${str.passwordRequired}</h1>
+<p>${str.passwordIntro}</p>
 <form id="f">
-<input type="password" id="pw" placeholder="Password" autofocus autocomplete="current-password" />
-<button type="submit" class="oa-btn oa-btn-primary">Unlock</button>
-<p class="oa-error" id="err">Incorrect password.</p>
+<input type="password" id="pw" placeholder="${str.passwordPlaceholder}" autofocus autocomplete="current-password" />
+<button type="submit" class="oa-btn oa-btn-primary">${str.unlock}</button>
+<p class="oa-error" id="err">${str.incorrectPassword}</p>
 </form>
 </div></div>`;
-  return documentShell({ title: "Password required", nonce, headExtra: `<script nonce="${nonce}">${script}</script>`, body });
+  return documentShell({ title: str.passwordRequired, nonce, lang, headExtra: `<script nonce="${nonce}">${script}</script>`, body });
 }
 
-export function renderRestrictedPage(loginHref: string, nonce: string): string {
+export function renderRestrictedPage(loginHref: string, nonce: string, lang: ViewerLang = "en"): string {
+  const str = VIEWER_STRINGS[lang];
   const body = `<div class="oa-page"><div class="oa-card">
-<h1>Members only</h1>
-<p>This link is only available to members of that team. Ask whoever shared it to invite you, <a href="${escapeHtml(loginHref)}">log in as someone else</a>, or go to your workspace.</p>
+<h1>${str.membersOnly}</h1>
+<p>${str.restrictedBody(escapeHtml(loginHref))}</p>
 </div></div>`;
-  return documentShell({ title: "Restricted", nonce, body });
+  return documentShell({ title: str.restricted, nonce, lang, body });
 }
 
-export function renderErrorPage(message: string, nonce: string): string {
+export function renderErrorPage(message: string, nonce: string, lang: ViewerLang = "en"): string {
   const body = `<div class="oa-page"><div class="oa-card"><p>${escapeHtml(message)}</p></div></div>`;
-  return documentShell({ title: "Unavailable", nonce, body });
+  return documentShell({ title: VIEWER_STRINGS[lang].unavailable, nonce, lang, body });
 }

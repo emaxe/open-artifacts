@@ -63,6 +63,8 @@ export function buildViewerShellCsp(opts: ViewerShellCspOptions): string {
     "img-src 'self'",
     // The shell's only child resource is its own /embed/:token iframe — never a third party.
     "frame-src 'self'",
+    // The product typeface, self-hosted at /fonts (see packages/shared/src/design).
+    "font-src 'self'",
     `connect-src ${opts.allowConnectSelf ? "'self'" : "'none'"}`,
     "form-action 'self'",
     "base-uri 'none'",
