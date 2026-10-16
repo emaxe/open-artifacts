@@ -50,15 +50,15 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
       ref={ref}
       onClick={handleBackdropClick}
       onClose={onClose}
-      className={cn("m-auto w-full max-w-md rounded-card border border-border bg-panel p-0 text-fg backdrop:bg-black/50", className)}
+      className={cn("m-auto w-full max-w-md rounded-card bg-panel p-0 text-fg shadow-xl backdrop:bg-scrim", className)}
     >
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold">{title}</h2>
+      <div className="flex items-center justify-between px-5 pt-5 pb-2">
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
         <button type="button" onClick={onClose} aria-label="Закрыть" className="text-muted hover:text-fg">
           <XIcon size={16} />
         </button>
       </div>
-      <div className="p-4">{children}</div>
+      <div className="px-5 pb-5 pt-2">{children}</div>
     </dialog>
   );
 }

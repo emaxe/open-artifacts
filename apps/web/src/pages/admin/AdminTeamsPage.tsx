@@ -60,7 +60,7 @@ export function AdminTeamsPage() {
           <button
             key={k}
             onClick={() => { setPage(1); setKind(k); }}
-            className={`rounded-control px-3 py-1 font-medium ${kind === k ? "bg-panel text-fg shadow-sm" : "text-muted hover:text-fg"}`}
+            className={`rounded-control px-3 py-1 font-medium ${kind === k ? "bg-panel text-fg" : "text-muted hover:text-fg"}`}
           >
             {k === "team" ? "Команды" : k === "main" ? "Основные" : "Все"}
           </button>

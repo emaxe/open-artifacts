@@ -11,10 +11,13 @@ import { BrandPanel } from "./BrandPanel";
 import { LangToggle } from "./LangToggle";
 import { EXTERNAL_LINKS, APP_VERSION } from "./links";
 
-const THEME_LABELS = { light: "☀︎", system: "◐", dark: "☾" };
+const THEME_LABELS = {
+  ru: { light: "Светлая", system: "Авто", dark: "Тёмная" },
+  en: { light: "Light", system: "Auto", dark: "Dark" },
+};
 
 function AuthPageContent() {
-  const { t } = useAuthCopy();
+  const { t, lang } = useAuthCopy();
   const { me, loading } = useAuth();
   const [searchParams] = useSearchParams();
   const wide = useMediaQuery("(min-width: 1024px)");
@@ -51,7 +54,7 @@ function AuthPageContent() {
         <div className="flex items-center justify-end">
           <div className="flex items-center gap-2">
             <LangToggle />
-            <ThemeSwitch labels={THEME_LABELS} />
+            <ThemeSwitch labels={THEME_LABELS[lang]} />
           </div>
         </div>
 

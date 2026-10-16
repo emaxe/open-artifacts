@@ -41,7 +41,7 @@ export function SearchInput({ value, onChange, placeholder = "Поиск…", cl
         value={draft}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
-        className="h-9 w-full rounded-control border border-border bg-panel py-1.5 pr-8 pl-8 text-sm text-fg placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring max-md:h-11"
+        className="h-10 w-full rounded-control border border-border bg-panel py-1.5 pr-8 pl-8 text-[0.9375rem] text-fg placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring max-md:h-11"
       />
       {draft && (
         <button

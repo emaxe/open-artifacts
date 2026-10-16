@@ -76,7 +76,7 @@ export function DropdownMenu({ items, trigger, align = "right", label = "Дей�
         <div
           role="menu"
           className={cn(
-            "absolute top-full z-20 mt-1 min-w-40 rounded-control border border-border bg-panel py-1 shadow-lg",
+            "absolute top-full z-20 mt-1 min-w-40 rounded-control bg-panel py-1 shadow-lg",
             align === "right" ? "right-0" : "left-0",
           )}
         >

@@ -15,8 +15,8 @@ export function LangToggle() {
           type="button"
           aria-pressed={lang === value}
           onClick={() => setLang(value)}
-          className={`rounded-[calc(var(--radius-control)-2px)] px-2 py-1 text-xs font-medium uppercase ${
-            lang === value ? "bg-panel text-fg shadow-sm" : "text-muted hover:text-fg"
+          className={`rounded-[calc(var(--radius-control)-2px)] px-2 py-1 text-xs font-medium ${
+            lang === value ? "bg-panel text-fg" : "text-muted hover:text-fg"
           }`}
         >
           {value}

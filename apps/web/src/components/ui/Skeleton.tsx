@@ -2,7 +2,7 @@ import type { HTMLAttributes } from "react";
 import { cn } from "../../lib/cn";
 
 export function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("animate-pulse rounded-control bg-panel-muted", className)} {...props} />;
+  return <div className={cn("animate-pulse motion-reduce:animate-none rounded-control bg-panel-muted", className)} {...props} />;
 }
 
 /** A stand-in for a data table while it loads, matching Table's row rhythm. */

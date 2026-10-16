@@ -78,7 +78,7 @@ export function TeamSwitcher() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-control border border-border bg-panel px-2.5 py-2 text-left hover:bg-panel-muted"
+        className="flex w-full items-center justify-between gap-2 rounded-control bg-panel-muted px-2.5 py-2 text-left hover:bg-panel-muted"
       >
         {current ? (
           <OrgIdentity org={{ id: current.orgId, name: current.name, slug: current.slug, kind: current.kind }} size="sm" secondary="none" />
@@ -89,7 +89,7 @@ export function TeamSwitcher() {
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-96 overflow-y-auto rounded-control border border-border bg-panel p-2 shadow-lg">
+        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-96 overflow-y-auto rounded-control bg-panel shadow-lg p-2 shadow-lg">
           <SearchInput value={search} onChange={setSearch} placeholder="Поиск команды…" debounceMs={200} className="mb-2" />
 
           <OrgGroup label="Основное" orgs={mainOrgs} onSelect={goTo} />
@@ -127,7 +127,7 @@ function OrgGroup({
   if (orgs.length === 0) return null;
   return (
     <div className="mb-2 last:mb-0">
-      <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</p>
+      <p className="px-2 py-1 text-[0.8125rem] font-semibold text-muted">{label}</p>
       {orgs.map((ref) => (
         <button
           key={ref.id}

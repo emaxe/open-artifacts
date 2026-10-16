@@ -30,7 +30,7 @@ export function CopyButton({ value, label = "Копировать", copiedLabel 
       type="button"
       onClick={handleCopy}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-control border border-border bg-panel px-2.5 py-1 text-xs font-medium text-fg hover:bg-panel-muted",
+        "inline-flex items-center gap-1.5 rounded-control bg-panel-muted px-3 py-2 text-[0.8125rem] font-medium text-fg transition-colors duration-150 hover:bg-accent-soft",
         className,
       )}
     >

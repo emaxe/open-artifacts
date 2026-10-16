@@ -5,11 +5,9 @@ import { useAuth } from "../lib/auth";
 import { ORG_ROLE_LABELS, label, pluralRu } from "../lib/labels";
 import { PageContainer } from "../components/PageContainer";
 import { PageHeader } from "../components/ui/PageHeader";
-import { Card, CardHeader } from "../components/ui/Card";
 import { CodeBlock } from "../components/ui/CodeBlock";
 import { Spinner } from "../components/ui/Spinner";
 import { OrgIdentity } from "../components/OrgIdentity";
-import { MailIcon, PlugIcon, SettingsIcon, ShieldIcon, UsersIcon } from "../components/ui/icons";
 
 /** One row per team the user belongs to, with the member/artifact counts `Me.orgs` doesn't carry
  * — fetched from GET /orgs/:id (the same call TeamLayout makes), which stays scoped to the
@@ -47,86 +45,68 @@ export function HomePage() {
 
   return (
     <PageContainer>
-      <PageHeader title={`Здравствуйте, ${me.name}!`} description="Обзор ваших команд и быстрый старт для подключения ИИ-агентов." />
+      <PageHeader title={`Здравствуйте, ${me.name}`} />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard label="Команд" value={me.orgs.length} />
-        <StatCard label="Артефактов всего" value={totalArtifacts ?? "…"} />
-        <StatCard label="Ожидающих приглашений" value={me.pendingInviteCount} />
-      </div>
+      <p className="-mt-4 mb-10 max-w-2xl text-xl leading-snug text-fg md:text-2xl">
+        {me.orgs.length} {pluralRu(me.orgs.length, ["команда", "команды", "команд"])}
+        {totalArtifacts !== null && (
+          <>
+            , {totalArtifacts} {pluralRu(totalArtifacts, ["артефакт", "артефакта", "артефактов"])}
+          </>
+        )}
+        .{" "}
+        {me.pendingInviteCount > 0 && (
+          <Link to="/invites" className="font-semibold text-accent underline decoration-2 underline-offset-4 hover:no-underline">
+            {me.pendingInviteCount} {pluralRu(me.pendingInviteCount, ["приглашение ждёт", "приглашения ждут", "приглашений ждут"])} ответа
+          </Link>
+        )}
+      </p>
 
-      <div className="flex flex-col gap-4">
-        <Card>
-          <CardHeader title="Ваши команды" />
-          {!teams ? (
-            <Spinner />
-          ) : (
-            <div className="flex flex-col divide-y divide-border">
-              {teams.map((team) => (
-                <Link
-                  key={team.orgId}
-                  to={`/t/${team.orgId}`}
-                  className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0 hover:bg-panel-muted"
-                >
-                  <OrgIdentity org={{ id: team.orgId, name: team.name, slug: team.slug, kind: team.kind }} secondary="slug" />
-                  <div className="flex items-center gap-4 text-xs text-muted">
-                    <span>{label(ORG_ROLE_LABELS, team.role ?? "")}</span>
-                    <span>
-                      {team.artifactCount} {pluralRu(team.artifactCount, ["артефакт", "артефакта", "артефактов"])}
-                    </span>
-                    <span>
-                      {team.memberCount} {pluralRu(team.memberCount, ["участник", "участника", "участников"])}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </Card>
+      <section className="mb-12">
+        <h2 className="mb-3 text-lg font-semibold tracking-tight text-fg">Ваши команды</h2>
+        {!teams ? (
+          <Spinner />
+        ) : (
+          <div className="flex flex-col gap-1">
+            {teams.map((team) => (
+              <Link
+                key={team.orgId}
+                to={`/t/${team.orgId}`}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-card bg-panel px-5 py-4 transition-colors duration-150 hover:bg-accent-soft"
+              >
+                <OrgIdentity org={{ id: team.orgId, name: team.name, slug: team.slug, kind: team.kind }} secondary="slug" />
+                <div className="flex items-center gap-5 text-[0.9375rem] text-muted">
+                  <span>{label(ORG_ROLE_LABELS, team.role ?? "")}</span>
+                  <span className="tabular-nums">
+                    {team.artifactCount} {pluralRu(team.artifactCount, ["артефакт", "артефакта", "артефактов"])}
+                  </span>
+                  <span className="tabular-nums">
+                    {team.memberCount} {pluralRu(team.memberCount, ["участник", "участника", "участников"])}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
 
-        <Card>
-          <CardHeader title="Быстрый старт: подключение агента" description="Полная инструкция со всеми способами авторизации и MCP — на отдельной странице." />
-          <div className="mb-3">
-            <strong className="text-sm text-fg">1. Установите скилл в проект агента:</strong>
+      <section className="rounded-card bg-field p-6 text-field-fg md:p-8">
+        <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Подключите агента за две команды</h2>
+        <p className="mt-2 max-w-prose text-[0.9375rem] opacity-80">Полная инструкция со всеми способами авторизации и MCP на отдельной странице.</p>
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <div>
+            <strong className="text-[0.9375rem]">Установите скилл в проект агента</strong>
             <CodeBlock text="npx skills add emaxe/open-artifacts" />
           </div>
           <div>
-            <strong className="text-sm text-fg">2. Авторизуйте агента:</strong>
+            <strong className="text-[0.9375rem]">Авторизуйте агента</strong>
             <CodeBlock text={`oa login --server ${origin}`} />
           </div>
-          <Link to="/help/agents" className="mt-3 inline-block text-sm font-medium text-fg underline">
-            Подробная инструкция →
-          </Link>
-        </Card>
-
-        <Card>
-          <CardHeader title="Быстрые ссылки" />
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <QuickLink to="/teams" icon={<UsersIcon size={16} />} label="Команды" />
-            <QuickLink to="/invites" icon={<MailIcon size={16} />} label="Приглашения" />
-            <QuickLink to="/settings" icon={<SettingsIcon size={16} />} label="Настройки" />
-            <QuickLink to="/help/agents" icon={<PlugIcon size={16} />} label="Подключение агентов" />
-            {me.isSuperadmin && <QuickLink to="/admin" icon={<ShieldIcon size={16} />} label="Админка" />}
-          </div>
-        </Card>
-      </div>
+        </div>
+        <Link to="/help/agents" className="mt-6 inline-block text-[0.9375rem] font-semibold underline decoration-2 underline-offset-4 hover:no-underline">
+          Подробная инструкция →
+        </Link>
+      </section>
     </PageContainer>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <Card>
-      <div className="text-xs text-muted">{label}</div>
-      <div className="text-2xl font-semibold text-fg">{value}</div>
-    </Card>
-  );
-}
-
-function QuickLink({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) {
-  return (
-    <Link to={to} className="flex items-center gap-2 rounded-control border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-panel-muted">
-      {icon} {label}
-    </Link>
   );
 }

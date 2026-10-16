@@ -58,8 +58,6 @@ export function SettingsPage() {
             <Input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
           </Field>
 
-          <hr className="my-2 border-border" />
-
           <Field label="Новый пароль" hint="Оставьте пустым, если не хотите менять">
             <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
           </Field>

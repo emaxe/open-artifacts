@@ -8,10 +8,10 @@ export interface PageHeaderProps {
 
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-xl font-semibold text-fg">{title}</h1>
-        {description && <p className="mt-1 text-sm text-muted">{description}</p>}
+        <h1 className="text-3xl font-bold tracking-tight text-fg md:text-4xl">{title}</h1>
+        {description && <p className="mt-2 max-w-prose text-[0.9375rem] text-muted">{description}</p>}
       </div>
       {action}
     </div>

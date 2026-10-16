@@ -11,8 +11,8 @@ const THEME_LABELS = { light: "Светлая", system: "Системная", da
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm font-medium",
-    isActive ? "bg-panel-muted text-fg" : "text-muted hover:bg-panel-muted hover:text-fg",
+    "flex items-center gap-2.5 rounded-control px-3 py-2 text-[0.9375rem] font-medium transition-colors duration-150",
+    isActive ? "bg-accent-soft text-accent" : "text-muted hover:bg-panel-muted hover:text-fg",
   );
 
 /** The sidebar's nav content — rendered as a fixed desktop rail by Layout, and reused inside the mobile drawer's Dialog so there's exactly one nav to keep in sync. */
@@ -21,8 +21,8 @@ export function GlobalSidebar({ onNavigate }: { onNavigate?: () => void } = {}) 
   if (!me) return null;
 
   return (
-    <div className="flex h-full flex-col p-4">
-      <Link to="/home" className="mb-1 flex items-center gap-2 text-base font-semibold text-fg" onClick={onNavigate}>
+    <div className="flex h-full flex-col p-5">
+      <Link to="/home" className="mb-2 flex items-center gap-2 text-[1.0625rem] font-bold tracking-tight text-fg" onClick={onNavigate}>
         <LogoMark size={20} /> Open Artifacts
       </Link>
       <TeamSwitcher />
@@ -53,15 +53,15 @@ export function GlobalSidebar({ onNavigate }: { onNavigate?: () => void } = {}) 
         </NavLink>
       </nav>
 
-      <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
+      <div className="mt-4 flex flex-col gap-3 pt-4">
         <ThemeSwitch labels={THEME_LABELS} />
-        <p className="truncate text-xs text-muted" title={me.email}>
+        <p className="truncate text-[0.8125rem] text-muted" title={me.email}>
           {me.email}
         </p>
         <button
           type="button"
           onClick={() => logout()}
-          className="flex items-center justify-center gap-2 rounded-control border border-border bg-panel px-3 py-2 text-sm font-medium text-fg hover:bg-panel-muted"
+          className="flex items-center justify-center gap-2 rounded-control bg-panel-muted px-3 py-2 text-[0.9375rem] font-medium text-fg transition-colors duration-150 hover:bg-accent-soft"
         >
           <LogOutIcon size={15} /> Выйти
         </button>

@@ -25,12 +25,10 @@ export interface AuthErrorCopy {
 export interface AuthCopy {
   meta: { title: string };
   brand: {
-    badge: string;
     heading: string;
     bullets: string[];
     terminalReplay: string;
   };
-  demo: { frameTitle: string; fakeUrl: string; note: string };
   tabLogin: string;
   tabRegister: string;
   nameLabel: string;
@@ -54,19 +52,13 @@ export const AUTH_COPY: { ru: AuthCopy; en: AuthCopy } = {
   ru: {
     meta: { title: "Open Artifacts — вход" },
     brand: {
-      badge: "Open source · MIT · Self-hosted",
-      heading: "Артефакты ваших AI-агентов — одной ссылкой, на вашем сервере",
+      heading: "Артефакты AI-агентов одной ссылкой",
       bullets: [
         "Песочница нулевого доверия: без доступа к сессии и API хоста",
         "Свой сервер, свои данные — MIT-лицензия",
         "MCP, REST и CLI из коробки — подключается за одну команду",
       ],
       terminalReplay: "Повторить",
-    },
-    demo: {
-      frameTitle: "Демонстрационный артефакт",
-      fakeUrl: "https://ваш-сервер/s/9kQ2xR",
-      note: "sandbox=\"allow-scripts\", без allow-same-origin",
     },
     tabLogin: "Вход",
     tabRegister: "Регистрация",
@@ -100,19 +92,13 @@ export const AUTH_COPY: { ru: AuthCopy; en: AuthCopy } = {
   en: {
     meta: { title: "Open Artifacts — sign in" },
     brand: {
-      badge: "Open source · MIT · Self-hosted",
-      heading: "Your AI agents' artifacts — one link, on your own server",
+      heading: "Your agents' artifacts, one link",
       bullets: [
         "Zero-trust sandbox: no access to the host's session or API",
         "Your server, your data — MIT-licensed",
         "MCP, REST, and a CLI out of the box — one command to connect",
       ],
       terminalReplay: "Replay",
-    },
-    demo: {
-      frameTitle: "Demo artifact",
-      fakeUrl: "https://your-server/s/9kQ2xR",
-      note: "sandbox=\"allow-scripts\", no allow-same-origin",
     },
     tabLogin: "Sign in",
     tabRegister: "Sign up",

@@ -57,11 +57,9 @@ a {
 
 /*
  * Sign-in screen animations (pages/auth/). CSS + IntersectionObserver only — this app keeps zero
- * extra runtime deps (see lib/cn.ts's comment), so no framer-motion. Three pieces:
+ * extra runtime deps (see lib/cn.ts's comment), so no framer-motion. Pieces:
  *  - `.oa-caret`: the blinking cursor at the end of TerminalAnimation's still-typing line.
- *  - `.oa-auth-aurora`: the slow-drifting glow behind BrandPanel's copy.
- *  - `.oa-auth-grid`: BrandPanel's background grid, faded out toward the edges.
- * All three are killed outright under prefers-reduced-motion — TerminalAnimation.tsx already skips
+ * It is killed outright under prefers-reduced-motion — TerminalAnimation.tsx already skips
  * the *triggering* JS in that case, but this is the actual enforcement: even if a class ends up
  * applied, no motion reaches the screen.
  */
@@ -80,28 +78,9 @@ a {
   }
 }
 
-.oa-auth-aurora {
-  animation: oa-drift 18s ease-in-out infinite alternate;
-}
-@keyframes oa-drift {
-  to {
-    transform: translate3d(6%, -4%, 0) scale(1.08);
-  }
-}
-
-.oa-auth-grid {
-  background-image: linear-gradient(var(--oa-border) 1px, transparent 1px), linear-gradient(90deg, var(--oa-border) 1px, transparent 1px);
-  background-size: 32px 32px;
-  -webkit-mask-image: radial-gradient(ellipse at center, black 0%, transparent 75%);
-  mask-image: radial-gradient(ellipse at center, black 0%, transparent 75%);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .oa-caret {
     animation: none !important;
     opacity: 1;
-  }
-  .oa-auth-aurora {
-    animation: none !important;
   }
 }

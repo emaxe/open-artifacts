@@ -14,7 +14,7 @@ export interface TabItem {
  */
 export function Tabs({ items, className }: { items: TabItem[]; className?: string }) {
   return (
-    <nav className={cn("flex gap-1 border-b border-border", className)}>
+    <nav className={cn("inline-flex max-w-full gap-1 overflow-x-auto rounded-control bg-panel-muted p-1", className)}>
       {items.map((item) => (
         <NavLink
           key={item.to}
@@ -22,8 +22,8 @@ export function Tabs({ items, className }: { items: TabItem[]; className?: strin
           end={item.end}
           className={({ isActive }) =>
             cn(
-              "-mb-px border-b-2 px-3 py-2 text-sm font-medium",
-              isActive ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg",
+              "whitespace-nowrap rounded-control px-3.5 py-1.5 text-sm font-medium transition-colors duration-150",
+              isActive ? "bg-panel text-fg" : "text-muted hover:text-fg",
             )
           }
         >

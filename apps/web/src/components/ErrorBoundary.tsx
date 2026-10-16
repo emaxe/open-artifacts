@@ -28,7 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div className="flex flex-col items-center gap-3 rounded-card border border-border bg-panel p-8 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-card bg-panel p-8 text-center">
           <p className="text-sm font-medium text-fg">Что-то пошло не так</p>
           <p className="max-w-sm text-sm text-muted">{this.state.error.message}</p>
           <Button variant="secondary" onClick={() => this.setState({ error: null })}>

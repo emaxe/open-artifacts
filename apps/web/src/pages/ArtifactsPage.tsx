@@ -8,10 +8,13 @@ import { Button } from "../components/ui/Button";
 import { Input, Select, Textarea } from "../components/ui/Input";
 import { Field } from "../components/ui/Field";
 import { LifetimeSelect } from "../components/ui/LifetimeSelect";
-import { Table, THead, TBody, TR, TH, TD } from "../components/ui/Table";
+import { SearchInput } from "../components/ui/SearchInput";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { MailIcon } from "../components/ui/icons";
+
+const KINDS = ["all", "html", "markdown", "mermaid", "svg"] as const;
+const KIND_LABELS: Record<ArtifactSummary["kind"], string> = { html: "HTML", markdown: "Markdown", mermaid: "Mermaid", svg: "SVG" };
 
 export function ArtifactsPage() {
   const { orgId } = useParams();
@@ -19,6 +22,8 @@ export function ArtifactsPage() {
   const [orgDetail, setOrgDetail] = useState<OrgDetail | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [query, setQuery] = useState("");
+  const [kindFilter, setKindFilter] = useState<"all" | ArtifactSummary["kind"]>("all");
 
   async function load() {
     if (!orgId) return;
@@ -37,6 +42,9 @@ export function ArtifactsPage() {
   }, [orgId]);
 
   if (!orgId) return null;
+
+  const q = query.trim().toLowerCase();
+  const visible = artifacts.filter((a) => (kindFilter === "all" || a.kind === kindFilter) && (!q || a.title.toLowerCase().includes(q)));
 
   return (
     <>
@@ -66,7 +74,7 @@ export function ArtifactsPage() {
           title="Здесь пока пусто"
           description="Создайте первый артефакт вручную, подключите агента, который будет публиковать их за вас, или пригласите коллегу в команду."
           action={
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-center gap-2">
               <Button onClick={() => setShowCreate(true)}>Новый артефакт</Button>
               <Link to="/help/agents">
                 <Button variant="secondary">Подключить агента</Button>
@@ -78,36 +86,56 @@ export function ArtifactsPage() {
           }
         />
       ) : (
-        <Card className="p-0">
-          <Table>
-            <THead>
-              <TR>
-                <TH>Название</TH>
-                <TH>Тип</TH>
-                <TH>Видимость</TH>
-                <TH>Обновлён</TH>
-                <TH>Истекает</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {artifacts.map((a) => (
-                <TR key={a.id}>
-                  <TD>
-                    <Link to={`/t/${orgId}/artifacts/${a.id}`} className="font-medium text-fg hover:underline">
-                      {a.title}
-                    </Link>
-                  </TD>
-                  <TD>
-                    <Badge>{a.kind}</Badge>
-                  </TD>
-                  <TD>{a.visibility === "org" ? "команда" : "приватный"}</TD>
-                  <TD className="text-muted">{formatDateTime(a.updatedAt)}</TD>
-                  <TD className="text-muted">{formatExpiry(a.expiresAt)}</TD>
-                </TR>
+        <>
+          {artifacts.length > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <SearchInput value={query} onChange={setQuery} placeholder="Поиск по названию" className="w-full sm:w-72" />
+              <div className="flex gap-1 overflow-x-auto">
+                {KINDS.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={kindFilter === k}
+                    onClick={() => setKindFilter(k)}
+                    className={`whitespace-nowrap rounded-control px-3 py-2 text-[0.9375rem] font-medium transition-colors duration-150 ${
+                      kindFilter === k ? "bg-accent text-accent-fg" : "bg-panel-muted text-fg hover:bg-accent-soft"
+                    }`}
+                  >
+                    {k === "all" ? "Все" : KIND_LABELS[k]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {visible.length === 0 && artifacts.length > 0 ? (
+            <p className="py-10 text-center text-[0.9375rem] text-muted">Ничего не найдено. Измените запрос или фильтр.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {visible.map((a) => (
+                <li key={a.id}>
+                  <Link
+                    to={`/t/${orgId}/artifacts/${a.id}`}
+                    className="grid items-center gap-x-6 gap-y-1 rounded-card bg-panel px-5 py-4 transition-colors duration-150 hover:bg-accent-soft md:grid-cols-[minmax(0,1fr)_auto_7rem_11rem]"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-[1.0625rem] font-semibold tracking-tight text-fg">{a.title}</span>
+                      {a.description && <span className="block truncate text-[0.9375rem] text-muted">{a.description}</span>}
+                    </span>
+                    <span>
+                      <Badge>{KIND_LABELS[a.kind]}</Badge>
+                    </span>
+                    <span className="text-[0.9375rem] text-fg">{a.visibility === "org" ? "Команда" : "Приватный"}</span>
+                    <span className="text-[0.9375rem] text-muted md:text-right">
+                      {formatDateTime(a.updatedAt)}
+                      {a.expiresAt && <span className="block text-[0.8125rem]">Истекает {formatExpiry(a.expiresAt)}</span>}
+                    </span>
+                  </Link>
+                </li>
               ))}
-            </TBody>
-          </Table>
-        </Card>
+            </ul>
+          )}
+        </>
       )}
     </>
   );
@@ -140,7 +168,7 @@ function CreateArtifactForm({
   }
 
   return (
-    <Card className="mb-4">
+    <Card className="mb-6">
       <form onSubmit={onSubmit} className="flex flex-col gap-3">
         <Field label="Название" required>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} required />

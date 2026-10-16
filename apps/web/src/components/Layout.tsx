@@ -29,17 +29,17 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden w-56 shrink-0 border-r border-border bg-panel md:block">
+      <aside className="hidden w-60 shrink-0 bg-panel md:block">
         <GlobalSidebar />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-border bg-panel px-4 py-3 md:hidden">
+        <header className="flex items-center gap-3 bg-panel px-4 py-3 md:hidden">
           <IconButton label="Меню" onClick={() => setMobileNavOpen(true)}>
             <MenuIcon />
           </IconButton>
           <LogoMark size={20} />
-          <span className="text-sm font-semibold text-fg">Open Artifacts</span>
+          <span className="text-[0.9375rem] font-bold tracking-tight text-fg">Open Artifacts</span>
         </header>
 
         <main className="flex-1 overflow-y-auto">
@@ -48,7 +48,7 @@ export function Layout() {
       </div>
 
       <Dialog open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} title="Меню" className="m-0 ml-0 mr-auto h-full max-h-none w-72 max-w-[85vw] rounded-none">
-        <div className="-m-4">
+        <div className="-m-5">
           <GlobalSidebar onNavigate={() => setMobileNavOpen(false)} />
         </div>
       </Dialog>

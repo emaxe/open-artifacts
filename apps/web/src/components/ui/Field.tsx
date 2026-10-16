@@ -27,18 +27,18 @@ export function Field({ label, hint, error, required, children, className }: Fie
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor={id} className="text-sm font-medium text-fg">
+      <label htmlFor={id} className="text-[0.9375rem] font-medium text-fg">
         {label}
         {required && <span className="text-danger"> *</span>}
       </label>
       {control}
       {hint && !error && (
-        <p id={hintId} className="text-xs text-muted">
+        <p id={hintId} className="text-[0.8125rem] text-muted">
           {hint}
         </p>
       )}
       {error && (
-        <p id={errorId} className="text-xs text-danger">
+        <p id={errorId} className="text-[0.8125rem] text-danger">
           {error}
         </p>
       )}

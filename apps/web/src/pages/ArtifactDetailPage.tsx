@@ -259,7 +259,7 @@ export function ArtifactDetailPage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted">
+      <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-[0.9375rem] text-muted">
         <span>Истекает:</span>
         <Badge variant={expiresSoon ? "warning" : "neutral"}>{formatExpiry(artifact.expiresAt)}</Badge>
         {canWrite && (
@@ -274,12 +274,12 @@ export function ArtifactDetailPage() {
             Изменить срок
           </Button>
         )}
-        <span className="ml-4">Видимость:</span>
+        <span className="sm:ml-4">Видимость:</span>
         {canWrite ? (
           <Select
             value={artifact.visibility}
             onChange={(e) => changeVisibility(e.target.value as "private" | "org")}
-            className="w-auto"
+            className="w-auto!"
           >
             <option value="org">Команда</option>
             <option value="private">Только я</option>
@@ -290,7 +290,7 @@ export function ArtifactDetailPage() {
       </div>
 
       {editing ? (
-        <Card className="mb-4">
+        <Card className="mb-8">
           <Textarea rows={14} value={draft} onChange={(e) => setDraft(e.target.value)} />
           {error && <p className="mt-2 text-sm text-danger">{error}</p>}
           <Button className="mt-3" onClick={saveEdit}>
@@ -298,22 +298,22 @@ export function ArtifactDetailPage() {
           </Button>
         </Card>
       ) : (
-        <Card className="mb-4 h-[420px] overflow-hidden p-0">
+        <Card className="mb-8 h-[72vh] min-h-[420px] overflow-hidden p-0">
           <iframe
             key={previewKey}
             title="preview"
             src={`/api/v1/artifacts/${id}/preview`}
             sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"
-            className="h-full w-full border-0"
+            className="h-full w-full border-0 bg-bg"
           />
         </Card>
       )}
 
       {canWrite && (
-      <Card className="mb-4">
+      <Card className="mb-6">
         <CardHeader title="Шаринг" action={<Button onClick={openShareDialog}>Создать ссылку</Button>} />
         {lastShareUrl && (
-          <div className="mb-3 flex items-center gap-2 rounded-control border border-border bg-panel-muted px-3 py-2 text-sm">
+          <div className="mb-3 flex items-center gap-2 rounded-control bg-panel-muted px-3 py-2 text-[0.9375rem]">
             <span className="flex-1 truncate">{lastShareUrl}</span>
             <CopyButton value={lastShareUrl} />
           </div>
@@ -353,7 +353,7 @@ export function ArtifactDetailPage() {
       </Card>
       )}
 
-      <Card className="mb-4">
+      <Card className="mb-6">
         <CardHeader
           title="Файлы"
           description={
@@ -377,7 +377,7 @@ export function ArtifactDetailPage() {
                   if (file) uploadFile(file);
                   e.target.value = "";
                 }}
-                className="block w-full max-w-sm cursor-pointer text-sm text-muted file:mr-3 file:cursor-pointer file:rounded-control file:border file:border-border file:bg-panel file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-fg hover:file:bg-panel-muted"
+                className="block w-full max-w-sm cursor-pointer text-[0.9375rem] text-muted file:mr-3 file:cursor-pointer file:rounded-control file:border-0 file:bg-panel-muted file:px-3.5 file:py-2 file:text-[0.9375rem] file:font-medium file:text-fg file:transition-colors hover:file:bg-accent-soft"
               />
             </label>
             )}

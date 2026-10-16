@@ -81,7 +81,7 @@ export function AuthForm() {
 
   return (
     <div className="w-full max-w-sm">
-      <div role="tablist" aria-label={`${t.tabLogin} / ${t.tabRegister}`} className="mb-4 flex gap-1 border-b border-border">
+      <div role="tablist" aria-label={`${t.tabLogin} / ${t.tabRegister}`} className="mb-6 inline-flex gap-1 rounded-control bg-panel-muted p-1">
         <TabButton active={tab === "login"} onClick={() => setTab("login")}>
           {t.tabLogin}
         </TabButton>
@@ -173,7 +173,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${active ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg"}`}
+      className={`rounded-control px-4 py-1.5 text-[0.9375rem] font-medium transition-colors duration-150 ${active ? "bg-panel text-fg" : "text-muted hover:text-fg"}`}
     >
       {children}
     </button>

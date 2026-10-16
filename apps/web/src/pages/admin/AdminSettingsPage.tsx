@@ -160,7 +160,7 @@ export function AdminSettingsPage() {
           <div className="flex flex-col gap-2">
             {settings.cdnAllowlist.map((url) => (
               <div key={url} className="flex items-center gap-2">
-                <code className="flex-1 rounded-control border border-border bg-panel-muted px-2.5 py-1.5 text-xs">{url}</code>
+                <code className="flex-1 rounded-control bg-panel-muted px-2.5 py-1.5 text-xs">{url}</code>
                 <IconButton
                   label="Удалить"
                   size="sm"

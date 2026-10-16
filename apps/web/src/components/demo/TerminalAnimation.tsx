@@ -13,14 +13,14 @@ import { useAuthCopy } from "../../pages/auth/AuthI18n";
 // half of that chore).
 const LINES: { prompt?: string; text: string; className?: string }[] = [
   { prompt: "$", text: "npx skills add emaxe/open-artifacts" },
-  { text: "✓ Installed skill \"open-artifacts\" (@emaxe/oa 0.11.0)", className: "text-success" },
+  { text: "ok Installed skill \"open-artifacts\" (@emaxe/oa 0.11.0)", className: "opacity-70" },
   { prompt: "$", text: "oa login --server https://your-server" },
-  { text: "Verification code: ABCD-1234", className: "text-muted" },
-  { text: "Open https://your-server/activate?code=ABCD-1234 to continue…", className: "text-muted" },
-  { text: "✓ Signed in as you@example.com", className: "text-success" },
+  { text: "Verification code: ABCD-1234", className: "opacity-70" },
+  { text: "Open https://your-server/activate?code=ABCD-1234 to continue…", className: "opacity-70" },
+  { text: "ok Signed in as you@example.com", className: "opacity-70" },
   { prompt: "$", text: "oa push report.html --title \"Q3 Summary\" --share" },
-  { text: "✓ Created artifact a1b2c3 (v1)", className: "text-success" },
-  { text: "🔗 https://your-server/s/9kQ2xR", className: "text-accent" },
+  { text: "ok Created artifact a1b2c3 (v1)", className: "opacity-70" },
+  { text: "→ https://your-server/s/9kQ2xR", className: "font-semibold" },
 ];
 
 const FULL_TRANSCRIPT = LINES.map((l) => (l.prompt ? `${l.prompt} ${l.text}` : l.text)).join("\n");
@@ -62,31 +62,26 @@ export function TerminalAnimation() {
   const done = visibleChars >= totalChars;
 
   return (
-    <div ref={containerRef} className="overflow-hidden rounded-card border border-border bg-[#0d1117] shadow-sm">
-      <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2 text-white/70">
-        <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f56]" />
-        <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
-        <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
-        <span className="ml-2 flex items-center gap-1.5 text-xs">
-          <TerminalIcon size={12} /> zsh
-        </span>
+    <div ref={containerRef} className="rounded-card bg-field-fg/10 p-5 text-field-fg">
+      <div className="mb-3 flex items-center gap-2 text-[0.8125rem] opacity-80">
+        <TerminalIcon size={13} /> zsh
         {!reducedMotion && done && (
           <button
             type="button"
             onClick={() => setRunId((n) => n + 1)}
-            className="ml-auto rounded-control px-2 py-0.5 text-xs text-white/60 hover:bg-white/10 hover:text-white"
+            className="ml-auto rounded-control px-2 py-1 transition-colors duration-150 hover:bg-field-fg/15"
           >
             ↻ {t.brand.terminalReplay}
           </button>
         )}
       </div>
-      <pre aria-hidden="true" className="min-h-56 overflow-x-auto p-4 text-xs leading-relaxed text-[#c9d1d9] sm:text-sm">
+      <pre aria-hidden="true" className="min-h-56 overflow-x-auto font-mono text-[0.8125rem] leading-relaxed">
         {LINES.map((line, idx) => {
           const lineText = shownLines[idx];
           if (lineText === undefined) return null;
           return (
             <div key={idx} className={line.className}>
-              {line.prompt && <span className="mr-2 text-[#7ee787]">{line.prompt}</span>}
+              {line.prompt && <span className="mr-2 text-accent-soft">{line.prompt}</span>}
               {lineText.replace(/^\$ /, "")}
             </div>
           );

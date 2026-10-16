@@ -12,15 +12,15 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-accent-fg hover:opacity-90",
-  secondary: "bg-panel-muted text-fg hover:opacity-80 border border-border",
-  danger: "bg-danger text-danger-fg hover:opacity-90",
+  primary: "bg-accent text-accent-fg hover:bg-field hover:text-field-fg",
+  secondary: "bg-panel-muted text-fg hover:bg-accent-soft",
+  danger: "bg-danger text-danger-fg hover:brightness-110",
   ghost: "bg-transparent text-fg hover:bg-panel-muted",
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {
-  sm: "h-8 px-3 text-sm max-md:h-9",
-  md: "h-9 px-4 text-sm max-md:h-11",
+  sm: "h-9 px-3.5 text-sm max-md:h-10",
+  md: "h-10 px-5 text-[0.9375rem] max-md:h-11",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -29,8 +29,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ref={ref}
       disabled={disabled || loading}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-control font-medium transition-opacity",
-        "disabled:opacity-50 disabled:cursor-not-allowed",
+        "inline-flex items-center justify-center gap-2 rounded-control font-semibold transition-[background-color,color,transform] duration-150 ease-out active:translate-y-px",
+        "disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-y-0",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         VARIANT_CLASSES[variant],
         SIZE_CLASSES[size],
@@ -59,11 +59,11 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       aria-label={label}
       title={label}
       className={cn(
-        "inline-flex items-center justify-center rounded-control transition-opacity",
+        "inline-flex items-center justify-center rounded-control transition-[background-color,color,transform] duration-150 ease-out active:translate-y-px",
         "disabled:opacity-50 disabled:cursor-not-allowed",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         variant === "ghost" ? "text-muted hover:bg-panel-muted hover:text-fg" : VARIANT_CLASSES[variant],
-        size === "sm" ? "size-8" : "size-9 max-md:size-11",
+        size === "sm" ? "size-9" : "size-10 max-md:size-11",
         className,
       )}
       {...props}

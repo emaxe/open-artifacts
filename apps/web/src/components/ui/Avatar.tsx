@@ -10,7 +10,7 @@ export interface AvatarProps {
 }
 
 const SIZE_CLASSES = {
-  sm: "size-6 text-[10px]",
+  sm: "size-6 text-[0.8125rem]",
   md: "size-8 text-xs",
   lg: "size-10 text-sm",
 };
@@ -19,7 +19,7 @@ export function Avatar({ id, name, size = "md", className }: AvatarProps) {
   const { bg, fg } = colorFromId(id);
   return (
     <span
-      className={cn("inline-flex shrink-0 items-center justify-center rounded-full font-semibold", SIZE_CLASSES[size], className)}
+      className={cn("inline-flex shrink-0 items-center justify-center rounded-control font-semibold", SIZE_CLASSES[size], className)}
       style={{ backgroundColor: bg, color: fg }}
       aria-hidden="true"
     >
