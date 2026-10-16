@@ -96,6 +96,16 @@ if (!html7.includes('A--&gt;B') && !html7.includes('A-->B')) {
 }
 console.log('✅ Test 7 Passed: mermaid-diagram code alias auto-mapped to definition');
 
+// Test 9: chart series without an explicit colour are not collapsed to the accent
+fs.writeFileSync('/tmp/t9.yaml', `title: T9\nblocks:\n  - type: chart-bar\n    labels: [a, b]\n    datasets:\n      - { label: x, data: [1, 2] }\n      - { label: y, data: [2, 1], color: c3 }\n  - type: chart-bar\n    monochrome: true\n    labels: [a]\n    datasets: [{ label: z, data: [1] }]\n`);
+run(`node "${buildScript}" /tmp/t9.yaml --out /tmp/t9.html`);
+const html9 = fs.readFileSync('/tmp/t9.html', 'utf8');
+if (!html9.includes('"_color":""') || !html9.includes('"_color":"c3"') || !html9.includes('var vary = false;') || !html9.includes('var vary = true;')) {
+  console.error('❌ Test 9 failed: chart colour defaults are wrong!');
+  process.exit(1);
+}
+console.log('✅ Test 9 Passed: uncoloured series walk the palette; explicit color and monochrome are respected');
+
 // Test 8: Full demo.yaml clean build
 if (fs.existsSync(demoYaml)) {
   run(`node "${buildScript}" "${demoYaml}" --out /tmp/t8.html`);

@@ -394,7 +394,7 @@ const BLOCK_DEFINITIONS = {
     }
   },
   'chart-bar': {
-    canonical: ['type', 'title', 'labels', 'datasets', 'height', 'stacked', 'horizontal', 'class', 'id'],
+    canonical: ['type', 'title', 'labels', 'datasets', 'height', 'stacked', 'horizontal', 'monochrome', 'class', 'id'],
     aliases: {
       caption: 'title',
       header: 'title',
@@ -419,7 +419,7 @@ const BLOCK_DEFINITIONS = {
     }
   },
   'chart-line': {
-    canonical: ['type', 'title', 'labels', 'datasets', 'height', 'fill', 'tension', 'y_min', 'y_max', 'class', 'id'],
+    canonical: ['type', 'title', 'labels', 'datasets', 'height', 'fill', 'tension', 'y_min', 'y_max', 'monochrome', 'class', 'id'],
     aliases: {
       caption: 'title',
       header: 'title',
@@ -1169,11 +1169,14 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
       b.not_horizontal = !b.horizontal;
       b.stacked = !!b.stacked;
       b.not_stacked = !b.stacked;
+      // A single series is painted bar by bar from the palette unless told otherwise.
+      b._vary = (b.monochrome || b.colorful === false) ? 'false' : 'true';
       b._labels_json = JSON.stringify(b.labels || []);
       b._datasets_json = JSON.stringify((b.datasets || []).map(ds => ({
         label: ds.label || ds.name || ds.title || '',
         data: ds.data || ds.values || [],
-        _color: colorVar(ds.color),
+        // empty = no explicit colour, so the template walks the palette (a missing colour must not collapse every series to the accent)
+        _color: ds.color ? colorVar(ds.color) : '',
         borderWidth: 1,
       })));
       break;
@@ -1184,12 +1187,14 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
       b.title = b.title || b.caption || b.header || '';
       b.height = b.height || 300;
       b._fill = b.fill ? 'true' : 'false';
+      b._vary = (b.monochrome || b.colorful === false) ? 'false' : 'true';
       b._tension = b.tension != null ? String(b.tension) : '0.3';
       b._labels_json = JSON.stringify(b.labels || []);
       b._datasets_json = JSON.stringify((b.datasets || []).map(ds => ({
         label: ds.label || ds.name || ds.title || '',
         data: ds.data || ds.values || [],
-        _color: colorVar(ds.color),
+        // empty = no explicit colour, so the template walks the palette (a missing colour must not collapse every series to the accent)
+        _color: ds.color ? colorVar(ds.color) : '',
       })));
       break;
 

@@ -47,7 +47,9 @@ Read `DESIGN-core.md` first — this file only adds what's specific to dashboard
 
 Nothing renamed — the categorical series `--c1`…`--c6` and semantic `--pos`/`--neg`/`--warn` from
 the core block are this theme's whole palette. Reuse `--c1`…`--c6` in the exact order across every
-chart on the page so "series 2" means the same color everywhere the viewer looks.
+chart on the page so "series 2" means the same color everywhere the viewer looks. A chart with one
+series and no meaning in its colour (a plain bar chart over categories) takes the next `--c*` per bar
+rather than one flat colour; the constructor does this by default (`monochrome: true` turns it off).
 
 ## Layout
 

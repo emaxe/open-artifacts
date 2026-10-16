@@ -139,6 +139,7 @@ HTML-таблица. Поддерживает опциональную JS-сор
 | `height` | number | 300 | Высота canvas в px |
 | `stacked` | boolean | false | Стакированные столбцы |
 | `horizontal` | boolean | false | Горизонтальные столбцы |
+| `monochrome` | boolean | false | Один датасет по умолчанию красится по столбцам из палитры (`--c1…--c6`); `true` или явный `color` у датасета оставляет один цвет |
 
 **Dataset fields:** `label`, `data` (number[]), `color` (маппится в --c1…--c6)
 
@@ -169,6 +170,7 @@ HTML-таблица. Поддерживает опциональную JS-сор
 | `height` | number | 300 | Высота canvas |
 | `fill` | boolean | false | Заливка под линией |
 | `tension` | number | 0.3 | Сглаживание линии (0–1) |
+| `monochrome` | boolean | false | Один датасет по умолчанию красится по сегментам и точкам из палитры; `true` или явный `color` оставляет один цвет |
 | `y_min` | number | — | Минимум оси Y |
 | `y_max` | number | — | Максимум оси Y |
 

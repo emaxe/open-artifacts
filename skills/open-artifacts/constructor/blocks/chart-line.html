@@ -21,14 +21,21 @@
     var colorMap = {c1:palette[0],c2:palette[1],c3:palette[2],c4:palette[3],c5:palette[4],c6:palette[5],accent:cs.getPropertyValue('--accent').trim(),pos:cs.getPropertyValue('--pos').trim(),neg:cs.getPropertyValue('--neg').trim(),warn:cs.getPropertyValue('--warn').trim()};
     var fill = {{{_fill}}};
     var tension = {{{_tension}}};
+    var vary = {{{_vary}}};
     var datasets = {{{_datasets_json}}};
     datasets.forEach(function(ds, i){
-      var c = colorMap[ds._color] || palette[i % palette.length];
+      var c = colorMap[ds._color] || palette[i % 6];
+      // One series and no explicit colour: markers and segments walk through the palette.
+      if (vary && datasets.length === 1 && !ds._color) {
+        ds.pointBackgroundColor = ds.data.map(function(_, k){ return palette[k % 6]; });
+        ds.pointBorderColor = ds.pointBackgroundColor;
+        ds.segment = { borderColor: function(ctx){ return palette[ctx.p0DataIndex % 6]; } };
+      }
       ds.borderColor = c;
       ds.backgroundColor = fill ? (window.__oaAlpha ? window.__oaAlpha(c, 0.16) : c) : 'transparent';
       ds.fill = fill;
       ds.tension = tension;
-      ds.pointRadius = 3;
+      ds.pointRadius = 4;
       ds.borderWidth = 2;
       delete ds._color;
     });

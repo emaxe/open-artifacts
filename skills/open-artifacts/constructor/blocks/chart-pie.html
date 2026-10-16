@@ -18,11 +18,12 @@
     if (window.__oaChartInit) window.__oaChartInit(cs);
     var cVars = ['--c1','--c2','--c3','--c4','--c5','--c6'];
     var palette = cVars.map(function(v){ return cs.getPropertyValue(v).trim(); });
+    var slices = {{{_labels_json}}}.map(function(_, k){ return palette[k % palette.length]; });
     new Chart(canvas, {
       type: '{{#if donut}}doughnut{{else}}pie{{/if}}',
       data: {
         labels: {{{_labels_json}}},
-        datasets: [{ data: {{{_data_json}}}, backgroundColor: palette, borderColor: cs.getPropertyValue('--surface').trim(), borderWidth: 2 }]
+        datasets: [{ data: {{{_data_json}}}, backgroundColor: slices, borderColor: cs.getPropertyValue('--surface').trim(), borderWidth: 2 }]
       },
       options: {
         responsive: true,

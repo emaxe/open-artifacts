@@ -19,21 +19,28 @@
     var colors = ['--c1','--c2','--c3','--c4','--c5','--c6','--accent'];
     var palette = colors.map(function(v){ return cs.getPropertyValue(v).trim(); });
     var colorMap = {c1:palette[0],c2:palette[1],c3:palette[2],c4:palette[3],c5:palette[4],c6:palette[5],accent:palette[6],pos:cs.getPropertyValue('--pos').trim(),neg:cs.getPropertyValue('--neg').trim(),warn:cs.getPropertyValue('--warn').trim()};
+    var labels = {{{_labels_json}}};
+    var vary = {{{_vary}}};
     var datasets = {{{_datasets_json}}};
     datasets.forEach(function(ds, i){
-      var c = colorMap[ds._color] || palette[i % palette.length];
+      var c = colorMap[ds._color] || palette[i % 6];
       ds.backgroundColor = c;
       ds.borderColor = c;
+      // One series and no explicit colour: every bar gets the next palette colour.
+      if (vary && datasets.length === 1 && !ds._color) {
+        ds.backgroundColor = labels.map(function(_, k){ return palette[k % 6]; });
+        ds.borderColor = ds.backgroundColor;
+      }
       delete ds._color;
     });
     new Chart(canvas, {
       type: 'bar',
-      data: { labels: {{{_labels_json}}}, datasets: datasets },
+      data: { labels: labels, datasets: datasets },
       options: {
         indexAxis: {{#if horizontal}}'y'{{else}}'x'{{/if}},
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: datasets.length > 1 } },
+        plugins: { legend: { display: datasets.length > 1 }, tooltip: { displayColors: true } },
         scales: {
           x: { stacked: {{#if stacked}}true{{else}}false{{/if}}, grid: { color: cs.getPropertyValue('--surface-2').trim() }, ticks: { color: cs.getPropertyValue('--fg-muted').trim() } },
           y: { stacked: {{#if stacked}}true{{else}}false{{/if}}, grid: { color: cs.getPropertyValue('--surface-2').trim() }, ticks: { color: cs.getPropertyValue('--fg-muted').trim() } }
