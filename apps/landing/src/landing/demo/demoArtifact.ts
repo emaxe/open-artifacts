@@ -5,8 +5,8 @@
  * it or turns off public links, and would pollute the exact view-count analytics the product
  * sells. This document is rendered via `srcDoc` in an iframe with `sandbox="allow-scripts"` and NO
  * `allow-same-origin` (see DemoPreview.tsx) — the same isolation model as production, with zero
- * backend dependency. It follows the token palette from
- * skills/open-artifacts/references/design/DESIGN-core.md so it looks like a real artifact, not a
+ * backend dependency. It follows the sand/moss token palette from
+ * packages/shared/src/design/tokens.css (mirrored by hand: the iframe is isolated, so it cannot import it) so it looks like a real artifact, not a
  * mockup, and carries its own CSP meta tag and its own `prefers-reduced-motion` handling, since
  * neither crosses the iframe boundary from the parent page.
  */
@@ -21,36 +21,36 @@ export const DEMO_HTML = `<!doctype html>
 <style>
 :root {
   color-scheme: light dark;
-  --bg: #fafafa; --surface: #ffffff; --surface-2: #f4f4f5; --border: #e4e4e7;
-  --fg: #18181b; --fg-muted: #71717a; --accent: #2563eb; --pos: #16a34a;
-  --c1: #2563eb; --c2: #d97706; --c3: #16a34a;
+  --bg: #e6e0d2; --surface: #efeade; --surface-2: #d9d2c1;
+  --fg: #2a2a26; --fg-muted: #59574e; --accent: #4f6238; --pos: #3f6b2a;
+  --c1: #4f6238; --c2: #b0741a; --c3: #3d6a8a;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0a0a0b; --surface: #18181b; --surface-2: #232326; --border: #2c2c31;
-    --fg: #f4f4f5; --fg-muted: #a1a1aa; --accent: #60a5fa; --pos: #4ade80;
-    --c1: #60a5fa; --c2: #fbbf24; --c3: #4ade80;
+    --bg: #171913; --surface: #20231b; --surface-2: #2a2e24;
+    --fg: #ece7da; --fg-muted: #a9a590; --accent: #a9c47f; --pos: #8fc46a;
+    --c1: #a9c47f; --c2: #e0a548; --c3: #7fb0d4;
   }
 }
 * { box-sizing: border-box; }
 body {
-  margin: 0; min-height: 100vh; background: var(--bg); color: var(--fg);
-  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  padding: 20px; display: flex; flex-direction: column; gap: 16px;
+  margin: 0; min-height: 100svh; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding: 24px; display: flex; flex-direction: column; gap: 20px;
 }
-h1 { font-size: 15px; margin: 0; }
-.sub { color: var(--fg-muted); margin: 0; font-size: 12px; }
-.stat-row { display: flex; gap: 12px; flex-wrap: wrap; }
-.stat { flex: 1; min-width: 100px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 12px; }
-.stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
-.stat span { color: var(--fg-muted); font-size: 11px; }
+h1 { font-size: 22px; letter-spacing: -0.02em; margin: 0; }
+.sub { color: var(--fg-muted); margin: 4px 0 0; font-size: 13px; }
+.stat-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.stat { flex: 1; min-width: 110px; background: var(--surface); padding: 14px; border-radius: 2px; }
+.stat b { display: block; font-size: 26px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--fg-muted); font-size: 13px; }
 .pos { color: var(--pos); }
 /* No flex:1 on .chart: it is a direct child of the column-flex body, and letting flex-grow drive
-   its height makes the explicit 110px indefinite for the flexbox layout algorithm, which in turn
+   its height makes the explicit 120px indefinite for the flexbox layout algorithm, which in turn
    makes every .bar percentage height resolve against nothing and collapse to 0 — a real
    flex/percentage-height gotcha, not a stylistic choice. */
-.chart { display: flex; align-items: flex-end; gap: 6px; height: 110px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 12px; }
-.bar { flex: 1; border-radius: 4px 4px 0 0; transform-origin: bottom; animation: grow 900ms ease-out both; }
+.chart { display: flex; align-items: flex-end; gap: 6px; height: 120px; background: var(--surface-2); padding: 14px; border-radius: 2px; }
+.bar { flex: 1; transform-origin: bottom; animation: grow 900ms cubic-bezier(.22,1,.36,1) both; }
 @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @media (prefers-reduced-motion: reduce) { .bar { animation: none; } }
 </style>
@@ -58,10 +58,10 @@ h1 { font-size: 15px; margin: 0; }
 <body>
   <header>
     <h1>Weekly Active Users</h1>
-    <p class="sub">Demo artifact · rendered inside a sandboxed iframe, no allow-same-origin</p>
+    <p class="sub">Demo artifact · sandboxed iframe, no allow-same-origin</p>
   </header>
   <div class="stat-row">
-    <div class="stat"><b>128,4K</b><span>Users <span class="pos">▲ 12%</span></span></div>
+    <div class="stat"><b>128,4K</b><span>Users <span class="pos">+12%</span></span></div>
     <div class="stat"><b>4.8K</b><span>Artifacts published</span></div>
     <div class="stat"><b>99.98%</b><span>Uptime</span></div>
   </div>

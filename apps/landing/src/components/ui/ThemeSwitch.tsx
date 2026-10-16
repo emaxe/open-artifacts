@@ -21,8 +21,8 @@ export function ThemeSwitch({
           aria-pressed={theme === value}
           onClick={() => setTheme(value)}
           className={cn(
-            "min-w-0 flex-1 truncate rounded-[calc(var(--radius-control)-2px)] px-2 py-1 text-xs font-medium",
-            theme === value ? "bg-panel text-fg shadow-sm" : "text-muted hover:text-fg",
+            "min-w-0 flex-1 truncate rounded-[calc(var(--radius-control)-2px)] px-2 py-1 text-sm font-medium",
+            theme === value ? "bg-panel text-fg" : "text-muted hover:text-fg",
           )}
         >
           {labels[value]}

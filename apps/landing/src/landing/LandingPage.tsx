@@ -1,36 +1,33 @@
+import { DomainProvider } from "./DomainContext";
 import { LandingI18nProvider } from "./LandingI18n";
 import { LandingHeader } from "./LandingHeader";
 import { HeroSection } from "./sections/HeroSection";
-import { CompatStrip } from "./sections/CompatStrip";
-import { ProblemSection } from "./sections/ProblemSection";
 import { HowItWorksSection } from "./sections/HowItWorksSection";
-import { FeatureGrid } from "./sections/FeatureGrid";
-import { SecuritySection } from "./sections/SecuritySection";
-import { LivePreviewSection } from "./sections/LivePreviewSection";
-import { StatsSection } from "./sections/StatsSection";
-import { AudienceSection } from "./sections/AudienceSection";
-import { ComparisonSection } from "./sections/ComparisonSection";
+import { ShowcaseSection } from "./sections/ShowcaseSection";
+import { ProductSection } from "./sections/ProductSection";
+import { CompareSection } from "./sections/CompareSection";
+import { PosterSection } from "./sections/PosterSection";
 import { SelfHostSection } from "./sections/SelfHostSection";
-import { ClosingCta } from "./sections/ClosingCta";
+import { PressBand, PressVideoBand } from "./MediaBands";
+import { CtaBand } from "./sections/CtaBand";
 import { LandingFooter } from "./sections/LandingFooter";
+import "./landing.css";
 
 function LandingContent() {
   return (
-    <div className="min-h-screen bg-bg text-fg">
+    <div className="lp">
       <LandingHeader />
       <main>
         <HeroSection />
-        <CompatStrip />
-        <ProblemSection />
+        <PressBand />
         <HowItWorksSection />
-        <FeatureGrid />
-        <SecuritySection />
-        <LivePreviewSection />
-        <StatsSection />
-        <AudienceSection />
-        <ComparisonSection />
+        <ShowcaseSection />
+        <PressVideoBand />
+        <ProductSection />
+        <CompareSection />
+        <PosterSection />
         <SelfHostSection />
-        <ClosingCta />
+        <CtaBand />
       </main>
       <LandingFooter />
     </div>
@@ -38,15 +35,15 @@ function LandingContent() {
 }
 
 /**
- * The whole site — mirrors apps/web/src/pages/landing/LandingPage.tsx, minus the inline
- * sign-in/sign-up card (`AuthCard`, `authCardRef`/`focusAuth`) that used to live in the hero. This
- * is now purely informational: it links out to GitHub and the self-host instructions instead of
- * authenticating anyone — see the app's own `/` for the actual sign-in/sign-up screen.
+ * The whole site: one page, no router, no backend. The visitor's typed domain (DomainProvider) is the
+ * one live thing — see HeroSection. Purely informational: it links out to GitHub and the setup guide.
  */
 export function LandingPage() {
   return (
     <LandingI18nProvider>
-      <LandingContent />
+      <DomainProvider>
+        <LandingContent />
+      </DomainProvider>
     </LandingI18nProvider>
   );
 }

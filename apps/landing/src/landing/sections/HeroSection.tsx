@@ -1,36 +1,61 @@
-import { CheckIcon } from "../../components/ui/icons";
-import { Button } from "../../components/ui/Button";
+import type { CSSProperties } from "react";
+import { useDomain } from "../DomainContext";
 import { useLandingCopy } from "../LandingI18n";
-import { EXTERNAL_LINKS } from "../links";
 
-// Single centered column — the two-column layout (form in the second column) only existed to fit
-// the inline auth card that lived here before the landing moved out of the app; see the app's own
-// two-panel sign-in screen for that form now.
+/**
+ * The sentence is the page: two authored lines at display size, rising from behind their own
+ * baselines (see `.lp-lines` in landing.css), and one live thing — the visitor's own domain turns
+ * the sample link into the address their agent would actually receive.
+ */
 export function HeroSection() {
   const { t } = useLandingCopy();
+  const { value, setValue, host } = useDomain();
+  const [first, second] = t.hero.lines;
 
   return (
-    <section id="top" className="mx-auto flex max-w-3xl flex-col items-center gap-5 px-4 pb-16 pt-10 text-center sm:px-6 sm:pt-16">
-      <span className="w-fit rounded-full border border-border bg-panel-muted px-3 py-1 text-xs font-medium text-muted">
-        {t.hero.badge}
-      </span>
-      <h1 className="text-3xl font-semibold leading-tight text-fg sm:text-4xl lg:text-[2.6rem]">{t.hero.title}</h1>
-      <p className="max-w-prose text-base text-muted sm:text-lg">{t.hero.subtitle}</p>
-      <ul className="flex flex-col items-start gap-2 self-center text-left">
-        {t.hero.bullets.map((bullet) => (
-          <li key={bullet} className="flex items-start gap-2 text-sm text-fg">
-            <CheckIcon size={16} className="mt-0.5 shrink-0 text-accent" />
-            {bullet}
-          </li>
-        ))}
-      </ul>
-      <div className="flex flex-wrap justify-center gap-3 pt-1">
-        <a href={EXTERNAL_LINKS.github} target="_blank" rel="noreferrer" className="inline-flex">
-          <Button>{t.hero.ctaSecondary}</Button>
+    <section id="top" className="lp-hero">
+      <div className="lp-hero__stage">
+        <h1 className="lp-display lp-lines" aria-label={`${first} ${second}`}>
+          <span className="line" aria-hidden="true">
+            <span data-line style={{ "--i": 0 } as CSSProperties}>
+              {first}
+            </span>
+          </span>
+          <span className="line" aria-hidden="true">
+            <span data-line style={{ "--i": 1 } as CSSProperties}>
+              {second}
+            </span>
+          </span>
+        </h1>
+
+        <div className="lp-hero__rise">
+          <div className="lp-link">
+            <label className="lp-chip" data-ui>
+              <span>{t.hero.domainLabel}</span>
+              <input
+                type="text"
+                inputMode="url"
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                value={value}
+                placeholder={t.hero.domainPlaceholder}
+                onChange={(e) => setValue(e.target.value)}
+              />
+            </label>
+            <p className="lp-url" aria-live="polite">
+              https://<b>{host}</b>/s/9kQ2xR
+            </p>
+          </div>
+          <p className="lp-hero__caption">{t.hero.linkCaption}</p>
+        </div>
+      </div>
+
+      <div className="lp-hero__foot lp-hero__rise lp-hero__rise--late">
+        <p>{t.hero.subtitle}</p>
+        <a href="#self-host" className="lp-btn">
+          {t.hero.cta}
         </a>
-        <Button variant="secondary" onClick={() => document.getElementById("how")?.scrollIntoView({ behavior: "smooth" })}>
-          {t.hero.ctaPrimary}
-        </Button>
       </div>
     </section>
   );
