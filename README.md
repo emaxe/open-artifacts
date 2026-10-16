@@ -10,6 +10,8 @@
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-%3E%3D20-brightgreen?logo=node.js" alt="Node.js"></a>
   <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white" alt="Docker"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Theme-light_%2F_dark-4f6238" alt="Light and dark themes"></a>
+  <a href="#"><img src="https://img.shields.io/badge/UI-RU_%7C_EN-3d6a8a" alt="Russian and English UI"></a>
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-Server-purple" alt="MCP Server"></a>
   <a href="#-constructor-mode-declarative-artifact-builder"><img src="https://img.shields.io/badge/Constructor_Mode-23_Blocks-blueviolet?logo=yaml" alt="Constructor Mode: 23 Blocks"></a>
   <a href="#file-storage-and-quotas"><img src="https://img.shields.io/badge/Storage-S3--compatible-orange?logo=amazons3&logoColor=white" alt="S3-compatible storage"></a>
@@ -26,7 +28,7 @@ Runs as a lightweight, single-stack Docker Compose deployment.
 ---
 
 ### Topics & Tags
-`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `mcp-server` • `model-context-protocol` • `self-hosted` • `docker` • `hono` • `react` • `typescript` • `cli` • `developer-tools` • `open-artifacts` • `llm` • `s3` • `constructor` • `yaml` • `block-builder`
+`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `mcp-server` • `model-context-protocol` • `self-hosted` • `docker` • `hono` • `react` • `typescript` • `cli` • `developer-tools` • `open-artifacts` • `llm` • `s3` • `constructor` • `yaml` • `mermaid`
 
 ---
 
@@ -37,10 +39,11 @@ Runs as a lightweight, single-stack Docker Compose deployment.
 - 📦 **Multi-Format Support**: Interactive HTML applications, GitHub-flavored Markdown, responsive Mermaid diagrams, and raw vector SVG graphics.
 - ⚡ **Built-in MCP Server**: Ready-to-use Model Context Protocol endpoint at `/mcp` (Streamable HTTP) for immediate integration with Cursor, Claude Desktop, and Claude Code.
 - 🤖 **Standard AI Agent Skill**: First-class support for `skills.sh` (`npx skills add emaxe/open-artifacts`) with automatic CLI detection and device-flow authorization.
-- 🎨 **Built-in Design Systems**: Four ready-made design templates (dashboards, documents, promo/decks, diagrams) ship with the skill so an agent picks the right one before publishing, keeping artifacts visually consistent.
+- 🎨 **Built-in Design Systems**: Four ready-made design templates (dashboards, documents, promo/decks, diagrams) ship with the skill so an agent picks the right one before publishing, keeping artifacts visually consistent. One shared sand-and-moss design language (light and dark) and the self-hosted Onest typeface run through the landing page, the account area, the viewer and the constructor; charts and Mermaid diagrams pick up the page palette, and a chart with a single series is multicolour by default.
 - 🔑 **Flexible Authentication**: Interactive OAuth Device Flow (`oa login`) and non-interactive organization API tokens (`OA_TOKEN`).
 - 🖥️ **Bilingual Sign-In Screen**: `/` greets a signed-out visitor with a two-panel sign-in/sign-up screen (English/Russian, toggle in the header) — no marketing copy to scroll past on your own instance. Signed-in visitors are redirected straight to their own workspace. The product's marketing site lives separately at **[emaxe.github.io/open-artifacts](https://emaxe.github.io/open-artifacts/)** (source: `apps/landing/`), published to GitHub Pages and carrying no auth of its own.
 - 👥 **Multi-Tenancy & Teams**: Organizations, user management, and fine-grained roles (`superadmin`, `admin`, `member`) with an intuitive Team Switcher.
+- 🌍 **Public viewer in Russian or English**: the shared-artifact page follows the browser's `Accept-Language`.
 - 🔗 **Secure Sharing**: Team-only links, password-protected links, public links (optionally labeled for your own reference), and automatic link expiration (1 hour, 1 day, 7 days, 30 days) — teams and instance admins control the default link mode and can disable public links entirely. Every share page shows a branded viewer panel: one compact row with the title, type, version and date. Anyone who can manage the artifact also gets a version picker, a collapsible details block (size, views, expiry, description) and a visibility control — pick *Team only*, *Password protected* or *Public* and it applies instantly, in place, on the same link: no page reload, no revoking it and handing out a new URL.
 - 🖼️ **File Attachments**: Images and other files can be uploaded to an S3-compatible bucket (MinIO ships in `docker-compose.yml` by default) and attached to an artifact — proxied through the app, never a public bucket. An agent can check its remaining quota (`oa quota` / the `get_storage_quota` MCP tool) before deciding whether to upload. Instance-wide and per-team storage quotas (team-wide and per-artifact, unlimited by default) keep usage in check; files are deleted automatically with their artifact.
 - 🚀 **One-Command Deployment**: Instant production setup with Docker Compose or the interactive `./run.sh` runner.
