@@ -60,13 +60,15 @@ Load and initialize it the same theme-aware way the server does internally:
   var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
   mermaid.initialize({
     startOnLoad: true,
-    theme: dark ? "dark" : "default",
-    fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+    theme: "base",
+    fontFamily: "system-ui, -apple-system, \"Segoe UI\", sans-serif",
     themeVariables: {
-      primaryColor: dark ? "#232326" : "#f4f4f5",
-      primaryTextColor: dark ? "#f4f4f5" : "#18181b",
-      primaryBorderColor: dark ? "#2c2c31" : "#e4e4e7",
-      lineColor: dark ? "#a1a1aa" : "#71717a"
+      darkMode: dark,
+      primaryColor: dark ? "#2f3a22" : "#d3dbc0",
+      primaryTextColor: dark ? "#e8e9e1" : "#2a2a26",
+      primaryBorderColor: dark ? "#a9c47f" : "#4f6238",
+      secondaryColor: dark ? "#2a2e24" : "#d9d2c1",
+      lineColor: dark ? "#a9ab9c" : "#59574e"
     }
   });
 </script>

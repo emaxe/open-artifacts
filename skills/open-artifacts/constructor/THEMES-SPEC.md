@@ -30,16 +30,17 @@ constructor/themes/
 /* === CORE TOKENS (generated from DESIGN-core.md) === */
 :root {
   color-scheme: light dark;
-  --bg: #fafafa; --surface: #ffffff; --surface-2: #f4f4f5;
-  --border: #e4e4e7;
-  --fg: #18181b; --fg-muted: #71717a;
-  --accent: #2563eb; --accent-fg: #ffffff; --ring: #2563eb;
-  --pos: #16a34a; --neg: #dc2626; --warn: #b45309;
-  --c1: #2563eb; --c2: #d97706; --c3: #16a34a;
-  --c4: #db2777; --c5: #7c3aed; --c6: #0891b2;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --bg: #e6e0d2; --surface: #efeade; --surface-2: #d9d2c1;
+  --border: #c4bba6;
+  --fg: #2a2a26; --fg-muted: #59574e;
+  --accent: #4f6238; --accent-fg: #ffffff; --accent-soft: #d3dbc0; --ring: #4f6238;
+  --field: #3f5a2a; --field-fg: #ffffff;
+  --pos: #3f6b2a; --neg: #a8321f; --warn: #8a5a00;
+  --c1: #4f6238; --c2: #b0741a; --c3: #3d6a8a;
+  --c4: #a24a4a; --c5: #2f7a76; --c6: #7a6a4f;
+  --font-sans: "Onest Variable", "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --t-xs: clamp(0.72rem, 0.70rem + 0.10vw, 0.78rem);
+  --t-xs: 0.8125rem;
   /* ... остальные токены из DESIGN-core.md ... */
 }
 @media (prefers-color-scheme: dark) { /* dark overrides */ }
@@ -341,17 +342,17 @@ main { max-width: 1000px; }
 
 | Значение | CSS-переменная | Light | Dark |
 |----------|---------------|-------|------|
-| `accent` | `--accent` | #2563eb | #60a5fa |
-| `pos` | `--pos` | #16a34a | #4ade80 |
-| `neg` | `--neg` | #dc2626 | #f87171 |
-| `warn` | `--warn` | #b45309 | #fbbf24 |
-| `muted` | `--fg-muted` | #71717a | #a1a1aa |
-| `c1` | `--c1` | #2563eb | #60a5fa |
-| `c2` | `--c2` | #d97706 | #fbbf24 |
-| `c3` | `--c3` | #16a34a | #4ade80 |
-| `c4` | `--c4` | #db2777 | #f472b6 |
-| `c5` | `--c5` | #7c3aed | #a78bfa |
-| `c6` | `--c6` | #0891b2 | #22d3ee |
+| `accent` | `--accent` | #4f6238 | #a9c47f |
+| `pos` | `--pos` | #3f6b2a | #8fc46a |
+| `neg` | `--neg` | #a8321f | #f0877f |
+| `warn` | `--warn` | #8a5a00 | #e0b04a |
+| `muted` | `--fg-muted` | #59574e | #a9ab9c |
+| `c1` | `--c1` | #4f6238 | #a9c47f |
+| `c2` | `--c2` | #b0741a | #e0a548 |
+| `c3` | `--c3` | #3d6a8a | #7fb0d4 |
+| `c4` | `--c4` | #a24a4a | #e08a8a |
+| `c5` | `--c5` | #2f7a76 | #6cc4bd |
+| `c6` | `--c6` | #7a6a4f | #b9a98a |
 
 Использование в шаблоне блока:
 ```html

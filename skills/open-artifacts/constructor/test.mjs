@@ -32,7 +32,7 @@ function run(cmd, shouldFail = false) {
 fs.writeFileSync('/tmp/t1.yaml', `title: T1\nblocks:\n  - type: alert\n    variant: warning\n    text: "Test Warning"\n`);
 run(`node "${buildScript}" /tmp/t1.yaml --out /tmp/t1.html`);
 const html1 = fs.readFileSync('/tmp/t1.html', 'utf8');
-if (!html1.includes('alert--warning') || !html1.includes('Test Warning') || !html1.includes('⚠️')) {
+if (!html1.includes('alert--warning') || !html1.includes('Test Warning') || !html1.includes('alert__icon')) {
   console.error('❌ Test 1 failed: alert output is wrong!');
   process.exit(1);
 }

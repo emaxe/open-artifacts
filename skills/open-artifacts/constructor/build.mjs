@@ -1222,8 +1222,8 @@ function preprocessBlock(block, { marked, specDir, blocksDir }) {
       b.kind = b.kind || b.variant || b.status || b.severity || b.level || b.alert_type || 'info';
       if (b.kind === 'warn') b.kind = 'warning';
       if (b.kind === 'danger' || b.kind === 'critical') b.kind = 'error';
-      const icons = { info: 'ℹ️', warning: '⚠️', error: '❌', success: '✅' };
-      b._default_icon = icons[b.kind] || 'ℹ️';
+      const icons = { info: 'i', warning: '!', error: '×', success: 'OK' };
+      b._default_icon = icons[b.kind] || 'i';
       b.icon = b.icon || b._default_icon;
       b.not_icon = !b.icon;
       b.title = b.title || b.heading || b.header || '';
@@ -1495,7 +1495,27 @@ function buildHtml({ title, lang, css, headScripts, bodyHtml, bodyScripts, inlin
   }
   if (window.mermaid) {
     var isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    mermaid.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'default' });
+    var cs = getComputedStyle(document.documentElement);
+    function v(n) { return cs.getPropertyValue(n).trim(); }
+    // Diagrams take the page's own tokens instead of mermaid's stock look.
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'base',
+      themeVariables: {
+        darkMode: isDark,
+        background: v('--bg'),
+        fontFamily: getComputedStyle(document.body).fontFamily,
+        fontSize: '15px',
+        primaryColor: v('--accent-soft'),
+        primaryTextColor: v('--fg'),
+        primaryBorderColor: v('--accent'),
+        lineColor: v('--fg-muted'),
+        secondaryColor: v('--surface-2'),
+        tertiaryColor: v('--surface'),
+        noteBkgColor: v('--surface-2'),
+        noteTextColor: v('--fg')
+      }
+    });
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', function(){ renderMermaid(); });
     } else {
@@ -1666,7 +1686,12 @@ async function main() {
 
   // hljs dark-mode aware CSS inline (fetch not available in CSP — use inline style override)
   if (cdnNeeds.hljs) {
-    css += `\n@media (prefers-color-scheme: dark) { pre code.hljs { background: var(--surface-2); color: var(--fg); } }`;
+    css += `\npre code.hljs { background: transparent; color: var(--fg); padding: 0; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: var(--accent); font-weight: 600; }
+.hljs-string, .hljs-attr, .hljs-attribute { color: var(--c3); }
+.hljs-number, .hljs-literal, .hljs-symbol { color: var(--c2); }
+.hljs-title, .hljs-function, .hljs-name { color: var(--c5); }
+.hljs-comment, .hljs-quote { color: var(--fg-muted); font-style: italic; }`;
   }
 
   // ── Assemble CDN tags ─────────────────────────────────────────────────────
@@ -1681,6 +1706,23 @@ async function main() {
 
   // hljs init (if needed)
   const inlineScripts = [...rawScripts];
+  if (cdnNeeds.chartjs) {
+    // Shared by every chart block (runs before their DOMContentLoaded init): the page's own type and
+    // colours become Chart.js defaults, and series colours get a proper alpha for filled areas.
+    inlineScripts.unshift(`window.__oaChartInit = function (cs) {
+  if (typeof Chart === 'undefined') return;
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  Chart.defaults.font.size = 13;
+  Chart.defaults.color = cs.getPropertyValue('--fg-muted').trim();
+  Chart.defaults.borderColor = cs.getPropertyValue('--surface-2').trim();
+};
+window.__oaAlpha = function (hex, a) {
+  var m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  var n = parseInt(m[1], 16);
+  return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+};`);
+  }
   if (cdnNeeds.hljs) {
     inlineScripts.unshift(`document.addEventListener('DOMContentLoaded', function(){ document.querySelectorAll('pre code').forEach(function(el){ hljs.highlightElement(el); }); });`);
   }

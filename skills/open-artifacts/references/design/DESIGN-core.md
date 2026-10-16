@@ -55,74 +55,79 @@ theme; omit it and you get a white flash in a dark shell.
 :root {
   color-scheme: light dark;
 
-  /* surfaces */
-  --bg: #fafafa;
-  --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --border: #e4e4e7;
+  /* surfaces — separated by tone, never by a line or a shadow */
+  --bg: #e6e0d2;
+  --surface: #efeade;
+  --surface-2: #d9d2c1;
+  --border: #c4bba6;          /* real tables only */
 
   /* text */
-  --fg: #18181b;
-  --fg-muted: #71717a;
+  --fg: #2a2a26;
+  --fg-muted: #59574e;
 
-  /* interactive accent — deliberately not the near-black used for host chrome elsewhere in
-     Open Artifacts; content needs a real hue for links, focus rings, and series 1 */
-  --accent: #2563eb;
+  /* interactive accent (moss) + colour fields */
+  --accent: #4f6238;
   --accent-fg: #ffffff;
-  --ring: #2563eb;
+  --accent-soft: #d3dbc0;     /* tonal fill behind accent text */
+  --field: #3f5a2a;           /* full-width colour band */
+  --field-fg: #ffffff;
+  --ring: #4f6238;
+  --scrim: rgba(42, 42, 38, 0.72);
 
   /* semantic */
-  --pos: #16a34a;
-  --neg: #dc2626;
-  --warn: #b45309;
+  --pos: #3f6b2a;
+  --neg: #a8321f;
+  --warn: #8a5a00;
 
   /* categorical data series — shared by charts (DESIGN-data.md) and diagrams
      (DESIGN-diagram.md) so the two never clash inside one artifact */
-  --c1: #2563eb;
-  --c2: #d97706;
-  --c3: #16a34a;
-  --c4: #db2777;
-  --c5: #7c3aed;
-  --c6: #0891b2;
+  --c1: #4f6238;
+  --c2: #b0741a;
+  --c3: #3d6a8a;
+  --c4: #a24a4a;
+  --c5: #2f7a76;
+  --c6: #7a6a4f;
 
-  /* type */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* type — the product face (Onest) when installed, otherwise the system stack; nothing below 13px */
+  --font-sans: "Onest Variable", "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --t-xs: clamp(0.72rem, 0.70rem + 0.10vw, 0.78rem);
-  --t-sm: clamp(0.82rem, 0.79rem + 0.12vw, 0.88rem);
-  --t-base: clamp(0.95rem, 0.92rem + 0.15vw, 1rem);
-  --t-lg: clamp(1.1rem, 1.03rem + 0.30vw, 1.25rem);
-  --t-xl: clamp(1.35rem, 1.20rem + 0.60vw, 1.7rem);
-  --t-2xl: clamp(1.7rem, 1.35rem + 1.30vw, 2.4rem);
-  --t-3xl: clamp(2.1rem, 1.50rem + 2.40vw, 3.2rem);
+  --t-xs: 0.8125rem;
+  --t-sm: clamp(0.875rem, 0.85rem + 0.12vw, 0.9375rem);
+  --t-base: clamp(1rem, 0.96rem + 0.18vw, 1.0625rem);
+  --t-lg: clamp(1.2rem, 1.08rem + 0.4vw, 1.4rem);
+  --t-xl: clamp(1.5rem, 1.25rem + 0.85vw, 2rem);
+  --t-2xl: clamp(2rem, 1.4rem + 2vw, 3rem);
+  --t-3xl: clamp(2.6rem, 1.6rem + 3.6vw, 4.6rem);
 
   /* spacing, 4/8 scale */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
   --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
 
-  --radius: 10px;
-  --radius-sm: 6px;
-  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+  --radius: 2px;              /* one corner radius everywhere */
+  --radius-sm: 2px;
+  --shadow: none;             /* no shadows at rest; kept so older raw blocks keep working */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0a0a0b;
-    --surface: #18181b;
-    --surface-2: #232326;
-    --border: #2c2c31;
-    --fg: #f4f4f5;
-    --fg-muted: #a1a1aa;
-    --accent: #60a5fa;
-    --accent-fg: #0a0a0b;
-    --ring: #60a5fa;
-    --pos: #4ade80;
-    --neg: #f87171;
-    --warn: #fbbf24;
-    --c1: #60a5fa; --c2: #fbbf24; --c3: #4ade80;
-    --c4: #f472b6; --c5: #a78bfa; --c6: #22d3ee;
-    /* a light shadow is invisible on a dark surface — a border carries the separation instead */
-    --shadow: none;
+    --bg: #171913;
+    --surface: #20231b;
+    --surface-2: #2a2e24;
+    --border: #3b4032;
+    --fg: #e8e9e1;
+    --fg-muted: #a9ab9c;
+    --accent: #a9c47f;
+    --accent-fg: #171913;
+    --accent-soft: #2f3a22;
+    --field: #2c3d1c;
+    --field-fg: #e8e9e1;
+    --ring: #a9c47f;
+    --scrim: rgba(0, 0, 0, 0.8);
+    --pos: #8fc46a;
+    --neg: #f0877f;
+    --warn: #e0b04a;
+    --c1: #a9c47f; --c2: #e0a548; --c3: #7fb0d4;
+    --c4: #e08a8a; --c5: #6cc4bd; --c6: #b9a98a;
   }
 }
 

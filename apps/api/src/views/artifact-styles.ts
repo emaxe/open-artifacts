@@ -14,33 +14,35 @@
 export const ARTIFACT_BASE_CSS = /* css */ `
 :root {
   color-scheme: light dark;
-  --bg: #fafafa;
-  --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --border: #e4e4e7;
-  --fg: #18181b;
-  --fg-muted: #71717a;
-  --accent: #2563eb;
-  --ring: #2563eb;
-  --pos: #16a34a;
-  --neg: #dc2626;
-  --warn: #b45309;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --bg: #e6e0d2;
+  --surface: #efeade;
+  --surface-2: #d9d2c1;
+  --border: #c4bba6;
+  --fg: #2a2a26;
+  --fg-muted: #59574e;
+  --accent: #4f6238;
+  --accent-soft: #d3dbc0;
+  --ring: #4f6238;
+  --pos: #3f6b2a;
+  --neg: #a8321f;
+  --warn: #8a5a00;
+  --font-sans: "Onest Variable", "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0a0a0b;
-    --surface: #18181b;
-    --surface-2: #232326;
-    --border: #2c2c31;
-    --fg: #f4f4f5;
-    --fg-muted: #a1a1aa;
-    --accent: #60a5fa;
-    --ring: #60a5fa;
-    --pos: #4ade80;
-    --neg: #f87171;
-    --warn: #fbbf24;
+    --bg: #171913;
+    --surface: #20231b;
+    --surface-2: #2a2e24;
+    --border: #3b4032;
+    --fg: #e8e9e1;
+    --fg-muted: #a9ab9c;
+    --accent: #a9c47f;
+    --accent-soft: #2f3a22;
+    --ring: #a9c47f;
+    --pos: #8fc46a;
+    --neg: #f0877f;
+    --warn: #e0b04a;
   }
 }
 
@@ -60,7 +62,7 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 { line-height: 1.25; text-wrap: pretty; }
-h1 { font-size: 1.9rem; margin: 0 0 .5rem; }
+h1 { font-size: 2.2rem; letter-spacing: -0.03em; margin: 0 0 .5rem; }
 h2 { font-size: 1.5rem; margin: 2rem 0 .6rem; }
 h3 { font-size: 1.2rem; margin: 1.6rem 0 .5rem; }
 h4, h5, h6 { font-size: 1rem; margin: 1.3rem 0 .4rem; }
@@ -75,27 +77,26 @@ a { color: var(--accent); text-underline-offset: 2px; }
 
 blockquote {
   margin: 1rem 0;
-  padding: .2rem 1rem;
-  border-left: 3px solid var(--border);
-  color: var(--fg-muted);
+  padding: .6rem 1rem;
+  background: var(--accent-soft);
+  border-radius: 2px;
 }
+blockquote > :last-child { margin-bottom: 0; }
 
-hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+hr { border: none; height: 6px; background: var(--surface-2); margin: 2rem 0; }
 
-img { max-width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--border); }
+img { max-width: 100%; height: auto; border-radius: 2px; }
 
 code {
   font-family: var(--font-mono);
   font-size: .9em;
   background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 2px;
   padding: .1em .35em;
 }
 pre {
   background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 2px;
   padding: 14px 16px;
   overflow-x: auto;
 }
@@ -110,7 +111,7 @@ table {
 th, td { padding: .5rem .7rem; border-bottom: 1px solid var(--border); text-align: left; }
 th { background: var(--surface-2); font-weight: 600; }
 td { font-variant-numeric: tabular-nums; }
-tbody tr:nth-child(even) { background: var(--surface-2); }
+tbody tr:nth-child(even) { background: var(--surface); }
 @media (max-width: 640px) {
   /* markdown-it emits a bare <table> with no scroll wrapper of its own; this is the only lever
      available to keep a wide table from forcing the whole page to scroll horizontally. */
@@ -120,13 +121,11 @@ tbody tr:nth-child(even) { background: var(--surface-2); }
 kbd {
   font-family: var(--font-mono);
   font-size: .85em;
-  border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: 4px;
+  border-radius: 2px;
   padding: .05em .4em;
   background: var(--surface-2);
 }
-mark { background: var(--warn); color: #1a1200; padding: 0 .15em; border-radius: 2px; }
+mark { background: var(--warn); color: var(--bg); padding: 0 .15em; border-radius: 2px; }
 del, s { color: var(--fg-muted); }
 sup, sub { font-size: .75em; }
 dt { font-weight: 600; }
@@ -166,18 +165,16 @@ body {
   align-items: center;
   justify-content: center;
   padding: clamp(20px, 4vw, 40px);
-  background: #fafafa;
+  background: #e6e0d2;
 }
 @media (prefers-color-scheme: dark) {
-  body { background: #0a0a0b; }
+  body { background: #171913; }
 }
 .oa-svg-card {
   background: #ffffff;
-  border: 1px solid #e4e4e7;
-  border-radius: 10px;
+  border-radius: 2px;
   padding: 24px;
   max-width: 100%;
-  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
 }
 .oa-svg-card svg { max-width: 100%; height: auto; display: block; }
 @media print {

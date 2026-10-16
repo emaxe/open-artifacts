@@ -15,6 +15,7 @@
     if (!canvas) return;
     var root = document.documentElement;
     var cs = getComputedStyle(root);
+    if (window.__oaChartInit) window.__oaChartInit(cs);
     var cVars = ['--c1','--c2','--c3','--c4','--c5','--c6'];
     var palette = cVars.map(function(v){ return cs.getPropertyValue(v).trim(); });
     new Chart(canvas, {

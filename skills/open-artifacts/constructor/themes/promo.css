@@ -1,34 +1,35 @@
 /* === THEME DELTA: promo — landing pages & announcements === */
 
-main { max-width: 1000px; }
+main { max-width: 1040px; }
 
+/* The hero is one flat colour field with the headline set large — no gradient, no card. */
 .hero {
-  padding: var(--sp-8) 0;
-  text-align: center;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--accent) 8%, transparent) 0%,
-    transparent 60%
-  );
+  padding: var(--sp-8) var(--sp-5);
+  text-align: left;
+  background: var(--field);
+  color: var(--field-fg);
   border-radius: var(--radius);
-  padding-left: var(--sp-5);
-  padding-right: var(--sp-5);
   margin-bottom: var(--sp-6);
 }
-.hero__title { font-size: var(--t-3xl); font-weight: 800; }
-.hero__subtitle { font-size: var(--t-xl); max-width: 600px; margin: 0 auto var(--sp-4); }
+.hero__title { font-size: var(--t-3xl); font-weight: 700; letter-spacing: -0.04em; line-height: 0.98; }
+.hero__subtitle { font-size: var(--t-xl); max-width: 36ch; margin: 0 0 var(--sp-4); color: var(--field-fg); opacity: 0.85; }
 .hero__badge {
   display: block;
-  margin: 0 auto var(--sp-3);
+  margin: 0 0 var(--sp-3);
   width: fit-content;
+  background: var(--field-fg);
+  color: var(--field);
 }
+.hero__meta { color: var(--field-fg); opacity: 0.75; }
+.hero--center { text-align: center; }
+.hero--center .hero__subtitle { margin-left: auto; margin-right: auto; }
+.hero--center .hero__badge { margin-left: auto; margin-right: auto; }
 
 .list-card {
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: background-color 0.15s, transform 0.15s;
 }
 a.list-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0,0,0,.12);
 }
 
 .kpi-tile {

@@ -15,6 +15,7 @@
     if (!canvas) return;
     var root = document.documentElement;
     var cs = getComputedStyle(root);
+    if (window.__oaChartInit) window.__oaChartInit(cs);
     var colors = ['--c1','--c2','--c3','--c4','--c5','--c6','--accent'];
     var palette = colors.map(function(v){ return cs.getPropertyValue(v).trim(); });
     var colorMap = {c1:palette[0],c2:palette[1],c3:palette[2],c4:palette[3],c5:palette[4],c6:palette[5],accent:palette[6],pos:cs.getPropertyValue('--pos').trim(),neg:cs.getPropertyValue('--neg').trim(),warn:cs.getPropertyValue('--warn').trim()};
@@ -34,8 +35,8 @@
         maintainAspectRatio: false,
         plugins: { legend: { display: datasets.length > 1 } },
         scales: {
-          x: { stacked: {{#if stacked}}true{{else}}false{{/if}}, grid: { color: cs.getPropertyValue('--border').trim() }, ticks: { color: cs.getPropertyValue('--fg-muted').trim() } },
-          y: { stacked: {{#if stacked}}true{{else}}false{{/if}}, grid: { color: cs.getPropertyValue('--border').trim() }, ticks: { color: cs.getPropertyValue('--fg-muted').trim() } }
+          x: { stacked: {{#if stacked}}true{{else}}false{{/if}}, grid: { color: cs.getPropertyValue('--surface-2').trim() }, ticks: { color: cs.getPropertyValue('--fg-muted').trim() } },
+          y: { stacked: {{#if stacked}}true{{else}}false{{/if}}, grid: { color: cs.getPropertyValue('--surface-2').trim() }, ticks: { color: cs.getPropertyValue('--fg-muted').trim() } }
         }
       }
     });

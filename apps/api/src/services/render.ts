@@ -72,7 +72,19 @@ export function renderArtifactHtml(kind: ArtifactKind, content: string): string 
          <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
          <script>
            var oaDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-           mermaid.initialize({ startOnLoad: true, theme: oaDark ? "dark" : "default" });
+           mermaid.initialize({
+             startOnLoad: true,
+             theme: "base",
+             themeVariables: {
+               darkMode: oaDark,
+               fontFamily: getComputedStyle(document.body).fontFamily,
+               primaryColor: oaDark ? "#2f3a22" : "#d3dbc0",
+               primaryTextColor: oaDark ? "#e8e9e1" : "#2a2a26",
+               primaryBorderColor: oaDark ? "#a9c47f" : "#4f6238",
+               secondaryColor: oaDark ? "#2a2e24" : "#d9d2c1",
+               lineColor: oaDark ? "#a9ab9c" : "#59574e"
+             }
+           });
          </script>`,
         ARTIFACT_BASE_CSS,
       );

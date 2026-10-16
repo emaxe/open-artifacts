@@ -51,8 +51,8 @@ describe("renderArtifactHtml", () => {
   it("initializes mermaid with the OS color-scheme rather than a hardcoded theme", () => {
     const out = renderArtifactHtml("mermaid", "graph TD; A-->B;");
     expect(out).toContain("matchMedia");
-    expect(out).toContain('"dark"');
-    expect(out).toContain('"default"');
+    expect(out).toContain("darkMode: oaDark");
+    expect(out).toContain("themeVariables");
   });
 
   it("never interpolates the mermaid source into a <script> block", () => {

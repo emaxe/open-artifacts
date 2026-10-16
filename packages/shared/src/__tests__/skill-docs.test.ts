@@ -66,8 +66,8 @@ describe("token parity between DESIGN-core.md and the server's artifact-styles.t
   // These are the neutral surface/text tokens both files must share so a hand-written `html`
   // artifact and a server-rendered `markdown` artifact read as one product. Update both together.
   const CANONICAL_HEX = [
-    "#fafafa", "#ffffff", "#f4f4f5", "#e4e4e7", "#18181b", "#71717a", // light
-    "#0a0a0b", "#232326", "#2c2c31", "#a1a1aa", // dark (shares #18181b / #f4f4f5 with light)
+    "#e6e0d2", "#efeade", "#d9d2c1", "#c4bba6", "#2a2a26", "#59574e", // light (sand)
+    "#171913", "#20231b", "#2a2e24", "#3b4032", "#e8e9e1", "#a9ab9c", // dark (moss-black)
   ];
 
   it("DESIGN-core.md contains the canonical neutrals", () => {
