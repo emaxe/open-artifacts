@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "apps/landing/**"
+      - "packages/shared/src/design/**"
       - ".github/workflows/landing.yml"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"

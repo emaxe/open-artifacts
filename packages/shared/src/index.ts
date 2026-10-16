@@ -8,3 +8,4 @@ export * from "./access.js";
 export * from "./share-policy.js";
 export * from "./share-access.js";
 export * from "./schemas.js";
+export * from "./design/tokens.js";
