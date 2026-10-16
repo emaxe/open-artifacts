@@ -55,6 +55,17 @@ describe("renderArtifactHtml", () => {
     expect(out).toContain("themeVariables");
   });
 
+  it("keeps mermaid arrows intact (escaped exactly once)", () => {
+    const out = renderArtifactHtml("mermaid", "graph LR\n  A --> B");
+    expect(out).toContain("A --&gt; B");
+    expect(out).not.toContain("&amp;gt;");
+  });
+
+  it("escapes markup in mermaid source", () => {
+    const out = renderArtifactHtml("mermaid", "graph LR\n  A[<img src=x onerror=alert(1)>] --> B");
+    expect(out).not.toContain("<img");
+  });
+
   it("never interpolates the mermaid source into a <script> block", () => {
     const source = "graph TD;\nA-->|</script><script>alert(1)</script>|B;";
     const out = renderArtifactHtml("mermaid", source);

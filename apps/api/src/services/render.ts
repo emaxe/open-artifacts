@@ -61,7 +61,10 @@ export function renderArtifactHtml(kind: ArtifactKind, content: string): string 
       return wrapDocument(`<div class="oa-svg-card">${safeSvg}</div>`, ARTIFACT_SVG_CSS);
     }
     case "mermaid": {
-      const safeSource = sanitizeHtml(content, { allowedTags: [], allowedAttributes: {} });
+      // One `escapeHtml` is the whole defence for text inside a <pre>: the browser decodes it back to
+      // the original diagram source for mermaid. Running `sanitizeHtml` first as well would escape `>`
+      // once more and turn every arrow (`-->`) into `--&gt;` after decoding, which mermaid rejects.
+      const safeSource = content;
       // Theme comes from `matchMedia` at load time, same signal the iframe gets for everything
       // else (see DESIGN-core.md's "Theming inside the iframe"). The diagram source is never
       // interpolated into this script — it only ever appears HTML-escaped inside the <pre> above,
