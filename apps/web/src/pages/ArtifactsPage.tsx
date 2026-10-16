@@ -132,7 +132,7 @@ function CreateArtifactForm({
     e.preventDefault();
     setError(null);
     try {
-      await api.post(`/artifacts?orgId=${orgId}`, { title, kind, content, visibility: "private", lifetime });
+      await api.post(`/artifacts?orgId=${orgId}`, { title, kind, content, visibility: "org", lifetime });
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");

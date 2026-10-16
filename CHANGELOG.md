@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- Artifacts are now team-visible (`visibility: "org"`) by default, so regular team members see every team artifact in the dashboard instead of only their own. Migration `0010` switches existing `private` artifacts to `org`. Non-owners get a read-only artifact page; the author and team owners/admins get a visibility switch ("Team" / "Only me"). `GET /artifacts/:id` now returns `access`, and `GET /artifacts` items carry `canWrite`.
+
 ## [0.11.0] - 2026-09-19
 
 ### Changed

@@ -66,6 +66,7 @@ export function ArtifactDetailPage() {
   const [contentHash, setContentHash] = useState("");
   const [versions, setVersions] = useState<Version[]>([]);
   const [shares, setShares] = useState<Share[]>([]);
+  const [canWrite, setCanWrite] = useState(false);
   const [files, setFiles] = useState<ArtifactFile[]>([]);
   const [quota, setQuota] = useState<QuotaSnapshot | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -87,14 +88,25 @@ export function ArtifactDetailPage() {
 
   async function load() {
     if (!id) return;
-    const data = await api.get<{ artifact: ArtifactSummary; content: string; contentHash: string }>(`/artifacts/${id}`);
+    const data = await api.get<{
+      artifact: ArtifactSummary;
+      content: string;
+      contentHash: string;
+      access: { read: boolean; write: boolean; delete: boolean };
+    }>(`/artifacts/${id}`);
+    setCanWrite(data.access.write);
     setArtifact(data.artifact);
     setContent(data.content);
     setContentHash(data.contentHash);
     const v = await api.get<{ versions: Version[] }>(`/artifacts/${id}/versions`);
     setVersions(v.versions);
-    const s = await api.get<{ shares: Share[] }>(`/artifacts/${id}/shares`);
-    setShares(s.shares);
+    // Share management is write-gated server-side; a read-only teammate has no shares to see.
+    if (data.access.write) {
+      const s = await api.get<{ shares: Share[] }>(`/artifacts/${id}/shares`);
+      setShares(s.shares);
+    } else {
+      setShares([]);
+    }
     const f = await api.get<{ files: ArtifactFile[] }>(`/artifacts/${id}/files`);
     setFiles(f.files);
     setQuota(await api.get<QuotaSnapshot>(`/quota?artifactId=${id}`));
@@ -209,6 +221,16 @@ export function ArtifactDetailPage() {
     }
   }
 
+  async function changeVisibility(visibility: "private" | "org") {
+    try {
+      await api.patch(`/artifacts/${id}`, { visibility });
+      await load();
+      toast.show(visibility === "org" ? "Артефакт виден команде" : "Артефакт виден только вам", "success");
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось изменить видимость", "error");
+    }
+  }
+
   const expiresSoon = artifact?.expiresAt ? new Date(artifact.expiresAt).getTime() - Date.now() < 24 * 60 * 60 * 1000 : false;
 
   if (!artifact) return <Spinner />;
@@ -218,36 +240,53 @@ export function ArtifactDetailPage() {
       <PageHeader
         title={artifact.title}
         action={
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setDraft(content);
-                setEditing((v) => !v);
-              }}
-            >
-              {editing ? "Отмена" : "Редактировать"}
-            </Button>
-            <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-              Удалить
-            </Button>
-          </div>
+          canWrite ? (
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setDraft(content);
+                  setEditing((v) => !v);
+                }}
+              >
+                {editing ? "Отмена" : "Редактировать"}
+              </Button>
+              <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+                Удалить
+              </Button>
+            </div>
+          ) : undefined
         }
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted">
         <span>Истекает:</span>
         <Badge variant={expiresSoon ? "warning" : "neutral"}>{formatExpiry(artifact.expiresAt)}</Badge>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            setLifetimeDraft(artifact.expiresAt ? Math.round((new Date(artifact.expiresAt).getTime() - Date.now()) / 60_000) : null);
-            setLifetimeDialogOpen(true);
-          }}
-        >
-          Изменить срок
-        </Button>
+        {canWrite && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setLifetimeDraft(artifact.expiresAt ? Math.round((new Date(artifact.expiresAt).getTime() - Date.now()) / 60_000) : null);
+              setLifetimeDialogOpen(true);
+            }}
+          >
+            Изменить срок
+          </Button>
+        )}
+        <span className="ml-4">Видимость:</span>
+        {canWrite ? (
+          <Select
+            value={artifact.visibility}
+            onChange={(e) => changeVisibility(e.target.value as "private" | "org")}
+            className="w-auto"
+          >
+            <option value="org">Команда</option>
+            <option value="private">Только я</option>
+          </Select>
+        ) : (
+          <Badge variant="neutral">{artifact.visibility === "org" ? "Команда" : "Только владелец"}</Badge>
+        )}
       </div>
 
       {editing ? (
@@ -270,6 +309,7 @@ export function ArtifactDetailPage() {
         </Card>
       )}
 
+      {canWrite && (
       <Card className="mb-4">
         <CardHeader title="Шаринг" action={<Button onClick={openShareDialog}>Создать ссылку</Button>} />
         {lastShareUrl && (
@@ -311,6 +351,7 @@ export function ArtifactDetailPage() {
           </TBody>
         </Table>
       </Card>
+      )}
 
       <Card className="mb-4">
         <CardHeader
@@ -325,6 +366,7 @@ export function ArtifactDetailPage() {
         />
         {quota?.storageEnabled && (
           <>
+            {canWrite && (
             <label className="mb-3 inline-block">
               <span className="sr-only">Загрузить файл</span>
               <input
@@ -338,6 +380,7 @@ export function ArtifactDetailPage() {
                 className="block w-full max-w-sm cursor-pointer text-sm text-muted file:mr-3 file:cursor-pointer file:rounded-control file:border file:border-border file:bg-panel file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-fg hover:file:bg-panel-muted"
               />
             </label>
+            )}
             <Table>
               <THead>
                 <TR>
@@ -356,9 +399,11 @@ export function ArtifactDetailPage() {
                     <TD className="text-muted">{formatBytes(f.sizeBytes)}</TD>
                     <TD className="flex justify-end gap-2">
                       <CopyButton value={`${window.location.origin}${f.url}`} label="Ссылка" />
-                      <Button variant="ghost" size="sm" onClick={() => deleteFile(f.id)}>
-                        Удалить
-                      </Button>
+                      {canWrite && (
+                        <Button variant="ghost" size="sm" onClick={() => deleteFile(f.id)}>
+                          Удалить
+                        </Button>
+                      )}
                     </TD>
                   </TR>
                 ))}
@@ -388,7 +433,7 @@ export function ArtifactDetailPage() {
                 <TD className="text-muted">{formatBytes(v.sizeBytes)}</TD>
                 <TD className="text-muted">{formatDateTime(v.createdAt)}</TD>
                 <TD className="text-right">
-                  {v.versionNo !== versions[0]?.versionNo && (
+                  {canWrite && v.versionNo !== versions[0]?.versionNo && (
                     <Button variant="ghost" size="sm" onClick={() => restore(v.versionNo)}>
                       Откатить
                     </Button>

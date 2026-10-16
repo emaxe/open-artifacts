@@ -69,7 +69,7 @@ artifactRoutes.get("/artifacts", requireAuth, async (c) => {
   const visible = [];
   for (const artifact of all) {
     const access = await resolveAccessForIdentity(db, identity, artifact);
-    if (access.read) visible.push(artifact);
+    if (access.read) visible.push({ ...artifact, canWrite: access.write });
   }
   return c.json({ artifacts: visible });
 });
@@ -114,7 +114,7 @@ artifactRoutes.get("/artifacts/:id", requireAuth, async (c) => {
   if (!access.read) return c.json({ error: { code: "forbidden" } }, 403);
 
   const version = await getCurrentVersion(db, artifact);
-  return c.json({ artifact, content: version?.content, contentHash: version?.contentHash, versionNo: version?.versionNo });
+  return c.json({ artifact, content: version?.content, contentHash: version?.contentHash, versionNo: version?.versionNo, access });
 });
 
 /**

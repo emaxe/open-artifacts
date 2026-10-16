@@ -213,7 +213,7 @@ function createMcpServer(
         kind: artifactKindSchema,
         content: z.string().min(1).describe("Full content, e.g. a self-contained HTML document"),
         description: z.string().max(2000).optional(),
-        visibility: visibilitySchema.default("private").describe("'org' makes it readable by everyone in your org"),
+        visibility: visibilitySchema.default("org").describe("'org' (default) makes it readable by everyone in your org; 'private' hides it from teammates"),
         orgId: z.string().uuid().optional().describe("Team id to publish into — omit to use the connection's default team, or when you belong to only one"),
         lifetime: lifetimeSchema,
       },

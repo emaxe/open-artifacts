@@ -175,7 +175,7 @@ export const artifacts = pgTable("artifacts", {
   description: text("description"),
   kind: artifactKindEnum("kind").notNull(),
   currentVersionId: uuid("current_version_id"),
-  visibility: artifactVisibilityEnum("visibility").notNull().default("private"),
+  visibility: artifactVisibilityEnum("visibility").notNull().default("org"),
   sizeBytes: integer("size_bytes").notNull().default(0),
   // Denormalized sum of live artifact_files.size_bytes for this artifact — kept in the same
   // transaction as every file insert/delete so quota checks stay a single scan of `artifacts`,

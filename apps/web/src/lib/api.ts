@@ -233,4 +233,6 @@ export interface ArtifactSummary {
   updatedAt: string;
   /** `null` = never expires. */
   expiresAt: string | null;
+  /** Present on list responses only: whether the caller may edit/delete this artifact. */
+  canWrite?: boolean;
 }

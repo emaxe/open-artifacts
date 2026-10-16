@@ -108,7 +108,7 @@ export async function pushCommand(
       const org = resolveOrg({ flag: opts.org, creds });
       const res = await client.post<{ artifact: { id: string; expiresAt: string | null } }>(
         `/artifacts${org.orgId ? `?orgId=${org.orgId}` : ""}`,
-        { title, kind, content, visibility: "private", lifetime: opts.lifetime },
+        { title, kind, content, visibility: "org", lifetime: opts.lifetime },
       );
       artifactId = res.artifact.id;
       expiresAt = res.artifact.expiresAt;

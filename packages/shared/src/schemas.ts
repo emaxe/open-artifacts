@@ -24,7 +24,7 @@ export const createArtifactSchema = z.object({
   description: z.string().max(2000).optional(),
   kind: artifactKindSchema,
   content: z.string().min(1),
-  visibility: artifactVisibilitySchema.default("private"),
+  visibility: artifactVisibilitySchema.default("org"),
   lifetime: lifetimeSchema,
 });
 export type CreateArtifactInput = z.infer<typeof createArtifactSchema>;

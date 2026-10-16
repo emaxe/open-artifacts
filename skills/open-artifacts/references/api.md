@@ -61,8 +61,8 @@ EOF
 # -> {"artifact":{"id":"...","...":"..."},"currentVersion":1}
 ```
 
-`kind` is one of `html` | `markdown` | `mermaid` | `svg`. `visibility` is `private` (default) or
-`org` (visible to everyone in your org). `orgId` can be omitted for a personal key that belongs to
+`kind` is one of `html` | `markdown` | `mermaid` | `svg`. `visibility` is `org` (default; visible to everyone in your org, read-only for non-owners) or
+`private` (only the author and team owners/admins). `orgId` can be omitted for a personal key that belongs to
 exactly one team — the server picks it automatically; with more than one and no `orgId`, the
 request fails with `400 org_required` and the candidate list in the body (see the error shape
 below and the `org_required` row in `SKILL.md`'s error table).
