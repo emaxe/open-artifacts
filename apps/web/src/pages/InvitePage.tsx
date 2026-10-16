@@ -5,7 +5,7 @@ import { useAuth } from "../lib/auth";
 import { ORG_ROLE_LABELS, INVITE_STATUS_LABELS, maskEmailClient } from "../lib/labels";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { Input } from "../components/ui/Input";
+import { Input, PasswordInput } from "../components/ui/Input";
 import { Field } from "../components/ui/Field";
 import { Badge } from "../components/ui/Badge";
 import { Spinner } from "../components/ui/Spinner";
@@ -213,7 +213,7 @@ export function InvitePage() {
           <Input value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
         <Field label="Пароль" hint="Минимум 8 символов" required>
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
         </Field>
         {error && <p className="text-sm text-danger">{error}</p>}
         <Button type="submit" loading={busy}>

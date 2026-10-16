@@ -4,7 +4,7 @@ import { api, ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { sanitizeNextPath, isServerRenderedPath } from "../../lib/next-path";
 import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Input";
+import { Input, PasswordInput } from "../../components/ui/Input";
 import { Field } from "../../components/ui/Field";
 import { useAuthCopy } from "./AuthI18n";
 import { useInstanceConfig } from "./useInstanceConfig";
@@ -107,8 +107,9 @@ export function AuthForm() {
           />
         </Field>
         <Field label={t.passwordLabel} hint={tab === "register" ? t.passwordHint : undefined} required>
-          <Input
-            type="password"
+          <PasswordInput
+            showLabel={t.showPassword}
+            hideLabel={t.hidePassword}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required

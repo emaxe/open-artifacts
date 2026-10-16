@@ -35,6 +35,8 @@ export interface AuthCopy {
   emailLabel: string;
   passwordLabel: string;
   passwordHint: string;
+  showPassword: string;
+  hidePassword: string;
   loginSubmit: string;
   registerSubmit: string;
   loginAltPrompt: string;
@@ -66,6 +68,8 @@ export const AUTH_COPY: { ru: AuthCopy; en: AuthCopy } = {
     emailLabel: "Email",
     passwordLabel: "Пароль",
     passwordHint: "Минимум 8 символов",
+    showPassword: "Показать пароль",
+    hidePassword: "Скрыть пароль",
     loginSubmit: "Войти",
     registerSubmit: "Создать аккаунт",
     loginAltPrompt: "Нет аккаунта?",
@@ -106,6 +110,8 @@ export const AUTH_COPY: { ru: AuthCopy; en: AuthCopy } = {
     emailLabel: "Email",
     passwordLabel: "Password",
     passwordHint: "At least 8 characters",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     loginSubmit: "Sign in",
     registerSubmit: "Create account",
     loginAltPrompt: "No account yet?",

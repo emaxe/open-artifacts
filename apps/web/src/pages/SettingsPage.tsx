@@ -6,7 +6,7 @@ import { PageContainer } from "../components/PageContainer";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { Input } from "../components/ui/Input";
+import { Input, PasswordInput } from "../components/ui/Input";
 import { Field } from "../components/ui/Field";
 
 export function SettingsPage() {
@@ -59,10 +59,10 @@ export function SettingsPage() {
           </Field>
 
           <Field label="Новый пароль" hint="Оставьте пустым, если не хотите менять">
-            <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
           </Field>
           <Field label="Текущий пароль" hint="Обязательно для применения изменений" required>
-            <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+            <PasswordInput value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
           </Field>
 
           {error && <p className="text-sm text-danger">{error}</p>}
