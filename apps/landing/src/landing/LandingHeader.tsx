@@ -18,7 +18,7 @@ export function LandingHeader() {
     <header className="sticky top-0 z-20 bg-bg/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
         <a href="#top" className="flex items-center gap-2 font-semibold text-fg">
-          <LogoMark size={22} />
+          <LogoMark size={28} />
           <span className="hidden sm:inline">Open Artifacts</span>
         </a>
 

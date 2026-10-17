@@ -43,6 +43,7 @@ export const light = {
   c5: "#2f7a76",
   c6: "#7a6a4f",
   "logo-lockup": 'url("/brand/logo-lockup.png")',
+  "logo-mark": 'url("/brand/logo-mark.png")',
 };
 
 export const dark = {
@@ -70,6 +71,7 @@ export const dark = {
   c5: "#6cc4bd",
   c6: "#b9a98a",
   "logo-lockup": 'url("/brand/logo-lockup-dark.png")',
+  "logo-mark": 'url("/brand/logo-mark-dark.png")',
 };
 
 // Theme-independent tokens.

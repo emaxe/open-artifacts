@@ -67,6 +67,7 @@
   --oa-c5: #2f7a76;
   --oa-c6: #7a6a4f;
   --oa-logo-lockup: url("/brand/logo-lockup.png");
+  --oa-logo-mark: url("/brand/logo-mark.png");
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -95,6 +96,7 @@
     --oa-c5: #6cc4bd;
     --oa-c6: #b9a98a;
     --oa-logo-lockup: url("/brand/logo-lockup-dark.png");
+    --oa-logo-mark: url("/brand/logo-mark-dark.png");
   }
 }
 :root[data-theme="dark"] {
@@ -123,4 +125,5 @@
   --oa-c5: #6cc4bd;
   --oa-c6: #b9a98a;
   --oa-logo-lockup: url("/brand/logo-lockup-dark.png");
+  --oa-logo-mark: url("/brand/logo-mark-dark.png");
 }

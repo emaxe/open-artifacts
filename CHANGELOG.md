@@ -11,9 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-17
+
 ### Changed
 
 - **Landing page** returns to the earlier concept (hero, agent compatibility, problem, how it works, features, security, live preview, stats, audience, comparison, self-host) in the new flat sand-and-moss look. The photographs and the looping video are removed, and the constructor copy now says 41 blocks. Refinements: left-aligned numbered section headings, a two-column hero showing the command, the returned link and the rendered artifact, an asymmetric features section (two large tiles and a list), a connected request path in the security section, a one-row footer, cascading list reveals, hover states, a skip-to-content link, a branded 404 page and a 1200×630 social preview image.
+- **New logo** in two tone sets: the swirl-and-"A" mark as drawn for light pages and a light-moss recolour for dark pages, switched by the new `--oa-logo-mark` token (landing, web app, shared-artifact viewer) alongside the existing lockup token. The favicon and the iOS touch icon carry the mark on a dark-moss plate so they read on any browser or home-screen background. `scripts/gen-brand-assets.sh` regenerates every asset from the single source image.
 
 ## [0.13.0] - 2026-10-17
 

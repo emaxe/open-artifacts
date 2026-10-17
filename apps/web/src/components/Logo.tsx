@@ -5,9 +5,16 @@
  */
 
 /** Ring monogram only, no wordmark — used small (sidebar rail, mobile header) where the full
- * lockup's wordmark wouldn't fit. Colorful enough to read the same on both themes. */
+ * lockup's wordmark wouldn't fit. Two tone sets, swapped per theme through the --oa-logo-mark token
+ * (same three-state mechanism as the lockup below). */
 export function LogoMark({ size = 20, className }: { size?: number; className?: string }) {
-  return <img src="/brand/logo-mark.png" width={size} height={size} alt="" className={className} />;
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-block shrink-0 bg-[image:var(--oa-logo-mark)] bg-contain bg-center bg-no-repeat ${className ?? ""}`}
+      style={{ width: size, height: size }}
+    />
+  );
 }
 
 /**

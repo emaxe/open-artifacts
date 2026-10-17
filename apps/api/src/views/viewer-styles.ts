@@ -68,7 +68,12 @@ body.oa-viewer { display: flex; flex-direction: column; }
   transition: transform var(--oa-dur-fast) var(--oa-ease-out);
 }
 .oa-logo:hover { transform: scale(1.08); }
-.oa-logo img { display: block; width: 22px; height: 22px; }
+.oa-logo-mark {
+  display: block;
+  width: 22px;
+  height: 22px;
+  background: var(--oa-logo-mark) center / contain no-repeat;
+}
 .oa-panel-title h1 {
   flex: 0 1 auto;
   min-width: 0;

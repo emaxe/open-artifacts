@@ -13,7 +13,7 @@ export function LandingFooter() {
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="flex items-center gap-2 font-semibold text-fg">
-            <LogoMark size={20} /> Open Artifacts
+            <LogoMark size={24} /> Open Artifacts
           </p>
           <p className="mt-2 max-w-sm text-sm text-muted">{t.footer.tagline}</p>
         </div>

@@ -521,7 +521,7 @@ export function renderViewerShell(vm: ViewerShellModel, nonce: string, lang: Vie
 
   const body = `${notice}<header class="oa-panel">
 <div class="oa-panel-row">
-<div class="oa-panel-title"><a class="oa-logo" href="/" aria-label="${str.homeAria}"><img src="/brand/logo-mark.png" alt="" width="18" height="18"></a><h1 title="${escapedTitle}">${escapedTitle}</h1><span class="oa-kind">${kindLabel}</span><ul class="oa-meta oa-meta-inline">${primaryMeta.join("")}</ul></div>
+<div class="oa-panel-title"><a class="oa-logo" href="/" aria-label="${str.homeAria}"><span class="oa-logo-mark" aria-hidden="true"></span></a><h1 title="${escapedTitle}">${escapedTitle}</h1><span class="oa-kind">${kindLabel}</span><ul class="oa-meta oa-meta-inline">${primaryMeta.join("")}</ul></div>
 <div class="oa-actions">${actions.join("")}</div>
 </div>
 ${details}
