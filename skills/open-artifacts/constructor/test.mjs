@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -112,6 +113,173 @@ if (fs.existsSync(demoYaml)) {
   console.log('✅ Test 8 Passed: Full demo.yaml builds cleanly (11 blocks)');
   fs.unlinkSync('/tmp/t8.html');
 }
+
+// ─── v0.13 blocks ────────────────────────────────────────────────────────────
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oa-constructor-'));
+function build(name, yamlText, extra = '', shouldFail = false) {
+  const spec = path.join(tmpDir, `${name}.yaml`);
+  const out = path.join(tmpDir, `${name}.html`);
+  fs.writeFileSync(spec, yamlText);
+  const log = run(`node "${buildScript}" "${spec}" --out "${out}" ${extra} 2>&1`, shouldFail);
+  return { log, html: fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : '' };
+}
+function check(name, cond, detail = '') {
+  if (!cond) {
+    console.error(`❌ ${name} failed! ${detail}`);
+    process.exit(1);
+  }
+  console.log(`✅ ${name} Passed`);
+}
+const count = (str, sub) => str.split(sub).length - 1;
+
+// Test 10: deep nesting through containers; shared libraries are included once
+{
+  const { html } = build('t10', `title: T10
+blocks:
+  - type: section
+    title: Outer
+    blocks:
+      - type: grid
+        cols: 2
+        blocks:
+          - type: tabs
+            items:
+              - label: A
+                blocks:
+                  - type: accordion
+                    items:
+                      - title: Q
+                        blocks:
+                          - { type: chart-bar, labels: [a], datasets: [{ label: x, data: [1] }] }
+          - { type: mermaid-diagram, definition: "graph LR; A-->B" }
+`);
+  check('Test 10: nested section→grid→tabs→accordion→chart',
+    count(html, 'chart.umd.min.js') === 1 && count(html, 'mermaid.min.js') === 1 && html.includes('oa-accordion') && html.includes('canvas'));
+}
+
+// Test 11: common fields land on the root element of any block (markdown included)
+{
+  const { html } = build('t11', `title: T11
+blocks:
+  - { type: alert, body: hi, id: note-1, class: extra, width: wide, hide: print }
+  - { type: markdown, content: "text", id: md-1, hide: [mobile, print], spacing: { top: sp-7 } }
+  - { type: grid, cols: 2, blocks: [ { type: alert, body: a, span: 2 }, { type: alert, body: b } ] }
+`);
+  const tagOf = id => (html.match(new RegExp(`<[a-z]+[^>]*id="${id}"[^>]*>`)) || [''])[0];
+  const alertTag = tagOf('note-1');
+  check('Test 11: common fields on a block root (id/class/width/hide)',
+    ['extra', 'oa-w-wide', 'oa-hide-print'].every(c => alertTag.includes(c)), alertTag);
+  const mdTag = tagOf('md-1');
+  check('Test 11b: markdown root gets id, hide classes and margin',
+    mdTag.includes('oa-hide-mobile') && mdTag.includes('oa-hide-print') && mdTag.includes('margin-top:48px'), mdTag);
+  check('Test 11c: span becomes --oa-span on a grid child', html.includes('--oa-span:2'));
+}
+
+// Test 12: anchors + TOC (transliteration, de-duplication, placeholder replaced)
+{
+  const { html } = build('t12', `title: T12
+blocks:
+  - { type: toc, numbered: true }
+  - { type: text-section, heading: "Введение", body: "x" }
+  - { type: text-section, heading: "Введение", body: "y" }
+  - { type: markdown, content: "## Install\\n\\ntext\\n\\n### Details\\n" }
+`);
+  check('Test 12: TOC lists headings with slugs',
+    html.includes('id="vvedenie"') && html.includes('id="vvedenie-2"') && html.includes('href="#install"') &&
+    html.includes('href="#details"') && html.includes('oa-toc__num') && !html.includes('OA_TOC_LIST'));
+}
+
+// Test 13: runtime modules are inlined only when needed, and only once
+{
+  const plain = build('t13a', `title: T13a\nblocks:\n  - { type: alert, body: x }\n`).html;
+  check('Test 13a: no runtime without media blocks', !plain.includes('oa-runtime: lightbox') && !plain.includes('oa-runtime: slideshow') && !plain.includes('oa-runtime: accordion'));
+  const rich = build('t13b', `title: T13b
+blocks:
+  - { type: image, src: "data:image/png;base64,AAAA", zoomable: true }
+  - { type: gallery, items: ["data:image/png;base64,AAAA", "data:image/png;base64,BBBB"] }
+  - { type: slideshow, items: ["data:image/png;base64,AAAA", "data:image/png;base64,BBBB"] }
+`).html;
+  check('Test 13b: lightbox/slideshow runtime once each',
+    count(rich, 'oa-runtime: lightbox') === 1 && count(rich, 'oa-runtime: slideshow') === 1 && count(rich, 'oa-runtime: core') === 1);
+}
+
+// Test 14: gallery "+N" tile, local images inlined, slideshow data attributes
+{
+  fs.writeFileSync(path.join(tmpDir, 'p.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>');
+  const { html } = build('t14', `title: T14
+blocks:
+  - type: gallery
+    max_visible: 2
+    items: [p.svg, p.svg, p.svg, p.svg]
+  - { type: slideshow, autoplay: 3000, effect: fade, nav: thumbs, items: [p.svg, p.svg] }
+`);
+  check('Test 14: gallery +N, base64 inlining, slideshow config',
+    html.includes('+2') && html.includes('data:image/svg+xml;base64,') && html.includes('data-autoplay="3000"') && html.includes('data-effect="fade"'));
+}
+
+// Test 15: backward compatibility (list-cards, two-columns, zoomable image)
+{
+  const { html } = build('t15', `title: T15
+blocks:
+  - type: list-cards
+    cols: 2
+    items: [{ title: A, body: b, href: "https://example.com", badge: new }, { title: B }]
+  - type: two-columns
+    left: [{ type: alert, body: l }]
+    right: [{ type: alert, body: r }]
+  - { type: image, src: "data:image/png;base64,AAAA", caption: Cap, zoomable: true }
+`);
+  check('Test 15: list-cards / two-columns / zoomable image still render',
+    html.includes('list-card__title') && html.includes('--oa-cols:2') && html.includes('target="_blank"') &&
+    html.includes('two-columns__left') && html.includes('data-zoomable="true"') && html.includes('<figcaption>Cap'));
+}
+
+// Test 16: new aliases and "Did you mean" for block types
+{
+  const { html, log } = build('t16', `title: T16
+blocks:
+  - { type: faq, items: [{ question: Q, answer: A }] }
+  - { type: carousel, items: ["data:image/png;base64,AAAA"] }
+`);
+  check('Test 16a: faq → accordion, carousel → slideshow', html.includes('oa-accordion') && html.includes('data-oa-slideshow'));
+  const bad = build('t16b', `title: T16b\nblocks:\n  - { type: slidshow, items: [] }\n`, '', true).log;
+  check('Test 16b: block-type typo suggests slideshow', bad.includes('Did you mean "slideshow"?'), bad);
+}
+
+// Test 17: embed — video from a third-party host warns; unknown fields still caught
+{
+  const { log } = build('t17', `title: T17
+blocks:
+  - { type: embed, kind: video, src: "https://cdn.example.com/a.mp4" }
+`);
+  check('Test 17: third-party video warns about CSP', log.includes('blocked by the viewer CSP'), log);
+}
+
+// Test 18: literal {{ }} inside nested blocks survive; javascript: links are dropped
+{
+  const { html } = build('t18', `title: T18
+blocks:
+  - type: section
+    blocks:
+      - { type: code-block, lang: plaintext, code: "<p>{{ name }}</p>" }
+      - type: buttons
+        items:
+          - { label: Bad, href: "javascript:alert(1)" }
+          - { label: Good, href: "https://example.com" }
+`);
+  check('Test 18a: braces inside a nested code block are preserved', html.includes('{{ name }}'));
+  check('Test 18b: javascript: href removed, https kept', !html.includes('javascript:') && html.includes('href="https://example.com"'));
+}
+
+// Test 19: showcase builds cleanly (no warnings)
+{
+  const showcase = path.join(repoRoot, 'demo', 'showcase.yaml');
+  if (fs.existsSync(showcase)) {
+    const out = run(`node "${buildScript}" "${showcase}" --out "${path.join(tmpDir, 'showcase.html')}"`);
+    check('Test 19: demo/showcase.yaml builds without warnings', !/warnings|failed/i.test(out), out);
+  }
+}
+fs.rmSync(tmpDir, { recursive: true, force: true });
 
 // Cleanup
 fs.unlinkSync('/tmp/t1.yaml'); fs.unlinkSync('/tmp/t1.html');

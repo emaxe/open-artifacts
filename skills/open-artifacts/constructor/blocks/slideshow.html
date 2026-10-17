@@ -1,0 +1,13 @@
+<div class="oa-slideshow oa-slideshow--{{effect}} oa-slideshow--cap-{{captions}}" role="region" aria-roledescription="carousel" aria-label="{{_label}}" data-oa-slideshow data-effect="{{effect}}" data-nav="{{nav}}" data-arrows="{{_arrows}}" data-autoplay="{{_autoplay}}" data-loop="{{_loop}}" data-per-view="{{_per_view}}" style="{{_style}}">
+  <div class="oa-slideshow__viewport">
+    <div class="oa-slideshow__track">
+      {{#each items}}
+      <div class="oa-slide{{#if this.src}} oa-slide--img{{/if}}" role="group" aria-roledescription="slide" aria-label="{{this._n}} / {{../_total}}">
+        {{#if this.src}}<img class="oa-slide__img" src="{{this.src}}" alt="{{this.alt}}" loading="lazy"{{#if ../zoomable}} data-zoomable="true" data-oa-group="{{../_group}}" data-caption="{{this._cap_text}}" tabindex="0" role="button"{{/if}}>{{/if}}
+        {{#if this._blocks_html}}<div class="oa-slide__blocks">{{{this._blocks_html}}}</div>{{/if}}
+        {{#if this._cap_text}}<div class="oa-slide__caption">{{#if this.title}}<strong>{{this.title}}</strong>{{/if}}{{#if this._caption_html}}<span>{{{this._caption_html}}}</span>{{/if}}</div>{{/if}}
+      </div>
+      {{/each}}
+    </div>
+  </div>
+</div>

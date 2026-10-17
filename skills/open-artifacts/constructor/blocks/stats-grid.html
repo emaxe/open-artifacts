@@ -4,6 +4,7 @@
     {{#if this.icon}}<span class="stats-icon" aria-hidden="true">{{this.icon}}</span>{{/if}}
     <div class="stats-value" style="{{#if this.color}}color: var(--{{this.color}});{{/if}}">{{this.value}}</div>
     <div class="stats-label">{{this.label}}</div>
+    {{#if this._spark_svg}}<div class="oa-spark-wrap" style="color: var(--{{this.color}});">{{{this._spark_svg}}}</div>{{/if}}
   </div>
   {{/each}}
 </div>

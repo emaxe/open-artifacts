@@ -1,0 +1,12 @@
+<ol class="oa-steps oa-steps--{{variant}}">
+  {{#each items}}
+  <li class="oa-step oa-step--{{this._status}}">
+    <span class="oa-step__num" aria-hidden="true">{{this._num}}</span>
+    <div class="oa-step__main">
+      <div class="oa-step__title">{{this.title}}</div>
+      {{#if this._body_html}}<div class="oa-step__body">{{{this._body_html}}}</div>{{/if}}
+      {{#if this._blocks_html}}<div class="oa-step__blocks">{{{this._blocks_html}}}</div>{{/if}}
+    </div>
+  </li>
+  {{/each}}
+</ol>

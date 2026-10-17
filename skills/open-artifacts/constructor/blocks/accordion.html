@@ -1,0 +1,13 @@
+<div class="oa-accordion oa-accordion--{{variant}}" data-oa-accordion{{#if _exclusive}} data-exclusive="true"{{/if}}>
+  {{#each items}}
+  <details class="oa-acc__item"{{#if ../_exclusive}} name="{{../_name}}"{{/if}}{{#if this._open}} open{{/if}}>
+    <summary class="oa-acc__summary">
+      {{#if this.icon}}<span class="oa-acc__icon" aria-hidden="true">{{this.icon}}</span>{{/if}}
+      <span class="oa-acc__title">{{this.title}}</span>
+      {{#if this.badge}}<span class="oa-acc__badge">{{this.badge}}</span>{{/if}}
+      <span class="oa-acc__chev" aria-hidden="true"></span>
+    </summary>
+    <div class="oa-acc__body">{{{this._body_html}}}{{{this._blocks_html}}}</div>
+  </details>
+  {{/each}}
+</div>

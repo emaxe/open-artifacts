@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-17
+
+### Added
+
+- **Constructor containers**: `section` (titled container with background and padding; aliases `container`, `wrapper`), `grid` (columns as a number, `"2fr 1fr"` tracks or auto-fit; children take `span` / `row_span`) and `stack` (flex row or column; aliases `row`, `flex`). `two-columns` is unchanged and documented as a special case of `grid`. Blocks nest to any depth through `section`, `grid`, `stack`, `two-columns`, and the items of `tabs`, `accordion`, `steps`, `slideshow` and `cards`.
+- **Common fields on every block**: `id`, `class`, `width` (`narrow|normal|wide|full`), `spacing`, `hide` (`mobile|desktop|print`), `span`, `row_span`, `toc_label`, `toc_level`. They are applied to the block's root element, with no wrapper added.
+- **Anchors and navigation**: the `anchor` and `toc` blocks (`inline`, `sticky` and `sidebar` variants, depth, numbering, headings and/or labelled blocks), automatic transliterated and de-duplicated ids for `hero`, `text-section`, `section` titles and Markdown headings, any `href: "#id"`, and spec-level options `heading_links` (on by default, a "#" link on headings), `back_to_top` and `width: narrow|normal|wide|<px>`.
+- **Media**: `image` gained `title`, Markdown `caption`, `credit`, `link`, `fit`, `aspect`, `height`, `float`, `rounded`, `border`, `shadow`, `lazy` and `group`. The lightbox now browses groups (arrows, keys, swipe, counter, caption) and zooms 2x with drag-to-pan. New blocks `gallery` (grid, masonry or strip, caption modes, "+N" overflow tile), `slideshow` (aliases `carousel`, `slider`; image or nested-block slides, slide or fade, dots, thumbnails or counter, autoplay with a pause button, several slides per view, keyboard and swipe, honours `prefers-reduced-motion`) and `image-compare` (before/after slider).
+- **`cards`** replaces `list-cards` (which keeps working as the same block) and adds images, subtitle, tags, meta, buttons, footer, accent colour, nested blocks and the `variant`, `layout`, `equal_height` and `image_aspect` options. **`accordion`** (aliases `faq`, `collapse`, `details`) is built on native `<details>`, supports single or multiple open items and is fully expanded when printing.
+- **More blocks**: `steps`, `quote`, `compare` (`vs`, `pros-cons`, `before-after`), `feature-matrix`, `buttons`, `cta`, `embed` (a video from this instance's `/af/` files or a link preview card; iframes are not possible under the viewer CSP), `definition-list` (also accepts a plain mapping) and `checklist` with a progress summary. `spark: [numbers]` on `kpi-row` and `stats-grid` items draws an inline SVG sparkline.
+- The constructor documentation has a "Common fields" section, a nesting note and a "CSP limits for media" section; the builder spec describes the block tree, the anchor registry and the runtime modules.
+
+### Changed
+
+- **`image.title` is no longer an alias of `caption`.** It is now a heading shown above the picture. Specs that used `title` as the caption must rename it to `caption`.
+- Interactive behaviour of blocks moved from the templates into small modules (`constructor/runtime/*.js`) that are inlined once and only when a block needs them; a page without zoomable images no longer carries the lightbox code.
+- External `http(s)` links in constructor blocks now open in a new tab automatically (the artifact lives in a sandboxed iframe); `javascript:` and `data:` hrefs are dropped.
+- The block-type aliases `grid` (with `items`), `columns` and `section` (with `body`) keep their old meaning when the data has the old shape: `grid` with `items` is `stats-grid`, `columns` is `two-columns` (or `grid` when it has `blocks`), `section` with `body` is `text-section`.
+
 ## [0.12.0] - 2026-10-16
 
 ### Changed

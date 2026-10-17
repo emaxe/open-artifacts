@@ -13,7 +13,7 @@
   <a href="#"><img src="https://img.shields.io/badge/Theme-light_%2F_dark-4f6238" alt="Light and dark themes"></a>
   <a href="#"><img src="https://img.shields.io/badge/UI-RU_%7C_EN-3d6a8a" alt="Russian and English UI"></a>
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-Server-purple" alt="MCP Server"></a>
-  <a href="#-constructor-mode-declarative-artifact-builder"><img src="https://img.shields.io/badge/Constructor_Mode-23_Blocks-blueviolet?logo=yaml" alt="Constructor Mode: 23 Blocks"></a>
+  <a href="#-constructor-mode-declarative-artifact-builder"><img src="https://img.shields.io/badge/Constructor_Mode-41_Blocks-blueviolet?logo=yaml" alt="Constructor Mode: 41 Blocks"></a>
   <a href="#file-storage-and-quotas"><img src="https://img.shields.io/badge/Storage-S3--compatible-orange?logo=amazons3&logoColor=white" alt="S3-compatible storage"></a>
 </p>
 
@@ -28,14 +28,14 @@ Runs as a lightweight, single-stack Docker Compose deployment.
 ---
 
 ### Topics & Tags
-`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `mcp-server` • `model-context-protocol` • `self-hosted` • `docker` • `hono` • `react` • `typescript` • `cli` • `developer-tools` • `open-artifacts` • `llm` • `s3` • `constructor` • `yaml` • `mermaid`
+`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `mcp-server` • `model-context-protocol` • `self-hosted` • `docker` • `hono` • `react` • `typescript` • `cli` • `developer-tools` • `open-artifacts` • `llm` • `s3` • `constructor` • `yaml` • `mermaid` • `report-generator` • `slideshow`
 
 ---
 
 ## Key Features
 
 - 🛡️ **Zero-Trust Security Sandbox**: Untrusted agent-generated artifacts render inside strictly isolated `<iframe>` containers with sandboxed origins (`allow-scripts`, no credential or cookie leaks, strict Content Security Policy).
-- 🧩 **Constructor Mode (Declarative Artifact Builder)**: Fast, token-efficient assembly of HTML deliverables. Agents describe pages as clean YAML/JSON specifications or reference existing Markdown reports using 23 modular blocks. Compiles in milliseconds, cuts token generation costs by ~80%, and eliminates CSS/HTML hallucinations.
+- 🧩 **Constructor Mode (Declarative Artifact Builder)**: Fast, token-efficient assembly of HTML deliverables. Agents describe pages as clean YAML/JSON specifications or reference existing Markdown reports using 41 modular blocks. Compiles in milliseconds, cuts token generation costs by ~80%, and eliminates CSS/HTML hallucinations.
 - 📦 **Multi-Format Support**: Interactive HTML applications, GitHub-flavored Markdown, responsive Mermaid diagrams, and raw vector SVG graphics.
 - ⚡ **Built-in MCP Server**: Ready-to-use Model Context Protocol endpoint at `/mcp` (Streamable HTTP) for immediate integration with Cursor, Claude Desktop, and Claude Code.
 - 🤖 **Standard AI Agent Skill**: First-class support for `skills.sh` (`npx skills add emaxe/open-artifacts`) with automatic CLI detection and device-flow authorization.
@@ -355,7 +355,7 @@ Already have a finished Markdown document (research note, RFC, post-mortem, or a
 
 ---
 
-### 23 Built-in Modular Blocks
+### 41 Built-in Modular Blocks
 
 | Block | Description |
 |---|---|
@@ -371,8 +371,26 @@ Already have a finished Markdown document (research note, RFC, post-mortem, or a
 | `two-columns` | Multi-column layout with configurable ratio (`1:1`, `2:1`, `3:2`) and nested blocks |
 | `timeline` | Vertical chronological milestones with visual status indicators (`done`, `active`, `pending`) |
 | `progress-bars` | Multi-item progress bars with automatic percentage calculation |
-| `list-cards` | Responsive grid of cards for features, links, and content blocks |
-| `image` | Responsive image with auto-base64 inlining, captions, and fullscreen lightbox (`zoomable: true`) |
+| `cards` | Responsive grid of cards (alias `list-cards`): images, badges, tags, buttons, links, and nested blocks |
+| `section` | Titled container (background, padding) that nests any blocks |
+| `grid` | CSS grid of blocks: column count, `"2fr 1fr"` tracks, auto-fit, per-block `span` |
+| `stack` | Flex row or column of blocks with gap, alignment, and wrapping |
+| `anchor` | Invisible jump target for `#id` links |
+| `toc` | Table of contents (inline, sticky, or sidebar) built from page headings |
+| `gallery` | Image gallery (grid, masonry, strip) with lightbox and a "+N" overflow tile |
+| `slideshow` | Carousel of images or nested blocks with dots/thumbnails, autoplay, swipe, and keyboard control |
+| `image-compare` | Before/after image slider |
+| `accordion` | Collapsible sections on native `<details>` (FAQ), expanded when printing |
+| `steps` | Numbered step-by-step instructions |
+| `quote` | Quote or testimonial with author and avatar |
+| `compare` | Side-by-side comparison: vs, pros/cons, before/after |
+| `feature-matrix` | Feature/plan matrix with ✓/✗ cells and a highlighted column |
+| `buttons` | Row of link buttons |
+| `cta` | Call-to-action banner with buttons |
+| `embed` | Video from the instance's `/af/` files or a link preview card (no iframes under the viewer CSP) |
+| `definition-list` | Glossary and key-value pairs |
+| `checklist` | Task list with statuses and a progress summary |
+| `image` | Responsive image with auto-base64 inlining, title, markdown captions, credit, aspect/float options, and a fullscreen lightbox (`zoomable: true`) |
 | `code-block` | Syntax-highlighted code snippets with dark-mode compatibility |
 | `alert` | Semantic callout boxes (`info`, `warning`, `error`, `success`) with default icons |
 | `text-section` | Structured prose section with heading and Markdown body |

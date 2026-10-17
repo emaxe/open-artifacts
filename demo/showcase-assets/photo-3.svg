@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a24a4a"/><stop offset="1" stop-color="#b0741a"/></linearGradient></defs>
+<rect width="1200" height="800" fill="url(#g)"/>
+<circle cx="936" cy="224" r="96" fill="#fff" opacity=".55"/>
+<polygon points="0,800 0,669 40,651 80,654 120,686 160,740 200,792 240,818 280,807 320,761 360,703 400,656 440,638 480,647 520,670 560,681 600,670 640,632 680,585 720,553 760,555 800,594 840,656 880,715 920,751 960,753 1000,731 1040,705 1080,696 1120,714 1160,750 1200,783 1200,800" fill="#000" opacity=".25"/>
+<text x="60" y="750" font-family="system-ui,sans-serif" font-size="64" font-weight="700" fill="#fff">Canyon · 3</text>
+</svg>

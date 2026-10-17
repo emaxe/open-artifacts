@@ -1,0 +1,11 @@
+<figure class="oa-compare-wrap">
+  <div class="oa-compare" data-oa-compare style="--oa-pos:{{_start}}%;aspect-ratio:{{_aspect}}">
+    <img class="oa-compare__img oa-compare__img--after" src="{{after}}" alt="{{after_label}}" loading="lazy">
+    <img class="oa-compare__img oa-compare__img--before" src="{{before}}" alt="{{before_label}}" loading="lazy">
+    {{#if before_label}}<span class="oa-compare__label oa-compare__label--before">{{before_label}}</span>{{/if}}
+    {{#if after_label}}<span class="oa-compare__label oa-compare__label--after">{{after_label}}</span>{{/if}}
+    <span class="oa-compare__handle" aria-hidden="true"></span>
+    <input class="oa-compare__range" type="range" min="0" max="100" step="1" value="{{_start}}" aria-label="{{_label}}">
+  </div>
+  {{#if _caption_html}}<figcaption>{{{_caption_html}}}</figcaption>{{/if}}
+</figure>

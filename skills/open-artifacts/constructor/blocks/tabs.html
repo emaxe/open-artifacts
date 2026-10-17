@@ -32,8 +32,10 @@
       var panel = document.getElementById(panelId);
       if (panel) {
         panel.setAttribute('aria-hidden', 'false');
-        window.dispatchEvent(new Event('resize'));
-        if (window.__renderMermaid) {
+        if (window.__oaReveal) {
+          window.__oaReveal(panel);
+        } else if (window.__renderMermaid) {
+          window.dispatchEvent(new Event('resize'));
           window.__renderMermaid(panel);
         } else if (window.mermaid) {
           try { mermaid.run({ nodes: panel.querySelectorAll('.mermaid') }); } catch(e) {}

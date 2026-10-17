@@ -30,16 +30,17 @@ constructor/themes/
 /* === CORE TOKENS (generated from DESIGN-core.md) === */
 :root {
   color-scheme: light dark;
-  --bg: #fafafa; --surface: #ffffff; --surface-2: #f4f4f5;
-  --border: #e4e4e7;
-  --fg: #18181b; --fg-muted: #71717a;
-  --accent: #2563eb; --accent-fg: #ffffff; --ring: #2563eb;
-  --pos: #16a34a; --neg: #dc2626; --warn: #b45309;
-  --c1: #2563eb; --c2: #d97706; --c3: #16a34a;
-  --c4: #db2777; --c5: #7c3aed; --c6: #0891b2;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --bg: #e6e0d2; --surface: #efeade; --surface-2: #d9d2c1;
+  --border: #c4bba6;
+  --fg: #2a2a26; --fg-muted: #59574e;
+  --accent: #4f6238; --accent-fg: #ffffff; --accent-soft: #d3dbc0; --ring: #4f6238;
+  --field: #3f5a2a; --field-fg: #ffffff;
+  --pos: #3f6b2a; --neg: #a8321f; --warn: #8a5a00;
+  --c1: #4f6238; --c2: #b0741a; --c3: #3d6a8a;
+  --c4: #a24a4a; --c5: #2f7a76; --c6: #7a6a4f;
+  --font-sans: "Onest Variable", "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --t-xs: clamp(0.72rem, 0.70rem + 0.10vw, 0.78rem);
+  --t-xs: 0.8125rem;
   /* ... остальные токены из DESIGN-core.md ... */
 }
 @media (prefers-color-scheme: dark) { /* dark overrides */ }
@@ -248,6 +249,34 @@ a.list-card:hover { border-color: var(--accent); }
 }
 ```
 
+### Часть 3: классы блоков 0.13
+
+Блоки 0.13 используют семейства классов с префиксом `oa-` (БЭМ: `oa-block__элемент`, `oa-block--модификатор`). Они определяются в `default.css` и опираются на те же токены (`--surface`, `--accent-soft`, `--c1…--c6`, `--sp-*`); тёмная тема и `prefers-reduced-motion` наследуются от токенов. Темы-дельты переопределяют только то, что нужно.
+
+| Семейство | Блок | Основные элементы и модификаторы |
+|-----------|------|----------------------------------|
+| `oa-section` | `section` | `__head`, `__eyebrow`, `__title`, `__subtitle`, `__body`; `--surface`, `--accent-soft`, `--gradient`, `--image`, `--center`, `--right`, `--bordered` |
+| `oa-grid` | `grid` | Колонки задаёт `--oa-cols`, число колонок на мобильных — `--oa-cols-m`, промежуток — `--oa-gap`; `--oa-span` на дочерних блоках |
+| `oa-stack` | `stack` | `--row`, `--column`, `--wrap`, `--nowrap`, `--fill` |
+| `oa-toc` | `toc` | `__title`, `__list`, `__item`, `__item--l2/l3`, `__num`; `--inline`, `--sticky`, `--sidebar` |
+| `oa-gallery` | `gallery` | `__item`, `__img`, `__link`, `__cap`, `__more`; `--grid`, `--masonry`, `--strip`, `--cap-below/overlay/hover/none` |
+| `oa-slideshow`, `oa-slide` | `slideshow` | `__viewport`, `__track`, `oa-slide__img`, `__caption`, `__blocks`; кнопки, точки, миниатюры создаёт runtime; `--slide`, `--fade` |
+| `oa-compare` | `image-compare` (шторка) | `__img--before/after`, `__label`, `__handle`, `__range`; обёртка `oa-compare-wrap` |
+| `oa-cards`, `oa-card` | `cards` (и `list-cards`) | `oa-card__media`, `__main`, `__subtitle`, `__meta`, `__tags`, `__tag`, `__blocks`, `__footer`, `__link`; `--elevated/outline/flat/accent`, `--grid/list/scroll`, `--equal`; сохранены `list-cards`, `list-card`, `list-card__*` |
+| `oa-accordion`, `oa-acc__*` | `accordion` | `oa-acc__item`, `__summary`, `__title`, `__icon`, `__badge`, `__chev`, `__body`; `--bordered/separated/minimal`; при печати все `details` раскрыты |
+| `oa-steps`, `oa-step` | `steps` | `oa-step__num`, `__main`, `__title`, `__body`, `__blocks`; `--vertical/horizontal`, статусы `--done/active/pending` |
+| `oa-quote` | `quote` | `__text`, `__by`, `__avatar`, `__author`, `__role`, `__source`; `--plain/card/large` |
+| `oa-cmp` | `compare` | `__side`, `__title`, `__badge`, `__list`, `__body`, `__vs`; тон стороны — `__side--pos/neg/neutral`; `--vs`, `--pros-cons`, `--before-after` |
+| `oa-matrix` | `feature-matrix` | `oa-matrix-wrap`, `oa-matrix-scroll`, `__feature`, `__group`, `__name`, `__sub`, `__badge`, `__note`, `__footnote`; ячейки `.is-yes`, `.is-no`, `.is-hl` |
+| `oa-btn`, `oa-buttons` | `buttons`, кнопки в `cards` / `cta` | `oa-btn--primary/secondary/ghost/link/static`, `oa-btn__icon`; `oa-buttons--<size>`, `--left/center/right` |
+| `oa-cta` | `cta` | `__text`, `__title`, `__body`, `__actions`; фон — `--accent/surface/accent-soft/gradient/image` |
+| `oa-embed` | `embed` | `--video`, `--link`; `__video`, `__card`, `__thumb`, `__play`, `__info`, `__title`, `__host` |
+| `oa-dl` | `definition-list` | `oa-dl__row`; `--stacked/inline/grid` |
+| `oa-checklist`, `oa-check` | `checklist` | `__title`, `__summary`, `__count`, `__list`; `oa-check__box`, `__text`, `__label`, `__note`; статусы `--done/todo/blocked/skip` |
+| `oa-spark` | `spark` в `kpi-row`, `stats-grid` | Inline SVG с цветом `currentColor` |
+
+Служебные классы общих полей: `oa-w-narrow/normal/wide/full` (ширина), `oa-hide-mobile/desktop/print` (скрытие), `oa-anchor` (невидимая точка перехода), `oa-hlink` (ссылка «#» у заголовка), `oa-top` (кнопка «наверх»).
+
 ---
 
 ## `data.css` — Delta для дашбордов
@@ -341,17 +370,17 @@ main { max-width: 1000px; }
 
 | Значение | CSS-переменная | Light | Dark |
 |----------|---------------|-------|------|
-| `accent` | `--accent` | #2563eb | #60a5fa |
-| `pos` | `--pos` | #16a34a | #4ade80 |
-| `neg` | `--neg` | #dc2626 | #f87171 |
-| `warn` | `--warn` | #b45309 | #fbbf24 |
-| `muted` | `--fg-muted` | #71717a | #a1a1aa |
-| `c1` | `--c1` | #2563eb | #60a5fa |
-| `c2` | `--c2` | #d97706 | #fbbf24 |
-| `c3` | `--c3` | #16a34a | #4ade80 |
-| `c4` | `--c4` | #db2777 | #f472b6 |
-| `c5` | `--c5` | #7c3aed | #a78bfa |
-| `c6` | `--c6` | #0891b2 | #22d3ee |
+| `accent` | `--accent` | #4f6238 | #a9c47f |
+| `pos` | `--pos` | #3f6b2a | #8fc46a |
+| `neg` | `--neg` | #a8321f | #f0877f |
+| `warn` | `--warn` | #8a5a00 | #e0b04a |
+| `muted` | `--fg-muted` | #59574e | #a9ab9c |
+| `c1` | `--c1` | #4f6238 | #a9c47f |
+| `c2` | `--c2` | #b0741a | #e0a548 |
+| `c3` | `--c3` | #3d6a8a | #7fb0d4 |
+| `c4` | `--c4` | #a24a4a | #e08a8a |
+| `c5` | `--c5` | #2f7a76 | #6cc4bd |
+| `c6` | `--c6` | #7a6a4f | #b9a98a |
 
 Использование в шаблоне блока:
 ```html

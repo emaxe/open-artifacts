@@ -1,0 +1,14 @@
+{{#if _is_video}}
+<figure class="oa-embed oa-embed--video">
+  <video class="oa-embed__video" controls playsinline preload="metadata" {{#if _poster}}poster="{{_poster}}" {{/if}}{{_flags}} src="{{_src}}" style="aspect-ratio:{{_aspect}}"></video>
+  {{#if _caption_html}}<figcaption>{{{_caption_html}}}</figcaption>{{/if}}
+</figure>
+{{else}}
+<figure class="oa-embed oa-embed--link">
+  <a class="oa-embed__card" {{{_link_attrs}}}>
+    <span class="oa-embed__thumb" style="aspect-ratio:{{_aspect}}">{{#if _thumb}}<img src="{{_thumb}}" alt="" loading="lazy">{{/if}}<span class="oa-embed__play" aria-hidden="true"></span></span>
+    <span class="oa-embed__info"><span class="oa-embed__title">{{_title}}</span><span class="oa-embed__host">{{_meta}}</span></span>
+  </a>
+  {{#if _caption_html}}<figcaption>{{{_caption_html}}}</figcaption>{{/if}}
+</figure>
+{{/if}}

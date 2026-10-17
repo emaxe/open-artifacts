@@ -1,0 +1,13 @@
+<figure class="oa-quote oa-quote--{{variant}}">
+  <blockquote class="oa-quote__text">{{{_text_html}}}</blockquote>
+  {{#if _has_by}}
+  <figcaption class="oa-quote__by">
+    {{#if avatar}}<img class="oa-quote__avatar" src="{{avatar}}" alt="" loading="lazy">{{/if}}
+    <span class="oa-quote__meta">
+      {{#if author}}<span class="oa-quote__author">{{author}}</span>{{/if}}
+      {{#if role}}<span class="oa-quote__role">{{role}}</span>{{/if}}
+      {{#if _source_html}}<span class="oa-quote__source">{{{_source_html}}}</span>{{/if}}
+    </span>
+  </figcaption>
+  {{/if}}
+</figure>

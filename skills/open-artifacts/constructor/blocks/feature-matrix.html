@@ -1,0 +1,19 @@
+<div class="oa-matrix-wrap">
+  {{#if caption}}<div class="table-caption">{{caption}}</div>{{/if}}
+  <div class="oa-matrix-scroll">
+    <table class="oa-matrix">
+      <thead>
+        <tr>
+          <th scope="col"><span class="sr-only">Feature</span></th>
+          {{#each _cols}}<th scope="col" class="{{#if this._hl}}is-hl{{/if}}">{{#if this.badge}}<span class="oa-matrix__badge">{{this.badge}}</span>{{/if}}<span class="oa-matrix__name">{{this.name}}</span>{{#if this.sub}}<span class="oa-matrix__sub">{{this.sub}}</span>{{/if}}</th>{{/each}}
+        </tr>
+      </thead>
+      <tbody>
+        {{#each _rows}}
+        {{#if this._group}}<tr class="oa-matrix__group"><th colspan="{{../_span}}" scope="colgroup">{{this._group}}</th></tr>{{else}}<tr><th scope="row" class="oa-matrix__feature">{{this.feature}}{{#if this.note}}<span class="oa-matrix__note">{{this.note}}</span>{{/if}}</th>{{#each this._cells}}<td class="{{this._cls}}">{{{this._html}}}</td>{{/each}}</tr>{{/if}}
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+  {{#if note}}<p class="oa-matrix__footnote">{{note}}</p>{{/if}}
+</div>

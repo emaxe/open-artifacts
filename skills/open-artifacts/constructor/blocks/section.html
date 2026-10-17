@@ -1,0 +1,10 @@
+<section class="oa-section oa-section--{{_bg}}{{_align}}{{_border}}" style="{{_style}}">
+  {{#if _has_head}}
+  <header class="oa-section__head">
+    {{#if eyebrow}}<div class="oa-section__eyebrow">{{eyebrow}}</div>{{/if}}
+    {{#if title}}<h{{_level}} class="oa-section__title">{{title}}</h{{_level}}>{{/if}}
+    {{#if subtitle}}<p class="oa-section__subtitle">{{subtitle}}</p>{{/if}}
+  </header>
+  {{/if}}
+  <div class="oa-section__body">{{{_blocks_html}}}</div>
+</section>

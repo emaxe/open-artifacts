@@ -249,6 +249,34 @@ a.list-card:hover { border-color: var(--accent); }
 }
 ```
 
+### Часть 3: классы блоков 0.13
+
+Блоки 0.13 используют семейства классов с префиксом `oa-` (БЭМ: `oa-block__элемент`, `oa-block--модификатор`). Они определяются в `default.css` и опираются на те же токены (`--surface`, `--accent-soft`, `--c1…--c6`, `--sp-*`); тёмная тема и `prefers-reduced-motion` наследуются от токенов. Темы-дельты переопределяют только то, что нужно.
+
+| Семейство | Блок | Основные элементы и модификаторы |
+|-----------|------|----------------------------------|
+| `oa-section` | `section` | `__head`, `__eyebrow`, `__title`, `__subtitle`, `__body`; `--surface`, `--accent-soft`, `--gradient`, `--image`, `--center`, `--right`, `--bordered` |
+| `oa-grid` | `grid` | Колонки задаёт `--oa-cols`, число колонок на мобильных — `--oa-cols-m`, промежуток — `--oa-gap`; `--oa-span` на дочерних блоках |
+| `oa-stack` | `stack` | `--row`, `--column`, `--wrap`, `--nowrap`, `--fill` |
+| `oa-toc` | `toc` | `__title`, `__list`, `__item`, `__item--l2/l3`, `__num`; `--inline`, `--sticky`, `--sidebar` |
+| `oa-gallery` | `gallery` | `__item`, `__img`, `__link`, `__cap`, `__more`; `--grid`, `--masonry`, `--strip`, `--cap-below/overlay/hover/none` |
+| `oa-slideshow`, `oa-slide` | `slideshow` | `__viewport`, `__track`, `oa-slide__img`, `__caption`, `__blocks`; кнопки, точки, миниатюры создаёт runtime; `--slide`, `--fade` |
+| `oa-compare` | `image-compare` (шторка) | `__img--before/after`, `__label`, `__handle`, `__range`; обёртка `oa-compare-wrap` |
+| `oa-cards`, `oa-card` | `cards` (и `list-cards`) | `oa-card__media`, `__main`, `__subtitle`, `__meta`, `__tags`, `__tag`, `__blocks`, `__footer`, `__link`; `--elevated/outline/flat/accent`, `--grid/list/scroll`, `--equal`; сохранены `list-cards`, `list-card`, `list-card__*` |
+| `oa-accordion`, `oa-acc__*` | `accordion` | `oa-acc__item`, `__summary`, `__title`, `__icon`, `__badge`, `__chev`, `__body`; `--bordered/separated/minimal`; при печати все `details` раскрыты |
+| `oa-steps`, `oa-step` | `steps` | `oa-step__num`, `__main`, `__title`, `__body`, `__blocks`; `--vertical/horizontal`, статусы `--done/active/pending` |
+| `oa-quote` | `quote` | `__text`, `__by`, `__avatar`, `__author`, `__role`, `__source`; `--plain/card/large` |
+| `oa-cmp` | `compare` | `__side`, `__title`, `__badge`, `__list`, `__body`, `__vs`; тон стороны — `__side--pos/neg/neutral`; `--vs`, `--pros-cons`, `--before-after` |
+| `oa-matrix` | `feature-matrix` | `oa-matrix-wrap`, `oa-matrix-scroll`, `__feature`, `__group`, `__name`, `__sub`, `__badge`, `__note`, `__footnote`; ячейки `.is-yes`, `.is-no`, `.is-hl` |
+| `oa-btn`, `oa-buttons` | `buttons`, кнопки в `cards` / `cta` | `oa-btn--primary/secondary/ghost/link/static`, `oa-btn__icon`; `oa-buttons--<size>`, `--left/center/right` |
+| `oa-cta` | `cta` | `__text`, `__title`, `__body`, `__actions`; фон — `--accent/surface/accent-soft/gradient/image` |
+| `oa-embed` | `embed` | `--video`, `--link`; `__video`, `__card`, `__thumb`, `__play`, `__info`, `__title`, `__host` |
+| `oa-dl` | `definition-list` | `oa-dl__row`; `--stacked/inline/grid` |
+| `oa-checklist`, `oa-check` | `checklist` | `__title`, `__summary`, `__count`, `__list`; `oa-check__box`, `__text`, `__label`, `__note`; статусы `--done/todo/blocked/skip` |
+| `oa-spark` | `spark` в `kpi-row`, `stats-grid` | Inline SVG с цветом `currentColor` |
+
+Служебные классы общих полей: `oa-w-narrow/normal/wide/full` (ширина), `oa-hide-mobile/desktop/print` (скрытие), `oa-anchor` (невидимая точка перехода), `oa-hlink` (ссылка «#» у заголовка), `oa-top` (кнопка «наверх»).
+
 ---
 
 ## `data.css` — Delta для дашбордов

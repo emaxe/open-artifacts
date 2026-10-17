@@ -1,0 +1,9 @@
+<div class="oa-gallery {{_cls}}" style="{{_style}}">
+  {{#each items}}
+  <figure class="oa-gallery__item{{#if this._more}} oa-gallery__item--more{{/if}}"{{#if this._hidden}} hidden{{/if}}>
+    {{#if this._href}}<a class="oa-gallery__link" {{{this._link_attrs}}}>{{/if}}<img class="oa-gallery__img" src="{{this.src}}" alt="{{this.alt}}" loading="lazy"{{#if ../zoomable}} data-zoomable="true" data-oa-group="{{../_group}}" data-caption="{{this._cap_text}}" tabindex="0" role="button" aria-label="Zoom image: {{this.alt}}"{{/if}}>{{#if this._href}}</a>{{/if}}
+    {{#if this._more}}<span class="oa-gallery__more" aria-hidden="true">+{{this._more_n}}</span>{{/if}}
+    {{#if this._cap_text}}<figcaption class="oa-gallery__cap">{{#if this.title}}<strong>{{this.title}}</strong>{{/if}}{{#if this.caption}}<span>{{this.caption}}</span>{{/if}}</figcaption>{{/if}}
+  </figure>
+  {{/each}}
+</div>

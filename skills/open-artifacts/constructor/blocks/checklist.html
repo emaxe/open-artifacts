@@ -1,0 +1,11 @@
+<div class="oa-checklist">
+  {{#if title}}<div class="oa-checklist__title">{{title}}</div>{{/if}}
+  {{#if summary}}
+  <div class="oa-checklist__summary"><span class="oa-checklist__count">{{_done}} / {{_total}}</span><div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{_pct}}"><div class="progress-fill" style="width:{{_pct}}%"></div></div></div>
+  {{/if}}
+  <ul class="oa-checklist__list">
+    {{#each items}}
+    <li class="oa-check oa-check--{{this._status}}"><span class="oa-check__box" aria-hidden="true"></span><span class="oa-check__text"><span class="oa-check__label">{{{this._label_html}}}</span><span class="sr-only"> ({{this._status_label}})</span>{{#if this.note}}<span class="oa-check__note">{{this.note}}</span>{{/if}}</span></li>
+    {{/each}}
+  </ul>
+</div>

@@ -1,7 +1,7 @@
 {
   "name": "open-artifacts",
   "private": true,
-  "version": "0.12.0",
+  "version": "0.13.0",
   "packageManager": "pnpm@11.1.2",
   "keywords": [
     "ai-agents",
@@ -22,8 +22,9 @@
     "s3",
     "constructor",
     "yaml",
-    "block-builder",
-    "report-generator"
+    "mermaid",
+    "report-generator",
+    "slideshow"
   ],
   "engines": {
     "node": ">=20"

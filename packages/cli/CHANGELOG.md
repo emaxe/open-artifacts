@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.13.0] - 2026-10-17
+
+### Changed
+- Synchronized version with Open Artifacts 0.13.0 release. No CLI behavior changes; the release extends the constructor skill (containers, anchors and TOC, galleries and slideshows, cards, accordions and more, 41 blocks in total).
+
 ## [0.12.0] - 2026-10-16
 
 ### Changed

@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675"><rect width="1200" height="675" fill="#4f6238"/>
+<g fill="#fff" opacity=".9"><rect x="120" y="120" width="420" height="40" rx="4"/><rect x="120" y="190" width="680" height="24" rx="4" opacity=".6"/><rect x="120" y="236" width="560" height="24" rx="4" opacity=".6"/>
+<rect x="120" y="330" width="260" height="120" rx="4" opacity=".9"/><rect x="410" y="330" width="260" height="120" rx="4" opacity=".9"/><rect x="700" y="330" width="260" height="120" rx="4" opacity=".9"/></g>
+<text x="120" y="560" font-family="system-ui,sans-serif" font-size="56" font-weight="700" fill="#fff">AFTER</text></svg>

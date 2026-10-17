@@ -1,0 +1,20 @@
+<div class="list-cards oa-cards {{_cls}}" style="{{_style}}">
+  {{#each items}}
+  <{{this._tag}} class="list-card oa-card {{this._cls}}" {{{this._attrs}}}{{#if this._style}} style="{{this._style}}"{{/if}}>
+    {{#if this._image}}<div class="oa-card__media"><img src="{{this._image}}" alt="{{this._alt}}" loading="lazy"{{#if this._zoom}} data-zoomable="true" data-oa-group="{{../_group}}" data-caption="{{this._cap_text}}" tabindex="0" role="button"{{/if}}></div>{{/if}}
+    <div class="oa-card__main">
+      {{#if this.icon}}<span class="list-card__icon" aria-hidden="true">{{this.icon}}</span>{{/if}}
+      <div class="list-card__title">{{this.title}}</div>
+      {{#if this.subtitle}}<div class="oa-card__subtitle">{{this.subtitle}}</div>{{/if}}
+      {{#if this.meta}}<div class="oa-card__meta">{{this.meta}}</div>{{/if}}
+      {{#if this.body}}<div class="list-card__body">{{{this._body_html}}}</div>{{/if}}
+      {{#if this._blocks_html}}<div class="oa-card__blocks">{{{this._blocks_html}}}</div>{{/if}}
+      {{#if this._has_tags}}<div class="oa-card__tags">{{#each this._tags}}<span class="oa-card__tag">{{this.t}}</span>{{/each}}</div>{{/if}}
+      {{#if this.badge}}<span class="list-card__badge" style="background:var(--{{this.badge_color}});">{{this.badge}}</span>{{/if}}
+      {{{this._buttons_html}}}
+      {{{this._link_html}}}
+      {{#if this.footer}}<div class="oa-card__footer">{{this.footer}}</div>{{/if}}
+    </div>
+  </{{this._tag}}>
+  {{/each}}
+</div>

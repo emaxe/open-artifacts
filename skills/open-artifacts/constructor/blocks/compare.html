@@ -1,0 +1,15 @@
+<div class="oa-cmp oa-cmp--{{variant}}">
+  <section class="oa-cmp__side oa-cmp__side--{{_left._tone}}" style="--oa-mark:'{{_left._mark}}'">
+    {{#if _left.badge}}<span class="oa-cmp__badge">{{_left.badge}}</span>{{/if}}
+    {{#if _left.title}}<h3 class="oa-cmp__title">{{_left.title}}</h3>{{/if}}
+    {{#if _left._body_html}}<div class="oa-cmp__body">{{{_left._body_html}}}</div>{{/if}}
+    {{#if _left._has_items}}<ul class="oa-cmp__list">{{#each _left._items}}<li>{{{this._html}}}</li>{{/each}}</ul>{{/if}}
+  </section>
+  <span class="oa-cmp__vs" aria-hidden="true">VS</span>
+  <section class="oa-cmp__side oa-cmp__side--{{_right._tone}}" style="--oa-mark:'{{_right._mark}}'">
+    {{#if _right.badge}}<span class="oa-cmp__badge">{{_right.badge}}</span>{{/if}}
+    {{#if _right.title}}<h3 class="oa-cmp__title">{{_right.title}}</h3>{{/if}}
+    {{#if _right._body_html}}<div class="oa-cmp__body">{{{_right._body_html}}}</div>{{/if}}
+    {{#if _right._has_items}}<ul class="oa-cmp__list">{{#each _right._items}}<li>{{{this._html}}}</li>{{/each}}</ul>{{/if}}
+  </section>
+</div>

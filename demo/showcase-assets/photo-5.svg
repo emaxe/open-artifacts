@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2f7a76"/><stop offset="1" stop-color="#3d6a8a"/></linearGradient></defs>
+<rect width="1200" height="800" fill="url(#g)"/>
+<circle cx="936" cy="224" r="96" fill="#fff" opacity=".55"/>
+<polygon points="0,800 0,756 40,706 80,673 120,667 160,683 200,703 240,705 280,678 320,628 360,574 400,543 440,550 480,592 520,651 560,701 600,725 640,719 680,697 720,681 760,688 800,722 840,768 880,803 920,806 960,772 1000,711 1040,650 1080,609 1120,601 1160,622 1200,649 1200,800" fill="#000" opacity=".25"/>
+<text x="60" y="750" font-family="system-ui,sans-serif" font-size="64" font-weight="700" fill="#fff">Glacier · 5</text>
+</svg>

@@ -328,8 +328,8 @@ All blocks support both canonical names and common model-friendly aliases (e.g. 
 | Type | Key Fields & Aliases | Purpose |
 |------|----------------------|---------|
 | `hero` | `title`* (or `heading`), `subtitle` (or `description`), `badge`, `meta` | Page header banner |
-| `kpi-row` | `items`* [`label`* (or `title`), `value`*, `delta`, `trend` (up\|down\|neutral), `icon`] | Row of KPI metric tiles |
-| `stats-grid` | `items`* [`label`, `value`, `icon`, `color`], `cols` | Large-number stat card grid |
+| `kpi-row` | `items`* [`label`* (or `title`), `value`*, `delta`, `trend` (up\|down\|neutral), `icon`, `spark` (numbers → sparkline)] | Row of KPI metric tiles |
+| `stats-grid` | `items`* [`label`, `value`, `icon`, `color`, `spark`], `cols` | Large-number stat card grid |
 | `table` | `columns`* (or `headers`), `rows`* (or `data`), `sortable`, `striped`, `caption` | Sortable HTML table |
 | `chart-bar` | `labels`*, `datasets`* [`label`, `data`*, `color`], `title`, `horizontal`, `stacked` | Bar chart (Chart.js) |
 | `chart-line` | `labels`*, `datasets`* [`label`, `data`*, `color`], `title`, `fill`, `tension` | Line chart (Chart.js) |
@@ -340,16 +340,36 @@ All blocks support both canonical names and common model-friendly aliases (e.g. 
 | `markdown-file` | `path`* (or `file` / `src`, path to .md file) | Embed Markdown file from disk |
 | `alert` | `kind` (or `variant`: `info\|warning\|error\|success`), `body`* (or `text`), `title`, `icon` | Callout / alert box (requires body or title) |
 | `code-block` | `code`* (or `source`), `lang` (or `language`), `caption`, `line_numbers` | Syntax-highlighted code |
-| `image` | `src`* (or `url`), `alt`*, `caption`, `width`, `align`, `zoomable` | Image with lightbox support |
+| `image` | `src`* (or `url`), `alt`, `title` (heading above the picture; use `caption` for the caption), `caption` (md), `credit`, `link`, `width` (CSS), `aspect`, `height`, `fit`, `align`, `float`, `zoomable`, `group`, `rounded`, `border`, `shadow`, `lazy` | Image with lightbox (groups, zoom, swipe) |
 | `two-columns` | `left`* (Block[]), `right`* (Block[]), `ratio` (e.g. `2:1`), `gap` | Two-column layout |
 | `tabs` | `items`* [`label`*, `blocks`* (Block[])] | Tabbed content switcher |
 | `timeline` | `items`* [`date`*, `title`*, `body`, `status` (done\|active\|pending)] | Vertical event timeline |
 | `progress-bars` | `items`* [`label`*, `value`* (0..100), `max`, `unit`, `color`] | Horizontal progress bars |
-| `list-cards` | `items`* [`title`*, `body`, `badge`, `href`, `icon`], `cols` | Grid of content cards |
+| `cards` (alias `list-cards`, `card`) | `items`* [`title`*, `subtitle`, `body` (md), `image` + `image_position` (top\|left\|background), `icon`, `badge`/`badge_color`, `tags`, `meta`, `href` + `link_label`, `buttons`, `footer`, `color`, `blocks`], `cols`, `variant` (elevated\|outline\|flat\|accent), `layout` (grid\|list\|scroll), `equal_height`, `image_aspect` | Grid of content cards (images, buttons, nested blocks) |
+| `section` (alias `container`) | `blocks`*, `title`, `subtitle`, `eyebrow`, `background` (none\|surface\|accent-soft\|gradient\|image), `padding`, `border`, `align` | Titled container, nests any blocks |
+| `grid` | `blocks`*, `cols` (number \| `"2fr 1fr"` \| auto), `min`, `gap`, `align`, `cols_mobile`; children take `span`/`row_span` | CSS grid of blocks (`two-columns` is its 2-col special case) |
+| `stack` (alias `row`, `flex`) | `blocks`*, `direction` (row\|column), `gap`, `align`, `justify`, `wrap`, `fill` | Flex row/column of blocks |
+| `anchor` | `id`*, `label` (adds to TOC) | Invisible jump target |
+| `toc` | `variant` (inline\|sticky\|sidebar), `title`, `depth`, `min_level`, `numbered`, `include` (headings\|blocks\|both) | Table of contents built from headings |
+| `gallery` | `items`* [`src`*, `alt`, `title`, `caption`, `link`], `layout` (grid\|masonry\|strip), `cols`, `aspect`, `gap`, `captions` (below\|overlay\|hover\|none), `zoomable` (default true), `max_visible` (→ "+N") | Image gallery with lightbox |
+| `slideshow` (alias `carousel`, `slider`) | `items`* [`src` or `blocks`, `alt`, `title`, `caption`], `effect` (slide\|fade), `nav` (dots\|thumbs\|counter\|none), `arrows`, `autoplay` (ms), `loop`, `per_view` (1-4), `aspect`, `fit`, `captions`, `zoomable` | Slideshow of images or blocks |
+| `image-compare` | `before`*, `after`*, `before_label`, `after_label`, `start` (%), `aspect`, `caption` | Before/after slider |
+| `accordion` (alias `faq`, `collapse`, `details`) | `items`* [`title`*, `body` (md), `blocks`, `open`, `icon`, `badge`], `multiple`/`single`, `default_open` (first\|all\|none), `variant` (bordered\|separated\|minimal) | Collapsible sections (native `<details>`, open when printed) |
+| `steps` | `items`* [`title`*, `body`, `blocks`, `status`], `variant` (vertical\|horizontal), `numbered` | Numbered how-to steps |
+| `quote` | `text`*, `author`, `role`, `avatar`, `source`, `href`, `variant` (plain\|card\|large) | Quote / testimonial |
+| `compare` | `left`*, `right`* [`title`, `badge`, `tone` (pos\|neg\|neutral), `items` or `body`], `variant` (vs\|pros-cons\|before-after) | Side-by-side comparison |
+| `feature-matrix` | `columns`*, `rows`* [`feature`, `values` (true\|false\|text), `group`], `highlight_col`, `note` | Feature/plan matrix with ✓/✗ |
+| `buttons` (alias `button`, `cta-row`) | `items`* [`label`*, `href`, `variant` (primary\|secondary\|ghost\|link), `icon`, `new_tab`], `align`, `size` | Row of buttons |
+| `cta` | `title`*, `body`, `buttons`, `background`, `align` | Call-to-action banner |
+| `embed` | `kind` (video\|link), `src`*, `title`, `caption`, `poster`, `thumbnail`, `aspect` | Video (only this instance's `/af/` files) or link preview card. **No iframes** (viewer CSP) |
+| `definition-list` (alias `glossary`, `facts`, `key-value`) | `items`* [`term`*, `definition`] or a plain `term: definition` mapping, `layout` (stacked\|inline\|grid) | Glossary / key-value pairs |
+| `checklist` | `items`* [`label`*, `status` (done\|todo\|blocked\|skip) or `checked`, `note`], `summary`, `title` | Task list with progress |
 | `badge-row` | `items`* (list of strings `["A","B"]` or objects `[{label, color}]`), `align` | Row of color-coded badges |
 | `divider` | `label` (optional text in separator) | Section separator line |
 | `spacer` | `size` (sp-1..sp-8, default `sp-5`) | Vertical whitespace |
 | `raw` | `html`, `css`, `scripts`, `cdn_scripts` | **Escape hatch: arbitrary HTML/CSS/JS** |
+
+**Common fields (every block):** `id`, `class`, `width` (narrow\|normal\|wide\|full; on `image` it stays a CSS width), `spacing` (`{top, bottom}` or one value), `hide` (mobile\|desktop\|print), `span`, `row_span` (inside `grid`), `toc_label`, `toc_level`. Containers (`section`, `grid`, `stack`, `two-columns`) and `tabs`/`accordion`/`steps`/`slideshow`/`cards` items nest blocks to any depth. Spec-level options: `width: narrow|normal|wide|<px>`, `heading_links` (default true), `back_to_top`. External `http(s)` links open in a new tab automatically; `javascript:`/`data:` hrefs are dropped. `image.title` is now a heading above the picture (use `caption` for the caption).
 
 Full field reference for every block: `constructor/BLOCKS-SPEC.md` (next to this file).
 

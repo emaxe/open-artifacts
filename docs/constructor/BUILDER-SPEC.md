@@ -92,6 +92,8 @@ build.mjs <spec.yaml>
 │   │   mermaid-diagram → Mermaid.js
 │   │   code-block → highlight.js (если есть хотя бы один)
 │   │   raw.cdn_scripts → добавляются напрямую
+│   ├─ Обход идёт через walkBlocks, то есть захватывает вложенные блоки на любой глубине
+│   ├─ Заодно собирает runtime-модули (lightbox, slideshow, accordion, …) — см. «Runtime-модули»
 │   └─ Дедуплицирует (Chart.js подключается один раз даже если 3 графика)
 │
 ├─ 7. RENDER BLOCKS
@@ -112,6 +114,9 @@ build.mjs <spec.yaml>
 │   │   │   ├─ if !exists → throw Error(`Unknown block type: ${block.type}`)
 │   │   │   ├─ template = fs.readFileSync(templatePath)
 │   │   │   └─ html = renderTemplate(template, block)
+│   │   │
+│   │   ├─ html = injectRootAttrs(html, id/class/width/spacing/hide/span)  ← общие поля
+│   │   │
 │   │   │
 │   │   └─ Добавляем html в bodyParts[]
 │   └─ bodyHtml = bodyParts.join('\n')
@@ -321,6 +326,76 @@ function stripFrontmatter(md) {
 
 ---
 
+## Дерево блоков, общие поля, якоря и runtime (0.13)
+
+### Обобщённое дерево блоков
+
+Вложенность описана одной таблицей `CHILD_SPEC` (в `build.mjs`): для каждого типа указано, где лежат дочерние блоки — собственные массивы (`own`: `left`/`right` у `two-columns`, `blocks` у `section` / `grid` / `stack`) или массивы `blocks` внутри элементов `items` (`items`: `tabs`, `accordion`, `steps`, `slideshow`, `cards`).
+
+```
+CHILD_SPEC  →  childSlots(block)  →  walkBlocks(blocks, visit)
+```
+
+- `childSlots(b)` возвращает список слотов `{ obj, key, label }` с дочерними массивами блока.
+- `walkBlocks(blocks, visit)` рекурсивно обходит дерево в порядке документа.
+- Через них работают: рекурсивная нормализация и валидация (`normalizeAndValidateBlock`, путь ошибки вида `Block #3 (blocks) → Block #2`), сборщик потребностей `collectNeeds` и резервирование явных `id`. Ручных веток под `two-columns` / `tabs` нет: чтобы новый контейнер заработал на любой глубине, достаточно добавить запись в `CHILD_SPEC` и шаблон.
+- Рендер дочерних блоков — `renderKids(list, ctx)`: вызывает `renderBlockList` и результат «экранирует» функцией `shield`.
+
+### Общие поля и `injectRootAttrs`
+
+`COMMON_FIELDS` (`id`, `class`, `width`, `spacing`, `hide`, `span`, `row_span`, `toc_label`, `toc_level`) добавляется к `canonical` каждого типа, поэтому валидатор не считает их неизвестными. После рендера шаблона `renderBlock` вызывает `rootAttrsFor(block)` (собирает id, классы `oa-w-*` / `oa-hide-*` / пользовательские, inline-стиль для `spacing` и `span` / `row_span`) и `injectRootAttrs(html, attrs)`, которая дописывает атрибуты в **первый реальный тег** результата. Обёрток нет — существующие селекторы не меняются. Если у корневого тега уже есть собственный `id`, а в блоке задан другой, перед блоком вставляется `<a class="oa-anchor" id="…">`. Тот же механизм работает для `markdown` / `markdown-file`.
+
+Исключение: у `image` поле `width` — CSS-ширина самой картинки, а не класс `oa-w-*`.
+
+### Реестр якорей и двухпроходное оглавление
+
+На сборку создаётся состояние `STATE` (`resetState(spec)` в начале `main()`): счётчики `uid(prefix)` (вместо отдельных `_chartIdx` / `_tabIdx`), множество занятых id, реестр `headings[]`, список конфигураций `tocs[]`, набор runtime-модулей, предупреждения.
+
+1. **Reserve.** До рендера `walkBlocks` резервирует все явные `id` из spec.
+2. **Anchor assign.** `assignAnchor(block)` перед рендером даёт id заголовкам `hero` (уровень 1), `text-section` и `section` (`level`) и блокам с `toc_label` / `anchor.label`; `uniqueId` делает slug (`slugify`: транслитерация кириллицы, латиница, дефисы) и добавляет суффикс `-2`, `-3` при повторе. Заголовки Markdown обрабатывает `addHeadingIds`: проставляет `id` на `<h1>…<h6>` и регистрирует их в `headings[]`.
+3. **Placeholder.** Блок `toc` на первом проходе кладёт в `STATE.tocs` свою конфигурацию (`variant`, `include`, `min_level`, `depth`, `numbered`) и выводит заглушку `<!--OA_TOC_LIST:n-->`.
+4. **Fill.** После рендера всех блоков `renderTocLists(bodyHtml)` заменяет заглушки списками `<ol class="oa-toc__list">`, отфильтровав реестр по конфигурации (поэтому оглавление видит заголовки ниже себя). Для `sticky` остаются только пункты уровня `min_level`.
+5. **Sidebar CSS.** Если есть `toc` с `variant: sidebar`, к CSS дописывается media query с `min-width = ширина main + 2 × (240 + 24) px`: боковая колонка закрепляется слева от `main` только когда хватает места; иначе остаётся inline.
+
+### Spec-level опции
+
+| Поле spec | Эффект |
+|-----------|--------|
+| `width: narrow\|normal\|wide\|<px>` | Ширина колонки `main`: 720 / 920 (по умолчанию) / 1200 px или число; записывается в CSS-переменную `--oa-main-w` (на `<main>` через `mainStyle`). Неверное значение — предупреждение и игнорирование |
+| `heading_links` (по умолчанию `true`) | Если `false`, runtime-модуль `anchors` не добавляет ссылки «#» к заголовкам |
+| `back_to_top` (по умолчанию `false`) | После `<main>` выводится `<a class="oa-top" hidden>`, модуль `anchors` показывает его при прокрутке |
+| `lang` | Язык служебных подписей (оглавление, слайдшоу, «Наверх») |
+
+### Runtime-модули
+
+JS блоков живёт в `constructor/runtime/*.js`, а не в шаблонах. Модули: `core` (`__oaReady`, `__oaReveal` — дорисовка графиков и Mermaid в только что показанных панелях), `lightbox`, `slideshow`, `accordion`, `compare` (`image-compare`), `toc`, `anchors` (ссылки «#» и «наверх»).
+
+```
+collectNeeds(blocks)  →  needs.runtime : Set<string>
+        ↓  (+ 'anchors' при heading_links и наличии заголовков, либо back_to_top)
+loadRuntime(names, runtimeDir)  →  string[]   // порядок фиксирован RUNTIME_ORDER, 'core' добавляется всегда
+        ↓
+inlineScripts = [...runtimeScripts, ...rawScripts]  →  один <script> перед </body>
+```
+
+- `collectNeeds` (развитие прежнего `collectCdnNeeds`) через `walkBlocks` возвращает CDN-флаги (`chartjs`, `mermaid`, `hljs`), CSS / скрипты / CDN-ссылки из `raw` и множество runtime-модулей: `lightbox` — при `zoomable` у `image`, `slideshow`, элементов `cards` и по умолчанию у `gallery`; `slideshow`, `accordion`, `compare` — по типу блока; `toc` — только для `sticky` / `sidebar`; `core` — для `tabs`.
+- Каждый модуль вставляется в страницу один раз и только если нужен: без `zoomable` lightbox в HTML нет. Каждый модуль завёрнут в комментарий `/* oa-runtime: name */` и защищён от повторной инициализации.
+- Модули не используют внешних библиотек и сети (CSP: только inline-скрипты).
+
+### `shield` / `unshield` для HTML дочерних блоков
+
+Шаблонизатор повторно сканирует результат на `{{ … }}`. HTML, уже отрендеренный дочерним блоком или Markdown'ом (и содержащий, например, `{{x}}` в блоке кода), при вставке в родительский шаблон проходит через `shield` (`{{` → `{`, `}}` → `}`), а готовый HTML шаблона возвращается обратно через `unshield` (`{` → `{{`). Так фигурные скобки из пользовательского контента доходят до страницы без изменений и не интерпретируются как теги шаблона. Правило для новых блоков: любой вставляемый в шаблон готовый HTML (`_*_html`) передавайте через `shield(…)` / `renderKids` / `mdb`, а в шаблоне выводите тройными скобками `{{{ }}}`.
+
+### Прочее в 0.13
+
+- `resolveImageSrc(src, specDir)` — инлайн локального файла в `data:` URI (image, gallery, slideshow, cards, quote, image-compare, фоны section / cta).
+- `safeHref(href)` отбрасывает `javascript:`, `data:` и другие схемы, кроме `http(s)`, `mailto:`, `tel:`; `linkAttrs(href, newTab)` добавляет `target="_blank" rel="noopener noreferrer"` внешним `http(s)` ссылкам (артефакт живёт в sandbox-iframe).
+- `sparklineSvg(values)` — inline SVG для `spark` в `kpi-row` / `stats-grid`.
+- Алиасы типов блоков: `BLOCK_TYPE_ALIASES` (карта «синоним → тип»), а также `resolveLegacyType` для имён, у которых значение менялось: `grid` с `items` и без `blocks` → `stats-grid`, `columns` → `grid` (если есть `blocks`) или `two-columns`, `section` без `blocks`, но с `body` / `text` → `text-section`.
+- Блок может определить `warn(b)` — не фатальные предупреждения (например, `embed video` с чужого домена).
+
+---
+
 ## Валидация спецификации и обработка ошибок
 
 Сборщик `build.mjs` выполняет предварительную валидацию спецификации перед сборкой:
@@ -341,6 +416,7 @@ function stripFrontmatter(md) {
 | `spec.source` файл не найден | `Error: source file not found: path/to/report.md` → exit 1 |
 | `markdown-file` файл не найден | `Error: markdown-file not found: path/to/file.md (block #N)` → exit 1 |
 | Неизвестный тип блока | `❌ Spec validation failed: Unknown block type "xyz"` + предложение похожих → exit 1 |
+| Нефатальное предупреждение блока (`warn`, например `embed video` с чужого домена) | В списке `⚠️ Spec warnings`, сборка продолжается |
 | Шаблон блока не найден | `Error: Template not found: blocks/xyz.html` → exit 1 |
 | `oa push` завершился с ошибкой | Выводит stderr oa и exit 1 |
 | `--share` без `--push` | Автоматически добавляет `--push` |
