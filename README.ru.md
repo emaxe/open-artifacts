@@ -28,7 +28,7 @@ Self-hosted (автономный) сервис хостинга артефак�
 ---
 
 ### Топики и теги репозитория
-`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `mcp-server` • `model-context-protocol` • `self-hosted` • `docker` • `hono` • `react` • `typescript` • `cli` • `developer-tools` • `open-artifacts` • `llm` • `s3` • `constructor` • `yaml` • `mermaid` • `report-generator` • `slideshow`
+`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `mcp-server` • `model-context-protocol` • `self-hosted` • `docker` • `hono` • `react` • `typescript` • `cli` • `developer-tools` • `open-artifacts` • `s3` • `constructor` • `yaml` • `mermaid` • `report-generator`
 
 ---
 
