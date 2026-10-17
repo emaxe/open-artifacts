@@ -17,7 +17,10 @@ export type Lang = "ru" | "en";
 
 export interface LandingCopy {
   meta: { title: string; description: string };
+  skip: string;
   nav: { features: string; how: string; security: string; selfHost: string };
+  /** Small label above each section heading, numbered by position on the page. */
+  kickers: { problem: string; how: string; features: string; security: string; demo: string; audience: string; comparison: string };
   hero: {
     badge: string;
     title: string;
@@ -25,6 +28,8 @@ export interface LandingCopy {
     bullets: string[];
     ctaPrimary: string;
     ctaSecondary: string;
+    /** The static "result" mock next to the headline: agent command, returned link, rendered artifact. */
+    mock: { command: string; access: string; title: string; kpis: { label: string; value: string }[]; caption: string };
   };
   compat: { heading: string; agents: string[]; badges: string[] };
   problem: { heading: string; before: string[]; afterHeading: string; after: string };
@@ -47,11 +52,21 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
       description:
         "Self-hosted хостинг артефактов для AI-агентов: конструктор дашбордов из YAML/JSON, публикация HTML, Markdown, Mermaid или SVG в изолированной песочнице. MIT, свой сервер, встроенный MCP.",
     },
+    skip: "Перейти к содержимому",
     nav: {
       features: "Возможности",
       how: "Как это работает",
       security: "Безопасность",
       selfHost: "Self-host",
+    },
+    kickers: {
+      problem: "Проблема",
+      how: "Как это работает",
+      features: "Возможности",
+      security: "Безопасность",
+      demo: "Предпросмотр",
+      audience: "Для кого",
+      comparison: "Сравнение",
     },
     hero: {
       badge: "Open source · MIT · Self-hosted",
@@ -66,6 +81,17 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
       ],
       ctaPrimary: "Как это работает",
       ctaSecondary: "Исходный код",
+      mock: {
+        command: "oa push report.yaml --share",
+        access: "для команды",
+        title: "Активные пользователи за неделю",
+        kpis: [
+          { label: "Пользователи", value: "12 480" },
+          { label: "Артефакты", value: "4,8 тыс." },
+          { label: "Доступность", value: "99,98%" },
+        ],
+        caption: "Агент вернул ссылку — получатель видит готовую страницу",
+      },
     },
     compat: {
       heading: "Работает с любым агентом, который умеет вызывать CLI, REST или MCP",
@@ -199,11 +225,21 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
       description:
         "Self-hosted artifact hosting for AI agents: declarative YAML/JSON constructor, publish HTML, Markdown, Mermaid, or SVG into a sandboxed viewer. MIT, your own server, built-in MCP.",
     },
+    skip: "Skip to content",
     nav: {
       features: "Features",
       how: "How it works",
       security: "Security",
       selfHost: "Self-host",
+    },
+    kickers: {
+      problem: "The problem",
+      how: "How it works",
+      features: "Features",
+      security: "Security",
+      demo: "Preview",
+      audience: "Who it is for",
+      comparison: "Comparison",
     },
     hero: {
       badge: "Open source · MIT · Self-hosted",
@@ -218,6 +254,17 @@ export const LANDING_COPY: { ru: LandingCopy; en: LandingCopy } = {
       ],
       ctaPrimary: "See how it works",
       ctaSecondary: "View source",
+      mock: {
+        command: "oa push report.yaml --share",
+        access: "team only",
+        title: "Weekly active users",
+        kpis: [
+          { label: "Users", value: "12,480" },
+          { label: "Artifacts", value: "4.8K" },
+          { label: "Uptime", value: "99.98%" },
+        ],
+        caption: "The agent gets a link back — the recipient sees a finished page",
+      },
     },
     compat: {
       heading: "Works with any agent that can call a CLI, REST, or MCP",

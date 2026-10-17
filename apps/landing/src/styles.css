@@ -52,6 +52,22 @@ a {
   color: inherit;
 }
 
+/* Headlines break into even lines, paragraphs avoid a lone last word. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p,
+li {
+  text-wrap: pretty;
+}
+
+/* Numbers line up in columns and counters do not jitter while they count. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
 /*
  * Scroll-reveal + terminal-caret animations, moved verbatim from apps/web/src/styles.css.
  *  - `.oa-reveal` / `.is-visible`: the scroll-reveal wrapper (Reveal.tsx) toggles the modifier
@@ -71,6 +87,100 @@ a {
   transform: none;
 }
 
+/* Lists cascade in item by item once their section is revealed. */
+.oa-stagger-list > * {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 450ms ease, transform 450ms ease;
+}
+.is-visible .oa-stagger-list > * {
+  opacity: 1;
+  transform: none;
+}
+.is-visible .oa-stagger-list > :nth-child(2) { transition-delay: 70ms; }
+.is-visible .oa-stagger-list > :nth-child(3) { transition-delay: 140ms; }
+.is-visible .oa-stagger-list > :nth-child(4) { transition-delay: 210ms; }
+.is-visible .oa-stagger-list > :nth-child(5) { transition-delay: 280ms; }
+.is-visible .oa-stagger-list > :nth-child(n + 6) { transition-delay: 350ms; }
+
+/* Request path in the security section: numbered nodes joined by a line with an arrowhead. */
+.oa-flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.oa-flow > li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 20px;
+}
+.oa-flow__node {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: var(--oa-accent);
+  color: var(--oa-accent-fg);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border-radius: var(--oa-radius);
+}
+.oa-flow__label {
+  color: var(--oa-fg);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.oa-flow > li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 15px;
+  left: 44px;
+  right: 14px;
+  height: 2px;
+  background: color-mix(in srgb, var(--oa-accent) 45%, transparent);
+}
+.oa-flow > li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  right: 6px;
+  border-left: 8px solid color-mix(in srgb, var(--oa-accent) 70%, transparent);
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+}
+@media (max-width: 639px) {
+  .oa-flow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .oa-flow > li {
+    flex-direction: row;
+    align-items: flex-start;
+    padding-right: 0;
+  }
+  .oa-flow__label {
+    padding-top: 5px;
+  }
+  .oa-flow > li:not(:last-child)::before {
+    top: 32px;
+    bottom: -20px;
+    left: 15px;
+    right: auto;
+    width: 2px;
+    height: auto;
+    background: color-mix(in srgb, var(--oa-accent) 65%, transparent);
+  }
+  .oa-flow > li:not(:last-child)::after {
+    display: none;
+  }
+}
+
 .oa-caret {
   display: inline-block;
   width: 0.55em;
@@ -87,6 +197,11 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .oa-stagger-list > * {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
   .oa-reveal {
     opacity: 1 !important;
     transform: none !important;

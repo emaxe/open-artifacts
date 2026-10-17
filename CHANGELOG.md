@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Landing page** returns to the earlier concept (hero, agent compatibility, problem, how it works, features, security, live preview, stats, audience, comparison, self-host) in the new flat sand-and-moss look. The photographs and the looping video are removed, and the constructor copy now says 41 blocks.
+- **Landing page** returns to the earlier concept (hero, agent compatibility, problem, how it works, features, security, live preview, stats, audience, comparison, self-host) in the new flat sand-and-moss look. The photographs and the looping video are removed, and the constructor copy now says 41 blocks. Refinements: left-aligned numbered section headings, a two-column hero showing the command, the returned link and the rendered artifact, an asymmetric features section (two large tiles and a list), a connected request path in the security section, a one-row footer, cascading list reveals, hover states, a skip-to-content link, a branded 404 page and a 1200×630 social preview image.
 
 ## [0.13.0] - 2026-10-17
 

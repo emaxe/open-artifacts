@@ -23,16 +23,16 @@ export function LandingHeader() {
         </a>
 
         <nav className="ml-2 hidden flex-1 items-center gap-5 text-sm text-muted lg:flex">
-          <a href="#features" className="hover:text-fg">
+          <a href="#features" className="transition-colors duration-150 hover:text-fg">
             {t.nav.features}
           </a>
-          <a href="#how" className="hover:text-fg">
+          <a href="#how" className="transition-colors duration-150 hover:text-fg">
             {t.nav.how}
           </a>
-          <a href="#security" className="hover:text-fg">
+          <a href="#security" className="transition-colors duration-150 hover:text-fg">
             {t.nav.security}
           </a>
-          <a href="#self-host" className="hover:text-fg">
+          <a href="#self-host" className="transition-colors duration-150 hover:text-fg">
             {t.nav.selfHost}
           </a>
         </nav>

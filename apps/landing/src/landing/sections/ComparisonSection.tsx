@@ -1,13 +1,14 @@
 import { Reveal } from "../Reveal";
 import { useLandingCopy } from "../LandingI18n";
+import { SectionHead } from "../SectionHead";
 
 export function ComparisonSection() {
   const { t } = useLandingCopy();
   return (
     <section className="bg-panel-muted py-20 sm:py-24">
       <div className="mx-auto max-w-4xl px-4 sm:px-6">
-        <Reveal className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-fg sm:text-4xl">{t.comparison.heading}</h2>
+        <Reveal>
+          <SectionHead index={7} label={t.kickers.comparison} title={t.comparison.heading} />
         </Reveal>
         <Reveal delayMs={100} className="mt-8 overflow-x-auto">
           <table className="w-full min-w-[420px] border-collapse overflow-hidden rounded-card bg-panel text-sm">

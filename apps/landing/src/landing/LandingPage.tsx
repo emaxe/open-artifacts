@@ -13,12 +13,20 @@ import { ComparisonSection } from "./sections/ComparisonSection";
 import { SelfHostSection } from "./sections/SelfHostSection";
 import { ClosingCta } from "./sections/ClosingCta";
 import { LandingFooter } from "./sections/LandingFooter";
+import { useLandingCopy } from "./LandingI18n";
 
 function LandingContent() {
+  const { t } = useLandingCopy();
   return (
     <div className="min-h-screen bg-bg text-fg">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-accent-fg"
+      >
+        {t.skip}
+      </a>
       <LandingHeader />
-      <main>
+      <main id="main" tabIndex={-1} className="outline-none">
         <HeroSection />
         <CompatStrip />
         <ProblemSection />

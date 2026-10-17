@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Page not found · Open Artifacts</title>
+    <link rel="icon" href="/open-artifacts/favicon.ico" sizes="48x48" />
+    <style>
+      :root { color-scheme: light dark; --bg: #e6e0d2; --fg: #2a2a26; --muted: #59574e; --accent: #4f6238; --accent-fg: #fff; --soft: #d3dbc0; }
+      @media (prefers-color-scheme: dark) { :root { --bg: #171913; --fg: #e8e9e1; --muted: #a9ab9c; --accent: #a9c47f; --accent-fg: #171913; --soft: #2f3a22; } }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: var(--bg); color: var(--fg);
+        font: 17px/1.55 "Onest", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+      main { max-width: 34rem; }
+      .code { margin: 0 0 12px; font-size: 14px; font-weight: 600; letter-spacing: .04em; color: var(--accent); font-variant-numeric: tabular-nums; }
+      h1 { margin: 0 0 12px; font-size: clamp(2rem, 1.4rem + 2.4vw, 3rem); line-height: 1.08; letter-spacing: -0.02em; text-wrap: balance; }
+      p { margin: 0 0 24px; color: var(--muted); text-wrap: pretty; }
+      a.btn { display: inline-block; padding: 10px 18px; border-radius: 2px; background: var(--accent); color: var(--accent-fg);
+        font-weight: 600; font-size: 15px; text-decoration: none; transition: background-color .15s, transform .15s; }
+      a.btn:hover { background: var(--soft); color: var(--fg); }
+      a.btn:active { transform: translateY(1px); }
+      a.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="code">404</p>
+      <h1>This page does not exist</h1>
+      <p>The link may be mistyped or the page was moved. The product site is a single page.</p>
+      <a class="btn" href="/open-artifacts/">Back to Open Artifacts</a>
+      <p style="margin-top:24px;font-size:14px">Страница не найдена — вернитесь на <a href="/open-artifacts/?lang=ru" style="color:var(--accent)">главную</a>.</p>
+    </main>
+  </body>
+</html>
