@@ -61,6 +61,16 @@ a {
  * already skip the *triggering* JS in that case, but this is the actual enforcement: even if a
  * class ends up applied, no motion reaches the screen.
  */
+.oa-reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 500ms ease, transform 500ms ease;
+}
+.oa-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
 .oa-caret {
   display: inline-block;
   width: 0.55em;
@@ -77,6 +87,11 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .oa-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
   .oa-caret {
     animation: none !important;
     opacity: 1;

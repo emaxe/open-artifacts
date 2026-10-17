@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Landing page** returns to the earlier concept (hero, agent compatibility, problem, how it works, features, security, live preview, stats, audience, comparison, self-host) in the new flat sand-and-moss look. The photographs and the looping video are removed, and the constructor copy now says 41 blocks.
+
 ## [0.13.0] - 2026-10-17
 
 ### Added

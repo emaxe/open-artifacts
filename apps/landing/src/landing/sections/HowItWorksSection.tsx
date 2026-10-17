@@ -1,41 +1,34 @@
-import type { CSSProperties } from "react";
 import { Reveal } from "../Reveal";
 import { TerminalAnimation } from "../TerminalAnimation";
-import { useInViewOnce } from "../useInViewOnce";
 import { useLandingCopy } from "../LandingI18n";
-
-// How long each stage really takes, as relative weights: connecting is the longest, the code is a
-// sliver, publishing is mostly the agent working. Each segment takes a different flat palette colour.
-const GROW = [4, 3, 5];
-const COLORS = ["var(--oa-field)", "var(--oa-accent)", "var(--oa-c6)"];
-const INKS = ["var(--oa-field-fg)", "var(--oa-accent-fg)", "var(--oa-accent-fg)"];
 
 export function HowItWorksSection() {
   const { t } = useLandingCopy();
-  const [ref, inView] = useInViewOnce<HTMLDivElement>();
-
   return (
-    <section id="how" className="lp-section">
-      <Reveal>
-        <h2 className="lp-display lp-h2">{t.how.heading}</h2>
-      </Reveal>
-
-      <div ref={ref} className={`lp-bar${inView ? " is-in" : ""}`}>
-        {t.how.steps.map((step, i) => (
-          <div key={step.title} className="lp-stage" style={{ "--grow": GROW[i], "--seg": COLORS[i], "--seg-ink": INKS[i], "--i": i } as CSSProperties}>
-            <div className="lp-stage__seg" data-ui>
-              {step.duration}
-            </div>
-            <p className="lp-stage__clause">
-              <b>{step.title}.</b> {step.body}
-            </p>
-          </div>
-        ))}
+    <section id="how" className="scroll-mt-16 bg-panel-muted py-20 sm:py-24">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:items-center">
+        <Reveal>
+          <h2 className="text-3xl font-bold tracking-tight text-fg sm:text-4xl">{t.how.heading}</h2>
+          <p className="mt-2 text-muted">{t.how.subtitle}</p>
+          <ol className="mt-6 flex flex-col gap-5">
+            {t.how.steps.map((step, i) => (
+              <li key={step.title} className="flex gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-accent text-sm font-semibold text-accent-fg">
+                  {i + 1}
+                </span>
+                <div>
+                  <p className="font-medium text-fg">{step.title}</p>
+                  <p className="text-sm text-muted">{step.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </Reveal>
+        <Reveal delayMs={120}>
+          <TerminalAnimation />
+          <p className="mt-2 text-xs text-muted">{t.how.terminalCaption}</p>
+        </Reveal>
       </div>
-
-      <Reveal delayMs={120}>
-        <TerminalAnimation />
-      </Reveal>
     </section>
   );
 }
