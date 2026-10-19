@@ -61,6 +61,11 @@ program
   .option("--password <password>", "Create a password-protected share (implies --share)")
   .option("--message <message>", "Version message")
   .option("--lifetime <duration>", "Delete the artifact after this long: 30m, 12h, 7d, or 0 for never. Omit to use the team's default (its maximum)")
+  .option("--theme <id>", "Colour theme: sand | graphite | ocean | editorial | terminal, or 'inherit' to use the team's/service's theme")
+  .option("--width <width>", "Content width: narrow | normal | wide | full, or 'default' for the kind's own width")
+  .option("--font <id>", "Body font: system | inter | onest | plex-sans | source-serif | jetbrains-mono, or 'theme' for the theme's own font")
+  .option("--lock-appearance", "Don't let viewers of a share link change the theme, width or colour scheme")
+  .option("--unlock-appearance", "Let viewers change the theme, width and colour scheme again (the default)")
   .option("--json", "Output raw JSON")
   .option("--org <team>", "Team id or slug to publish into (overrides the project/machine default)")
   .action((file, opts) => pushCommand(file, { ...opts, share: opts.share || opts.team || opts.public || !!opts.password }));

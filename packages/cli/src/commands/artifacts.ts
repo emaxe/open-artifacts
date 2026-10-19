@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, basename } from "node:path";
-import type { ArtifactKind } from "../scopes.js";
+import { ARTIFACT_FONT_IDS, ARTIFACT_THEME_IDS, ARTIFACT_WIDTHS, type ArtifactKind } from "../scopes.js";
 import { requireCredentials } from "../config.js";
 import { makeClient, CliApiError, type OrgChoice } from "../client.js";
 import { resolveOrg } from "../org.js";
@@ -68,6 +68,13 @@ export async function listCommand(opts: { json?: boolean; org?: string }) {
   }
 }
 
+function parseChoice<T extends string>(flag: string, value: string | undefined, allowed: readonly T[], reset: string): T | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === reset) return null;
+  if ((allowed as readonly string[]).includes(value)) return value as T;
+  return die(`${flag} must be one of: ${[...allowed, reset].join(", ")} (got "${value}")`);
+}
+
 export async function pushCommand(
   filePath: string,
   opts: {
@@ -82,12 +89,25 @@ export async function pushCommand(
     json?: boolean;
     org?: string;
     lifetime?: string;
+    theme?: string;
+    width?: string;
+    font?: string;
+    lockAppearance?: boolean;
+    unlockAppearance?: boolean;
   },
 ) {
   if (!existsSync(filePath)) die(`File not found: ${filePath}`);
   const content = readFileSync(filePath, "utf8");
   const kind = opts.kind ?? inferKind(filePath);
   const title = opts.title ?? basename(filePath);
+
+  // `undefined` = leave alone; `null` = clear back to inherit/default (sent as JSON null).
+  const theme = parseChoice("--theme", opts.theme, ARTIFACT_THEME_IDS, "inherit");
+  const width = parseChoice("--width", opts.width, ARTIFACT_WIDTHS, "default");
+  const font = parseChoice("--font", opts.font, ARTIFACT_FONT_IDS, "theme");
+
+  if (opts.lockAppearance && opts.unlockAppearance) die("--lock-appearance and --unlock-appearance are mutually exclusive");
+  const lockAppearance = opts.lockAppearance ? true : opts.unlockAppearance ? false : undefined;
 
   const creds = requireCredentials();
   const client = makeClient(creds);
@@ -100,6 +120,10 @@ export async function pushCommand(
         content,
         message: opts.message,
         lifetime: opts.lifetime,
+        theme,
+        width,
+        font,
+        lockAppearance,
       });
       expiresAt = res.artifact.expiresAt;
     } else {
@@ -108,7 +132,7 @@ export async function pushCommand(
       const org = resolveOrg({ flag: opts.org, creds });
       const res = await client.post<{ artifact: { id: string; expiresAt: string | null } }>(
         `/artifacts${org.orgId ? `?orgId=${org.orgId}` : ""}`,
-        { title, kind, content, visibility: "org", lifetime: opts.lifetime },
+        { title, kind, content, visibility: "org", lifetime: opts.lifetime, theme, width, font, lockAppearance },
       );
       artifactId = res.artifact.id;
       expiresAt = res.artifact.expiresAt;
