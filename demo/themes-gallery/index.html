@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Темы артефактов</title>
+<style>
+  :root { --bg:#f4f3ef; --panel:#fff; --fg:#1f1f1c; --muted:#6b6a62; --line:#d8d6cc; --accent:#3f5a2a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161714; --panel:#20211d; --fg:#ececE6; --muted:#a3a299; --line:#34352f; --accent:#a9c47f; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.4 system-ui,sans-serif; background:var(--bg); color:var(--fg); display:flex; flex-direction:column; height:100vh; }
+  header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; flex-wrap:wrap; gap:10px 22px; align-items:center; }
+  .group { display:flex; align-items:center; gap:6px; }
+  .group > span { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; margin-right:2px; }
+  button { font:inherit; border:1px solid var(--line); background:var(--bg); color:var(--fg); padding:5px 10px; border-radius:6px; cursor:pointer; }
+  button[aria-pressed="true"] { background:var(--accent); color:var(--panel); border-color:var(--accent); }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  main { flex:1; min-height:0; overflow:auto; padding:16px; display:flex; justify-content:center; }
+  .frame { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
+  .frame > b { padding:6px 10px; font-size:12px; border-bottom:1px solid var(--line); }
+  .frame > b small { color:var(--muted); font-weight:400; margin-left:6px; }
+  iframe { border:0; width:100%; flex:1; min-height:0; background:#888; }
+  #single { width:100%; max-width:100%; height:100%; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(520px,1fr)); gap:14px; width:100%; align-content:start; }
+  #grid .frame { height:560px; }
+  .hint { color:var(--muted); font-size:12px; margin-left:auto; }
+</style>
+</head>
+<body>
+<header>
+  <div class="group" id="g-kind"><span>Контент</span></div>
+  <div class="group" id="g-theme"><span>Тема</span></div>
+  <div class="group" id="g-scheme"><span>Режим</span></div>
+  <div class="group" id="g-width"><span>Ширина</span></div>
+  <div class="group" id="g-device"><span>Экран</span></div>
+  <div class="group" id="g-view"><span>Вид</span></div>
+  <span class="hint">Нужен интернет: шрифты, Mermaid, графики</span>
+</header>
+<main id="main"></main>
+<script src="gallery-data.js"></script>
+<script>
+(function () {
+  var G = window.GALLERY;
+  var DEVICES = [["desktop", "Десктоп", "100%"], ["tablet", "Планшет", "820px"], ["phone", "Телефон", "390px"]];
+  var st = { kind: "showcase", theme: "sand", scheme: "light", width: "normal", device: "desktop", view: "single" };
+  try { Object.assign(st, JSON.parse(decodeURIComponent(location.hash.slice(1)))); } catch (e) {}
+
+  function btn(group, key, items) {
+    var el = document.getElementById("g-" + group);
+    items.forEach(function (it) {
+      var b = document.createElement("button");
+      b.textContent = it[1]; b.dataset.key = key; b.dataset.val = it[0];
+      b.onclick = function () { st[key] = it[0]; render(); };
+      el.appendChild(b);
+    });
+  }
+  btn("kind", "kind", G.kinds.map(function (k) { return [k.id, k.label]; }));
+  btn("theme", "theme", G.themes.map(function (t) { return [t.id, t.name]; }));
+  btn("scheme", "scheme", [["light", "Светлый"], ["dark", "Тёмный"]]);
+  btn("width", "width", [["narrow", "Узкая 720"], ["normal", "Обычная 920"], ["wide", "Широкая 1200"], ["full", "Резиновая"]]);
+  btn("device", "device", DEVICES);
+  btn("view", "view", [["single", "Одна тема"], ["grid", "Все темы сразу"]]);
+
+  function src(themeId) {
+    var k = G.kinds.filter(function (x) { return x.id === st.kind; })[0];
+    return "pages/" + st.kind + "." + themeId + "." + (k.widths ? st.width : "default") + "." + st.scheme + ".html";
+  }
+  function frame(t) {
+    var f = document.createElement("div"); f.className = "frame";
+    f.innerHTML = "<b>" + t.name + "<small>" + t.description + "</small></b>";
+    var i = document.createElement("iframe"); i.src = src(t.id); i.title = t.name; f.appendChild(i);
+    return f;
+  }
+  function render() {
+    var k = G.kinds.filter(function (x) { return x.id === st.kind; })[0];
+    document.querySelectorAll("header button").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(st[b.dataset.key] === b.dataset.val));
+      if (b.dataset.key === "width") b.disabled = !k.widths;
+      if (b.dataset.key === "theme") b.disabled = st.view === "grid";
+    });
+    var main = document.getElementById("main"); main.innerHTML = "";
+    if (st.view === "grid") {
+      var g = document.createElement("div"); g.id = "grid";
+      G.themes.forEach(function (t) { g.appendChild(frame(t)); });
+      main.appendChild(g);
+    } else {
+      var t = G.themes.filter(function (x) { return x.id === st.theme; })[0];
+      var f = frame(t); f.id = "single";
+      f.style.width = DEVICES.filter(function (d) { return d[0] === st.device; })[0][2];
+      main.appendChild(f);
+    }
+    location.hash = encodeURIComponent(JSON.stringify(st));
+  }
+  render();
+})();
+</script>
+</body>
+</html>
