@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { DEFAULT_CDN_ALLOWLIST, type DefaultShareMode } from "@open-artifacts/shared";
+import { DEFAULT_ARTIFACT_THEME, DEFAULT_CDN_ALLOWLIST, type ArtifactThemeId, type DefaultShareMode } from "@open-artifacts/shared";
 import type { Database } from "../db/client.js";
 import { settings } from "../db/schema.js";
 
@@ -34,6 +34,8 @@ export interface InstanceSettings {
    * play different roles.
    */
   defaultShareMode: DefaultShareMode;
+  /** Service-wide artifact theme; always set. A team (`orgs.theme`) and an artifact (`artifacts.theme`) may override it. */
+  artifactTheme: ArtifactThemeId;
 }
 
 export function defaultInstanceSettings(env: { DEFAULT_REGISTRATION_MODE: string; DEFAULT_KEY_TTL_DAYS: number }): InstanceSettings {
@@ -49,6 +51,7 @@ export function defaultInstanceSettings(env: { DEFAULT_REGISTRATION_MODE: string
     defaultShareMode: "team",
     orgQuotaBytes: 0,
     artifactQuotaBytes: 0,
+    artifactTheme: DEFAULT_ARTIFACT_THEME,
   };
 }
 

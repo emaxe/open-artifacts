@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
-import { defaultShareModeSchema } from "@open-artifacts/shared";
+import { artifactThemeSchema, defaultShareModeSchema } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import { requireAuth, requireSuperadmin } from "../middleware/auth.js";
 import { artifacts, agents, artifactFiles, orgs, users } from "../db/schema.js";
@@ -103,6 +103,8 @@ const settingsPatchSchema = z.object({
   // Bytes; 0 = unlimited (the default). A team may set its own stricter override — see quota.ts.
   orgQuotaBytes: z.number().int().nonnegative().optional(),
   artifactQuotaBytes: z.number().int().nonnegative().optional(),
+  // Never null: the service-wide theme is the floor of the artifact → team → service chain.
+  artifactTheme: artifactThemeSchema.optional(),
 });
 
 adminRoutes.patch("/admin/settings", async (c) => {
@@ -152,6 +154,16 @@ adminRoutes.patch("/admin/settings", async (c) => {
       identity: c.get("identity")!,
       action: "settings.share_policy_update",
       meta: { allowPublicShares: body.data.allowPublicShares, defaultShareMode: body.data.defaultShareMode },
+    });
+  }
+
+  if (body.data.artifactTheme !== undefined && body.data.artifactTheme !== current.artifactTheme) {
+    // Re-colours every artifact that inherits the instance theme at its next view; nothing stored
+    // on artifacts or teams changes, so there is nothing to rewrite — just leave a trail.
+    await recordAudit(db, {
+      identity: c.get("identity")!,
+      action: "settings.artifact_theme_update",
+      meta: { from: current.artifactTheme, to: body.data.artifactTheme },
     });
   }
 

@@ -78,6 +78,27 @@
       "when": 1792136491006,
       "tag": "0010_same_sabretooth",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792417805500,
+      "tag": "0011_abandoned_surge",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792428771186,
+      "tag": "0012_nervous_iron_patriot",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792430905844,
+      "tag": "0013_thankful_nightshade",
+      "breakpoints": true
     }
   ]
 }

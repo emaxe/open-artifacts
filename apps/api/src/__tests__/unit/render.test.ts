@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderArtifactHtml } from "../../services/render.js";
+import { isRestylable, renderArtifactHtml } from "../../services/render.js";
 
 describe("renderArtifactHtml", () => {
   it("passes html content through unchanged (its safety comes from the sandbox, not sanitization)", () => {
@@ -93,5 +93,107 @@ describe("renderArtifactHtml", () => {
       expect(out).not.toContain("@import");
       expect(out.match(/<style>/g)?.length ?? 0).toBe(1);
     }
+  });
+});
+
+describe("renderArtifactHtml appearance", () => {
+  const terminal = { theme: "terminal" as const, width: null };
+  const constructorPage =
+    '<!doctype html><html><head><meta charset="utf-8"><meta name="oa-generator" content="constructor"><style>:root{--bg:#fff}</style></head><body><main>x</main></body></html>';
+
+  it("leaves html untouched when no appearance is given", () => {
+    expect(renderArtifactHtml("html", "<p>hi</p>")).toBe("<p>hi</p>");
+  });
+
+  it("themes server-rendered kinds and sets the body class for markdown", () => {
+    const md = renderArtifactHtml("markdown", "# Hi", { theme: "ocean", width: "wide" });
+    expect(md).toContain('<style id="oa-theme">');
+    expect(md).toContain("--accent:#0b6e8a");
+    expect(md).toContain('<body class="oa-doc">');
+    expect(md).toContain("--oa-measure:80ch");
+    const svg = renderArtifactHtml("svg", "<svg><circle r='1'/></svg>", { theme: "ocean", width: "wide" });
+    expect(svg).toContain("--accent:#0b6e8a");
+    expect(svg).not.toContain("--oa-main-w"); // the svg card centres itself, no width override
+    expect(renderArtifactHtml("mermaid", "graph TD;A-->B", terminal)).toContain("--bg:#e4e6e1");
+  });
+
+  it("puts the theme AFTER a constructor page's own styles so it wins, and adds the width override", () => {
+    const out = renderArtifactHtml("html", constructorPage, { theme: "graphite", width: "full" });
+    expect(out.indexOf(":root{--bg:#fff}")).toBeLessThan(out.indexOf('<style id="oa-theme">'));
+    expect(out.indexOf('<style id="oa-theme">')).toBeLessThan(out.indexOf("</head>"));
+    expect(out).toContain("--oa-main-w:100% !important");
+  });
+
+  it("puts the theme BEFORE a hand-written page's styles so its own :root still wins, and never forces a width", () => {
+    const page = "<!doctype html><html><head><title>t</title><style>:root{--bg:#fff}</style></head><body>x</body></html>";
+    const out = renderArtifactHtml("html", page, { theme: "graphite", width: "full" });
+    expect(out.indexOf('<style id="oa-theme">')).toBeLessThan(out.indexOf(":root{--bg:#fff}"));
+    expect(out).not.toContain("--oa-main-w");
+  });
+
+  it("themes fragments without producing quirks mode", () => {
+    expect(renderArtifactHtml("html", "<!doctype html><p>x</p>", terminal).startsWith("<!doctype html><style")).toBe(true);
+    expect(renderArtifactHtml("html", "<p>x</p>", terminal).startsWith('<style id="oa-theme">')).toBe(true);
+  });
+});
+
+describe("forced colour scheme", () => {
+  const constructorPage =
+    '<!doctype html><html><head><meta name="oa-generator" content="constructor"><script>var isDark = window.matchMedia && window.matchMedia(\'(prefers-color-scheme: dark)\').matches;</script></head><body><main>x</main></body></html>';
+
+  it("writes the forced scheme's tokens straight into :root, with no media query", () => {
+    const dark = renderArtifactHtml("markdown", "# x", { theme: "ocean", width: null, scheme: "dark" });
+    expect(dark).toContain("color-scheme:dark;");
+    expect(dark).toContain("--bg:#0c1a21");
+    const light = renderArtifactHtml("markdown", "# x", { theme: "ocean", width: null, scheme: "light" });
+    expect(light).toContain("--bg:#dfeaee");
+    expect(light.split('<style id="oa-theme">')[1]).not.toContain("prefers-color-scheme");
+  });
+
+  it("without a forced scheme the page still follows the OS", () => {
+    const out = renderArtifactHtml("markdown", "# x", { theme: "ocean", width: null });
+    expect(out.split('<style id="oa-theme">')[1]).toContain("prefers-color-scheme:dark");
+  });
+
+  it("answers the constructor page's own matchMedia dark check, so diagrams and charts match", () => {
+    expect(renderArtifactHtml("html", constructorPage, { theme: "sand", width: null, scheme: "dark" })).toContain("({matches:true}).matches");
+    expect(renderArtifactHtml("html", constructorPage, { theme: "sand", width: null, scheme: "light" })).toContain("({matches:false}).matches");
+    expect(renderArtifactHtml("html", constructorPage, { theme: "sand", width: null })).toContain("window.matchMedia('(prefers-color-scheme: dark)')");
+  });
+
+  it("pins the mermaid darkMode flag too", () => {
+    expect(renderArtifactHtml("mermaid", "graph TD;A-->B", { theme: "sand", width: null, scheme: "dark" })).toContain("var oaDark = true;");
+  });
+
+  it("never rewrites a hand-written page's scripts", () => {
+    const page = "<html><head></head><body><script>window.matchMedia('(prefers-color-scheme: dark)')</script></body></html>";
+    expect(renderArtifactHtml("html", page, { theme: "sand", width: null, scheme: "dark" })).toContain("window.matchMedia('(prefers-color-scheme: dark)')");
+  });
+});
+
+describe("isRestylable", () => {
+  it("covers server-rendered kinds and constructor pages, but not hand-written html", () => {
+    expect(isRestylable("markdown", "x")).toEqual({ theme: true, width: true });
+    expect(isRestylable("mermaid", "x")).toEqual({ theme: true, width: true });
+    expect(isRestylable("svg", "<svg/>")).toEqual({ theme: true, width: false });
+    expect(isRestylable("html", '<meta name="oa-generator" content="constructor">')).toEqual({ theme: true, width: true });
+    expect(isRestylable("html", "<h1>hi</h1>")).toBeNull();
+  });
+});
+
+describe("artifact font", () => {
+  it("replaces --font-sans after the theme and puts every @import first", () => {
+    const out = renderArtifactHtml("markdown", "# x", { theme: "editorial", width: null, font: "jetbrains-mono" });
+    const css = out.split('<style id="oa-theme">')[1]!.split("</style>")[0]!;
+    expect(css.startsWith('@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono')).toBe(true);
+    const lastImport = css.lastIndexOf("@import");
+    expect(css.indexOf(":root{")).toBeGreaterThan(lastImport); // no rule precedes an @import
+    expect(css.lastIndexOf("--font-sans:")).toBeGreaterThan(css.indexOf("--font-sans:")); // font rule wins over the theme's
+    expect(css).toContain('--font-sans:"JetBrains Mono"');
+  });
+  it("without a font the theme's own is untouched", () => {
+    const css = renderArtifactHtml("markdown", "# x", { theme: "editorial", width: null }).split('<style id="oa-theme">')[1]!;
+    expect(css).toContain('--font-sans:"Source Serif 4"');
+    expect(css).not.toContain("JetBrains");
   });
 });

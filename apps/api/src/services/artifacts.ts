@@ -72,6 +72,14 @@ export interface CreateArtifactInput {
   kind: "html" | "markdown" | "mermaid" | "svg";
   content: string;
   visibility: "private" | "org";
+  /** `null`/omitted = inherit the team's, then the instance's, theme. */
+  theme?: string | null;
+  /** `null`/omitted = the kind's default content width. */
+  width?: string | null;
+  /** `null`/omitted = the theme's own font. */
+  font?: string | null;
+  /** `true` = viewers of a share link may not restyle the page. Default false. */
+  lockAppearance?: boolean;
   /** Caller's choice: a duration string, a number of minutes, `null` for "never", or omitted to use `maxLifetimeMinutes`. */
   lifetime?: string | number | null;
   /**
@@ -114,6 +122,10 @@ export async function createArtifact(db: Database, input: CreateArtifactInput) {
         description: input.description,
         kind: input.kind,
         visibility: input.visibility,
+        theme: input.theme ?? null,
+        width: input.width ?? null,
+        font: input.font ?? null,
+        lockAppearance: input.lockAppearance ?? false,
         sizeBytes,
         createdAt: now,
         updatedAt: now,
@@ -234,6 +246,11 @@ export interface UpdateArtifactInput {
   title?: string;
   description?: string;
   visibility?: "private" | "org";
+  /** `null` clears the artifact's own theme so it inherits again. */
+  theme?: string | null;
+  width?: string | null;
+  font?: string | null;
+  lockAppearance?: boolean;
   identity: Identity;
   /** Optimistic-locking guard: if provided, must match the artifact's current content hash. */
   ifMatchContentHash?: string;
@@ -270,6 +287,10 @@ export async function updateArtifact(db: Database, artifactId: string, input: Up
     if (input.title !== undefined) patch.title = input.title;
     if (input.description !== undefined) patch.description = input.description;
     if (input.visibility !== undefined) patch.visibility = input.visibility;
+    if (input.theme !== undefined) patch.theme = input.theme;
+    if (input.width !== undefined) patch.width = input.width;
+    if (input.font !== undefined) patch.font = input.font;
+    if (input.lockAppearance !== undefined) patch.lockAppearance = input.lockAppearance;
     if (input.lifetime !== undefined) {
       // Recomputed from the artifact's ORIGINAL created_at, not "now" — the same rule the policy
       // recompute uses, so extending then having the instance lower its max can't smuggle in

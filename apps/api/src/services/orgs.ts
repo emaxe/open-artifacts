@@ -1,6 +1,6 @@
 import { and, asc, eq, sql, ilike, inArray, isNull, ne, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { effectiveLifetimeLimit, effectiveQuotaLimit, toLifetimeLimit, toQuotaLimit, resolveSharePolicy, type DefaultShareMode, type OrgRole } from "@open-artifacts/shared";
+import { effectiveLifetimeLimit, effectiveQuotaLimit, toLifetimeLimit, toQuotaLimit, resolveArtifactTheme, resolveSharePolicy, type ArtifactThemeId, type DefaultShareMode, type OrgRole } from "@open-artifacts/shared";
 import type { Database } from "../db/client.js";
 import { artifacts, orgMembers, orgs, users } from "../db/schema.js";
 import { getOrgUsageBytes } from "./quota.js";
@@ -314,6 +314,7 @@ export async function updateOrg(
     maxArtifactLifetimeMinutes?: number | null;
     defaultShareMode?: DefaultShareMode | null;
     allowPublicShares?: boolean;
+    theme?: ArtifactThemeId | null;
   },
 ) {
   const [updated] = await db.update(orgs).set(patch).where(eq(orgs.id, orgId)).returning();
@@ -330,7 +331,7 @@ export async function updateOrg(
 export async function getOrgDetail(
   db: Database,
   orgId: string,
-  instance: Pick<InstanceSettings, "maxArtifactLifetimeMinutes" | "allowPublicShares" | "defaultShareMode" | "orgQuotaBytes" | "artifactQuotaBytes">,
+  instance: Pick<InstanceSettings, "maxArtifactLifetimeMinutes" | "allowPublicShares" | "defaultShareMode" | "orgQuotaBytes" | "artifactQuotaBytes" | "artifactTheme">,
 ) {
   const org = await db.query.orgs.findFirst({ where: eq(orgs.id, orgId) });
   if (!org) return null;
@@ -365,6 +366,9 @@ export async function getOrgDetail(
     globalAllowPublicShares: instance.allowPublicShares,
     effectiveDefaultShareMode: sharePolicy.defaultShareMode,
     effectiveAllowPublicShares: sharePolicy.allowPublicShares,
+    theme: org.theme,
+    globalTheme: instance.artifactTheme,
+    effectiveTheme: resolveArtifactTheme(null, org.theme, instance.artifactTheme),
     createdAt: org.createdAt,
     memberCount: counts.get(orgId)?.members ?? 0,
     artifactCount: counts.get(orgId)?.artifacts ?? 0,

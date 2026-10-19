@@ -1,0 +1,1 @@
+ALTER TABLE "artifacts" ADD COLUMN "lock_appearance" boolean DEFAULT false NOT NULL;

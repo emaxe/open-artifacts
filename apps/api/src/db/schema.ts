@@ -71,6 +71,10 @@ export const orgs = pgTable("orgs", {
   // the AND of the two (resolveSharePolicy). Stored separately from the instance flag so
   // re-enabling public shares instance-wide restores each team's own prior preference.
   allowPublicShares: boolean("allow_public_shares").notNull().default(true),
+  // NULL = inherit the instance-wide artifact theme (InstanceSettings.artifactTheme). Plain text,
+  // validated against ARTIFACT_THEME_IDS in the API; an id retired later just falls through to the
+  // inherited theme at resolve time (see resolveArtifactTheme in packages/shared).
+  theme: text("theme"),
   kind: orgKindEnum("kind").notNull().default("team"),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -189,6 +193,14 @@ export const artifacts = pgTable("artifacts", {
   // Set once the sweeper has hard-deleted this artifact's version content. `artifacts` itself
   // is kept as a tombstone (audit log + view analytics reference it), only the content goes.
   purgedAt: timestamp("purged_at", { withTimezone: true }),
+  // NULL = inherit the team's, then the instance's, theme (resolveArtifactTheme in packages/shared).
+  theme: text("theme"),
+  // NULL = the kind's default content width. One of ARTIFACT_WIDTHS, validated in the API.
+  width: text("width"),
+  // NULL = the theme's own font. One of ARTIFACT_FONT_IDS, validated in the API.
+  font: text("font"),
+  // When true, viewers of a share link cannot restyle the page (theme / width / colour scheme).
+  lockAppearance: boolean("lock_appearance").notNull().default(false),
 }, (table) => [
   index("artifacts_org_id_idx").on(table.orgId),
   index("artifacts_owner_idx").on(table.ownerType, table.ownerId),

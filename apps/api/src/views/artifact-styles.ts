@@ -57,6 +57,7 @@ body {
   margin-inline: auto;
 }
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+body.oa-doc :is(p, li, blockquote, dd) { max-width: var(--oa-measure, none); }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
@@ -79,24 +80,24 @@ blockquote {
   margin: 1rem 0;
   padding: .6rem 1rem;
   background: var(--accent-soft);
-  border-radius: 2px;
+  border-radius: var(--radius-sm, 2px);
 }
 blockquote > :last-child { margin-bottom: 0; }
 
 hr { border: none; height: 6px; background: var(--surface-2); margin: 2rem 0; }
 
-img { max-width: 100%; height: auto; border-radius: 2px; }
+img { max-width: 100%; height: auto; border-radius: var(--radius-sm, 2px); }
 
 code {
   font-family: var(--font-mono);
   font-size: .9em;
   background: var(--surface-2);
-  border-radius: 2px;
+  border-radius: var(--radius-sm, 2px);
   padding: .1em .35em;
 }
 pre {
   background: var(--surface-2);
-  border-radius: 2px;
+  border-radius: var(--radius-sm, 2px);
   padding: 14px 16px;
   overflow-x: auto;
 }
@@ -121,11 +122,11 @@ tbody tr:nth-child(even) { background: var(--surface); }
 kbd {
   font-family: var(--font-mono);
   font-size: .85em;
-  border-radius: 2px;
+  border-radius: var(--radius-sm, 2px);
   padding: .05em .4em;
   background: var(--surface-2);
 }
-mark { background: var(--warn); color: var(--bg); padding: 0 .15em; border-radius: 2px; }
+mark { background: var(--warn); color: var(--bg); padding: 0 .15em; border-radius: var(--radius-sm, 2px); }
 del, s { color: var(--fg-muted); }
 sup, sub { font-size: .75em; }
 dt { font-weight: 600; }
@@ -165,14 +166,14 @@ body {
   align-items: center;
   justify-content: center;
   padding: clamp(20px, 4vw, 40px);
-  background: #e6e0d2;
+  background: var(--bg, #e6e0d2);
 }
 @media (prefers-color-scheme: dark) {
-  body { background: #171913; }
+  body { background: var(--bg, #171913); }
 }
 .oa-svg-card {
   background: #ffffff;
-  border-radius: 2px;
+  border-radius: var(--radius-sm, 2px);
   padding: 24px;
   max-width: 100%;
 }

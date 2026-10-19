@@ -32,7 +32,7 @@ import { createShare, listSharesForArtifact, revokeShare } from "../services/sha
 import { resolveArtifactCeilings, buildQuotaSnapshot } from "../services/quota.js";
 import { listFilesForArtifact, deleteFile } from "../services/artifact-files.js";
 import { resolveSharePolicyForRequest } from "../services/share-policy.js";
-import { resolveRequestedShareMode, shareModeSchema } from "@open-artifacts/shared";
+import { artifactFontSchema, artifactThemeSchema, artifactWidthSchema, resolveRequestedShareMode, shareModeSchema } from "@open-artifacts/shared";
 
 export const mcpRoutes = new Hono<AppBindings>();
 
@@ -157,6 +157,9 @@ function createMcpServer(
             title: artifact.title,
             kind: artifact.kind,
             visibility: artifact.visibility,
+            theme: artifact.theme,
+            width: artifact.width,
+            font: artifact.font,
             updatedAt: artifact.updatedAt,
             expiresAt: artifact.expiresAt,
           });
@@ -187,6 +190,9 @@ function createMcpServer(
         description: artifact.description,
         kind: artifact.kind,
         visibility: artifact.visibility,
+        theme: artifact.theme,
+        width: artifact.width,
+        font: artifact.font,
         versionNo: version?.versionNo,
         contentHash: version?.contentHash,
         content: version?.content,
@@ -203,6 +209,11 @@ function createMcpServer(
       "How long before the artifact is permanently deleted: a number of minutes, a duration like '30m'/'12h'/'7d', or null for never. Omit to use the team's default (its maximum). Exceeding the team/instance maximum is rejected — see the returned error for the allowed limit.",
     );
 
+  const themeDesc = "Colour theme: sand, graphite, ocean, editorial or terminal. Omit/null to inherit the team's, then the service's, theme.";
+  const lockDesc = "true = viewers of a share link cannot change the theme/width/colour scheme (default false: they can).";
+  const fontDesc = "Body typeface: system, inter, onest, plex-sans, source-serif or jetbrains-mono. Omit/null for the theme's own font.";
+  const widthDesc = "Content width: narrow, normal, wide or full (fluid). Omit/null for the kind's default.";
+
   server.registerTool(
     "create_artifact",
     {
@@ -216,9 +227,13 @@ function createMcpServer(
         visibility: visibilitySchema.default("org").describe("'org' (default) makes it readable by everyone in your org; 'private' hides it from teammates"),
         orgId: z.string().uuid().optional().describe("Team id to publish into — omit to use the connection's default team, or when you belong to only one"),
         lifetime: lifetimeSchema,
+        theme: artifactThemeSchema.nullish().describe(themeDesc),
+        width: artifactWidthSchema.nullish().describe(widthDesc),
+        font: artifactFontSchema.nullish().describe(fontDesc),
+        lockAppearance: z.boolean().optional().describe(lockDesc),
       },
     },
-    async ({ title, kind, content, description, visibility, orgId, lifetime }): Promise<CallToolResult> => {
+    async ({ title, kind, content, description, visibility, orgId, lifetime, theme, width, font, lockAppearance }): Promise<CallToolResult> => {
       if (!requiresScope(identity, "artifacts:write")) return toolError("Missing scope: artifacts:write");
       const resolved = await resolveOrgForTool(db, identity, orgId, defaultOrgId);
       if (!resolved.ok) return resolved.result;
@@ -235,6 +250,10 @@ function createMcpServer(
           description,
           visibility,
           lifetime,
+          theme,
+          width,
+          font,
+          lockAppearance,
           ...ceilings,
         });
         await recordAudit(db, { orgId: resolved.orgId, identity, action: "artifact.create", targetType: "artifact", targetId: artifact.id });
@@ -266,9 +285,13 @@ function createMcpServer(
         message: z.string().max(500).optional().describe("Short version note, e.g. 'fixed the Q3 numbers'"),
         ifMatchContentHash: z.string().optional().describe("Pass the contentHash from get_artifact to fail instead of clobbering a concurrent edit"),
         lifetime: lifetimeSchema,
+        theme: artifactThemeSchema.nullable().optional().describe(themeDesc + " null resets to inherit."),
+        width: artifactWidthSchema.nullable().optional().describe(widthDesc),
+        font: artifactFontSchema.nullable().optional().describe(fontDesc),
+        lockAppearance: z.boolean().optional().describe(lockDesc),
       },
     },
-    async ({ id, content, title, description, visibility, message, ifMatchContentHash, lifetime }): Promise<CallToolResult> => {
+    async ({ id, content, title, description, visibility, message, ifMatchContentHash, lifetime, theme, width, font, lockAppearance }): Promise<CallToolResult> => {
       if (!requiresScope(identity, "artifacts:write")) return toolError("Missing scope: artifacts:write");
       const artifact = await getArtifact(db, id);
       if (!artifact) return toolError("Artifact not found");
@@ -280,7 +303,7 @@ function createMcpServer(
         const lifetimePatch = lifetime !== undefined ? { requested: lifetime, maxMinutes: ceilings.maxLifetimeMinutes } : undefined;
         const contentPatch =
           content !== undefined ? { text: content, message, maxArtifactSizeBytes: ceilings.maxArtifactSizeBytes, quota: ceilings.quota } : undefined;
-        const result = await updateArtifact(db, id, { title, description, visibility, identity, ifMatchContentHash, lifetime: lifetimePatch, content: contentPatch });
+        const result = await updateArtifact(db, id, { title, description, visibility, theme, width, font, lockAppearance, identity, ifMatchContentHash, lifetime: lifetimePatch, content: contentPatch });
         await recordAudit(db, { orgId: artifact.orgId, identity, action: "artifact.update", targetType: "artifact", targetId: id });
         return ok({ id, newVersionNo: result.version?.versionNo, expiresAt: result.artifact.expiresAt });
       } catch (err) {

@@ -21,6 +21,7 @@ import {
   listAllArtifacts,
 } from "../services/artifacts.js";
 import { renderArtifactHtml } from "../services/render.js";
+import { resolveArtifactAppearance } from "../services/artifact-appearance.js";
 import { recordAudit } from "../services/audit.js";
 import { requiresScope } from "../services/scopes.js";
 import { defaultInstanceSettings, getInstanceSettings } from "../services/settings.js";
@@ -114,7 +115,16 @@ artifactRoutes.get("/artifacts/:id", requireAuth, async (c) => {
   if (!access.read) return c.json({ error: { code: "forbidden" } }, 403);
 
   const version = await getCurrentVersion(db, artifact);
-  return c.json({ artifact, content: version?.content, contentHash: version?.contentHash, versionNo: version?.versionNo, access });
+  const settings = await getInstanceSettings(db, defaultInstanceSettings(c.get("env")));
+  const appearance = await resolveArtifactAppearance(db, artifact, settings);
+  return c.json({
+    artifact,
+    effectiveTheme: appearance.theme,
+    content: version?.content,
+    contentHash: version?.contentHash,
+    versionNo: version?.versionNo,
+    access,
+  });
 });
 
 /**
@@ -145,7 +155,7 @@ artifactRoutes.get("/artifacts/:id/preview", requireAuth, async (c) => {
   c.header("Content-Security-Policy", buildEmbedCsp({ scriptAllowlist: settings.cdnAllowlist, frameAncestor: env.APP_ORIGIN, assetOrigin }));
   c.header("X-Content-Type-Options", "nosniff");
   c.header("Referrer-Policy", "no-referrer");
-  return c.html(renderArtifactHtml(artifact.kind, version.content));
+  return c.html(renderArtifactHtml(artifact.kind, version.content, await resolveArtifactAppearance(db, artifact, settings)));
 });
 
 artifactRoutes.patch("/artifacts/:id", requireAuth, async (c) => {

@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { createInviteSchema, defaultShareModeSchema, orgRoleSchema } from "@open-artifacts/shared";
+import { artifactThemeSchema, createInviteSchema, defaultShareModeSchema, orgRoleSchema } from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import { requireAuth } from "../middleware/auth.js";
 import { orgMembers, orgs } from "../db/schema.js";
@@ -88,6 +88,8 @@ const updateOrgSchema = z.object({
   // `null` reverts to inheriting the instance default. `"password"` is not a legal default mode.
   defaultShareMode: defaultShareModeSchema.nullable().optional(),
   allowPublicShares: z.boolean().optional(),
+  // `null` reverts to inheriting the instance artifact theme.
+  theme: artifactThemeSchema.nullable().optional(),
 });
 
 orgRoutes.patch("/orgs/:id", requireAuth, async (c) => {
@@ -177,6 +179,7 @@ orgRoutes.patch("/orgs/:id", requireAuth, async (c) => {
     maxArtifactLifetimeMinutes: updated.maxArtifactLifetimeMinutes,
     defaultShareMode: updated.defaultShareMode,
     allowPublicShares: updated.allowPublicShares,
+    theme: updated.theme,
   });
 });
 
