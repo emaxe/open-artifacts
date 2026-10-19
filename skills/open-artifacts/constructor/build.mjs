@@ -15,7 +15,11 @@
  *   --lifetime <dur>     Lifetime for oa push (e.g. 7d, 12h)
  *   --public             Create public share link
  *   --password <pwd>     Create password-protected share link
- *   --themes-dir <path>  Path to themes directory
+ *   --theme <id>         Colour theme: sand | graphite | ocean | editorial | terminal
+ *   --font <id>          Body font: system | inter | onest | plex-sans | source-serif | jetbrains-mono
+ *   --width <w>          Page width: narrow | normal | wide | full (or a px value)
+ *   --themes-dir <path>  Path to the directory holding the base stylesheet (default.css)
+ *   --layouts-dir <path> Path to layout presets (data, document, promo, diagram)
  *   --blocks-dir <path>  Path to blocks directory
  *   --strict             Fail build on any unknown fields or alias warnings
  *   --lenient            Proceed with build even if validation errors are found
@@ -157,7 +161,11 @@ Options:
   --lifetime <dur>     Lifetime (e.g. 7d, 12h)
   --public             Public share link
   --password <pwd>     Password-protected share link
-  --themes-dir <path>  Custom themes directory
+  --theme <id>         Colour theme: sand | graphite | ocean | editorial | terminal
+  --font <id>          Body font: system | inter | onest | plex-sans | source-serif | jetbrains-mono
+  --width <w>          Page width: narrow | normal | wide | full (or a px value)
+  --themes-dir <path>  Custom directory with the base stylesheet (default.css)
+  --layouts-dir <path> Custom layout presets directory
   --blocks-dir <path>  Custom blocks directory
   --strict             Fail on any unknown fields or unmapped properties
   --lenient            Proceed with build even if validation errors are found
@@ -166,7 +174,10 @@ Options:
 
 Spec format (YAML):
   title: "My Artifact"
-  theme: default | data | document | promo | diagram
+  layout: default | data | document | promo | diagram   # spacing/density preset
+  theme: sand | graphite | ocean | editorial | terminal   # colour theme (omit to inherit the team's/service's)
+  font: system | inter | onest | plex-sans | source-serif | jetbrains-mono   # body font (omit = the theme's own)
+  width: narrow | normal | wide | full                    # page width ("full" is fluid)
   lang: en
   source: /path/to/report.md        # passthrough mode (whole MD file)
   blocks:                            # or blocks mode
@@ -223,6 +234,8 @@ function resolveSize(s) {
 function colorVar(c) {
   if (!c) return 'accent';
   const valid = ['accent','pos','neg','warn','muted','c1','c2','c3','c4','c5','c6'];
+  // `muted` is the author-facing name; the token is --fg-muted (there is no --muted).
+  if (c === 'muted') return 'fg-muted';
   return valid.includes(c) ? c : 'accent';
 }
 
@@ -2725,6 +2738,7 @@ function buildHtml({ title, lang, css, headScripts, bodyHtml, bodyScripts, inlin
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<meta name="oa-generator" content="constructor">
 <title>${escapeHtml(title || 'Artifact')}</title>
 ${headScriptTags ? headScriptTags + '\n' : ''}<style>
 ${css}
@@ -2776,6 +2790,7 @@ async function main() {
 
   const specDir   = path.dirname(specPath);
   const themesDir = args['--themes-dir'] || path.join(__dirname, 'themes');
+  const layoutsDir = args['--layouts-dir'] || path.join(__dirname, 'layouts');
   const blocksDir = args['--blocks-dir'] || path.join(__dirname, 'blocks');
   const outPath   = path.resolve(args['--out'] || specPath.replace(/\.(ya?ml|json)$/i, '.html'));
 
@@ -2790,15 +2805,50 @@ async function main() {
   }
   let css = fs.readFileSync(defaultCssPath, 'utf8');
 
-  const theme = spec.theme || 'default';
-  if (theme !== 'default') {
-    const themeFile = path.join(themesDir, `${theme}.css`);
-    if (fs.existsSync(themeFile)) {
-      css += '\n' + fs.readFileSync(themeFile, 'utf8');
-    } else {
-      console.warn(`[warn] theme file not found: ${themeFile}, using default`);
+  // `layout` = spacing/density preset; `theme` = colour theme. Before colour themes existed `theme:`
+  // held the layout name, so a layout name there is still honoured as an alias.
+  const LAYOUT_NAMES = ['default', 'data', 'document', 'promo', 'diagram'];
+  let layout = spec.layout ? String(spec.layout) : 'default';
+  let themeId = args['--theme'] ? String(args['--theme']) : null;
+  if (spec.theme != null && spec.theme !== '') {
+    const t = String(spec.theme);
+    if (LAYOUT_NAMES.includes(t)) {
+      if (!spec.layout) layout = t;
+      if (t !== 'default') console.warn(`[warn] "theme: ${t}" is a layout preset; use "layout: ${t}". "theme" now selects a colour theme.`);
+    } else if (!themeId) {
+      themeId = t;
     }
   }
+  if (layout !== 'default') {
+    const layoutFile = [layoutsDir, themesDir].map(d => path.join(d, `${layout}.css`)).find(f => fs.existsSync(f));
+    if (layoutFile) css += '\n' + fs.readFileSync(layoutFile, 'utf8');
+    else console.warn(`[warn] layout file not found: ${layout}.css in ${layoutsDir}, using default`);
+  }
+
+  // Colour theme: baked in so a local file looks like the published one. The server injects the
+  // resolved theme (artifact -> team -> service) on every view and wins over this copy.
+  // `@import` only works at the very top of a stylesheet, so web-font imports are collected here and
+  // prepended to the whole <style> instead of sitting next to the rules that need them.
+  let fontImports = '';
+  if (themeId) {
+    let palettes = {};
+    try { palettes = JSON.parse(fs.readFileSync(path.join(__dirname, 'themes', 'palettes.json'), 'utf8')); } catch { /* optional */ }
+    if (palettes[themeId]) {
+      const m = /^(@import url\([^)]*\);)?([\s\S]*)$/.exec(palettes[themeId]);
+      fontImports += m[1] || '';
+      css += `\n/* === COLOUR THEME: ${themeId} === */\n${m[2]}\n`;
+    } else { console.warn(`[warn] unknown theme "${themeId}" (known: ${Object.keys(palettes).join(', ') || 'none'}), ignored`); themeId = null; }
+  }
+  let fontId = args['--font'] ? String(args['--font']) : (spec.font ? String(spec.font) : null);
+  if (fontId) {
+    let fonts = {};
+    try { fonts = JSON.parse(fs.readFileSync(path.join(__dirname, 'themes', 'fonts.json'), 'utf8')); } catch { /* optional */ }
+    if (fonts[fontId]) {
+      fontImports += fonts[fontId].imports;
+      css += `\n/* === FONT: ${fontId} === */\n${fonts[fontId].rules}\n`;
+    } else { console.warn(`[warn] unknown font "${fontId}" (known: ${Object.keys(fonts).join(', ') || 'none'}), ignored`); fontId = null; }
+  }
+  if (fontImports) css = fontImports + '\n' + css;
 
   resetState(spec || {});
 
@@ -2879,19 +2929,27 @@ async function main() {
 
   bodyHtml = renderTocLists(bodyHtml);
 
-  // Page width: narrow | normal | wide | <css length>
+  // Page width: narrow | normal | wide | full | <px>. `full` is fluid (100%) with a capped text measure.
   const MAIN_WIDTHS = { narrow: 720, normal: 920, wide: 1200 };
   let mainWidthPx = MAIN_WIDTHS.normal;
   let mainStyle = '';
-  if (spec.width != null && spec.width !== '') {
-    const w = String(spec.width);
-    if (MAIN_WIDTHS[w]) { mainWidthPx = MAIN_WIDTHS[w]; mainStyle = `--oa-main-w:${mainWidthPx}px`; }
+  let widthName = null; // one of the named widths, forwarded to `oa push --width`
+  const widthRaw = args['--width'] ?? spec.width;
+  let fluid = false;
+  if (widthRaw != null && widthRaw !== '') {
+    const w = String(widthRaw);
+    if (w === 'full') { fluid = true; widthName = w; mainStyle = '--oa-main-w:100%;--oa-measure:80ch'; }
+    else if (MAIN_WIDTHS[w]) {
+      widthName = w; mainWidthPx = MAIN_WIDTHS[w];
+      mainStyle = `--oa-main-w:${mainWidthPx}px` + (w === 'wide' ? ';--oa-measure:80ch' : '');
+    }
     else if (/^\d+(px)?$/.test(w)) { mainWidthPx = parseInt(w, 10); mainStyle = `--oa-main-w:${mainWidthPx}px`; }
-    else console.warn(`[warn] spec "width" must be narrow, normal, wide or a pixel value (got "${w}") — ignored`);
+    else console.warn(`[warn] "width" must be narrow, normal, wide, full or a pixel value (got "${w}") — ignored`);
   }
 
   // Sidebar TOC sits beside <main>; it needs room on both sides, so it only floats on wide viewports.
-  if (STATE.tocs.some(t => t.variant === 'sidebar')) {
+  // (Not for `full`: there is no fixed column edge to anchor it to, so it stays in the flow.)
+  if (!fluid && STATE.tocs.some(t => t.variant === 'sidebar')) {
     const need = mainWidthPx + 2 * (240 + 24);
     css += `\n/* === TOC SIDEBAR (generated for main width ${mainWidthPx}px) === */
 @media (min-width: ${need}px) {
@@ -2983,8 +3041,11 @@ window.__oaAlpha = function (hex, a) {
     const shareFlag = args['--share']   ? '--share' : '';
     const pubFlag   = args['--public']  ? '--public' : '';
     const pwdFlag   = args['--password'] ? `--password "${args['--password']}"` : '';
+    const themeFlag = themeId ? `--theme ${themeId}` : '';
+    const widthFlag = widthName ? `--width ${widthName}` : '';
+    const fontFlag  = fontId ? `--font ${fontId}` : '';
 
-    const cmd = `oa push "${outPath}" --title "${title.replace(/"/g, '\\"')}" ${orgFlag} ${lifeFlag} ${shareFlag} ${pubFlag} ${pwdFlag}`.replace(/\s+/g, ' ').trim();
+    const cmd = `oa push "${outPath}" --title "${title.replace(/"/g, '\\"')}" ${orgFlag} ${lifeFlag} ${shareFlag} ${pubFlag} ${pwdFlag} ${themeFlag} ${widthFlag} ${fontFlag}`.replace(/\s+/g, ' ').trim();
     if (verbose) console.log('[push]', cmd);
     try {
       const out = execSync(cmd, { encoding: 'utf8', stdio: ['inherit', 'pipe', 'inherit'] });

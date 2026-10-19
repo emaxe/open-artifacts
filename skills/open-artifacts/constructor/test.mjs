@@ -271,6 +271,27 @@ blocks:
   check('Test 18b: javascript: href removed, https kept', !html.includes('javascript:') && html.includes('href="https://example.com"'));
 }
 
+// Test 20: layout vs colour theme, width, generator marker
+{
+  const body = 'blocks:\n  - { type: text-section, heading: Hi, body: Hello }\n';
+  const a = build('t20a', `title: T20\nlayout: promo\ntheme: ocean\nwidth: full\n${body}`);
+  check('Test 20a: layout preset and colour theme are applied independently',
+    a.html.includes('THEME DELTA: promo') && a.html.includes('COLOUR THEME: ocean') && a.html.includes('--accent:#0b6e8a'));
+  check('Test 20b: width: full is fluid with a capped text measure',
+    a.html.includes('<main style="--oa-main-w:100%;--oa-measure:80ch">'));
+  check('Test 20c: pages carry the constructor generator marker',
+    a.html.includes('<meta name="oa-generator" content="constructor">'));
+  const legacy = build('t20d', `title: T20\ntheme: data\n${body}`);
+  check('Test 20d: legacy "theme: data" still selects the data layout, no colour theme',
+    legacy.html.includes('THEME DELTA: data') && !legacy.html.includes('COLOUR THEME'));
+  const f = build('t20f', `title: T20\nfont: jetbrains-mono\ntheme: ocean\n${body}`);
+  check('Test 20f: font is baked in, with its @import ahead of every rule',
+    f.html.includes('FONT: jetbrains-mono') && f.html.includes('--font-sans:"JetBrains Mono"') &&
+    f.html.indexOf('@import') > -1 && f.html.indexOf('@import') < f.html.indexOf(':root {'));
+  const bad = build('t20e', `title: T20\ntheme: nope\n${body}`);
+  check('Test 20e: unknown colour theme is ignored', !bad.html.includes('COLOUR THEME'));
+}
+
 // Test 19: showcase builds cleanly (no warnings)
 {
   const showcase = path.join(repoRoot, 'demo', 'showcase.yaml');

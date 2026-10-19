@@ -1,6 +1,6 @@
 /* === THEME DELTA: promo — landing pages & announcements === */
 
-main { max-width: 1040px; }
+main { --oa-main-w: 1040px; }
 
 /* The hero is one flat colour field with the headline set large — no gradient, no card. */
 .hero {

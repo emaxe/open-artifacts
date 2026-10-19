@@ -1,6 +1,6 @@
 /* === THEME DELTA: diagram — architecture & flow diagrams === */
 
-main { max-width: 1000px; }
+main { --oa-main-w: 1000px; }
 
 .mermaid-figure {
   text-align: center;

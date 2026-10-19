@@ -116,8 +116,11 @@ a { color: var(--accent); }
 main {
   max-width: var(--oa-main-w, 920px);
   margin: 0 auto;
-  padding: var(--sp-5) var(--sp-4);
+  padding: var(--sp-5) clamp(16px, 4vw, 48px);
 }
+/* Readable line length for running text on wide/full pages (--oa-measure is set by the width
+   option; unset = no cap). Tables, charts, grids and cards keep the whole width. */
+:is(.text-section, .markdown-body) > :is(p, ul, ol, blockquote, dl) { max-width: var(--oa-measure, none); }
 
 /* === HERO BLOCK === */
 .hero { padding: var(--sp-7) 0 var(--sp-6); }

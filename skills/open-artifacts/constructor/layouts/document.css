@@ -1,7 +1,7 @@
 /* === THEME DELTA: document — long-form prose === */
 
 main {
-  max-width: 720px;
+  --oa-main-w: 720px;
   padding-top: var(--sp-7);
 }
 

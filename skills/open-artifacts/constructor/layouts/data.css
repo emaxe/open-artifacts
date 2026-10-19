@@ -1,6 +1,6 @@
 /* === THEME DELTA: data — analytics dashboards === */
 
-main { max-width: 1100px; }
+main { --oa-main-w: 1100px; }
 
 .kpi-row { gap: var(--sp-3); }
 .kpi-tile { padding: var(--sp-3) var(--sp-4); }
