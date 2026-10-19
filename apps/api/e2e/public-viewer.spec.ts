@@ -82,10 +82,16 @@ test("the anonymous viewer shell's own inline CSS/JS run under its CSP (no viola
 
   const panel = page.locator(".oa-panel");
   await expect(panel).toBeVisible();
-  // A real, applied stylesheet (not a CSP-blocked one) gives the panel a border — the browser's
-  // UA-stylesheet default for a bare <header> has none.
-  const borderWidth = await panel.evaluate((el) => getComputedStyle(el).borderBottomWidth);
-  expect(borderWidth).not.toBe("0px");
+  // A real, applied stylesheet (not a CSP-blocked one) gives the panel its own stacking context and
+  // background; a bare <header> from the browser's UA stylesheet is static and transparent. (The
+  // panel used to be asserted by its bottom border, but the flat design separates it by tone only.)
+  const panelStyle = await panel.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { position: cs.position, zIndex: cs.zIndex, background: cs.backgroundColor };
+  });
+  expect(panelStyle.position).toBe("relative");
+  expect(panelStyle.zIndex).toBe("1");
+  expect(panelStyle.background).not.toBe("rgba(0, 0, 0, 0)");
 
   // Positive control that the artifact's own content actually rendered in the sandboxed iframe.
   const iframe = page.frameLocator("iframe.oa-frame");
