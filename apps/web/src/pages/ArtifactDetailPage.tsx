@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, ApiError, type ArtifactSummary, type OrgDetail, type ShareMode } from "../lib/api";
-import { formatDateTime, formatBytes, formatQuota, formatExpiry, formatLifetime, label, SHARE_MODE_LABELS } from "../lib/labels";
+import { api, ApiError, type ArtifactFontId, type ArtifactSummary, type ArtifactThemeId, type OrgDetail, type ShareMode } from "../lib/api";
+import { ARTIFACT_WIDTH_LABELS, formatDateTime, formatBytes, formatQuota, formatExpiry, formatLifetime, label, SHARE_MODE_LABELS } from "../lib/labels";
+import { ARTIFACT_FONTS, ARTIFACT_THEMES } from "../lib/artifactThemes.generated";
+import { themeName } from "../components/ThemePicker";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -231,6 +233,17 @@ export function ArtifactDetailPage() {
     }
   }
 
+  async function changeAppearance(patch: { theme?: ArtifactThemeId | null; width?: string | null; font?: ArtifactFontId | null; lockAppearance?: boolean }) {
+    try {
+      await api.patch(`/artifacts/${id}`, patch);
+      await load();
+      setPreviewKey((k) => k + 1); // the preview is server-rendered with the theme, so re-fetch it
+      toast.show("Оформление обновлено", "success");
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось изменить оформление", "error");
+    }
+  }
+
   const expiresSoon = artifact?.expiresAt ? new Date(artifact.expiresAt).getTime() - Date.now() < 24 * 60 * 60 * 1000 : false;
 
   if (!artifact) return <Spinner />;
@@ -287,6 +300,68 @@ export function ArtifactDetailPage() {
         ) : (
           <Badge variant="neutral">{artifact.visibility === "org" ? "Команда" : "Только владелец"}</Badge>
         )}
+        <span className="sm:ml-4">Тема:</span>
+        {canWrite ? (
+          <Select
+            aria-label="Тема оформления"
+            value={artifact.theme ?? ""}
+            onChange={(e) => changeAppearance({ theme: (e.target.value || null) as ArtifactThemeId | null })}
+            className="w-auto!"
+          >
+            <option value="">Наследовать (сейчас: {themeName(orgDetail?.effectiveTheme ?? "sand")})</option>
+            {ARTIFACT_THEMES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <Badge variant="neutral">{themeName(artifact.theme ?? orgDetail?.effectiveTheme ?? "sand")}</Badge>
+        )}
+        <span className="sm:ml-4">Шрифт:</span>
+        {canWrite ? (
+          <Select
+            aria-label="Шрифт"
+            value={artifact.font ?? ""}
+            onChange={(e) => changeAppearance({ font: (e.target.value || null) as ArtifactFontId | null })}
+            className="w-auto!"
+          >
+            <option value="">Из темы</option>
+            {ARTIFACT_FONTS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <Badge variant="neutral">{ARTIFACT_FONTS.find((f) => f.id === artifact.font)?.name ?? "Из темы"}</Badge>
+        )}
+        <span className="sm:ml-4">Ширина:</span>
+        {canWrite ? (
+          <Select
+            aria-label="Ширина содержимого"
+            value={artifact.width ?? ""}
+            onChange={(e) => changeAppearance({ width: e.target.value || null })}
+            className="w-auto!"
+          >
+            {Object.entries(ARTIFACT_WIDTH_LABELS).map(([value, text]) => (
+              <option key={value} value={value}>
+                {text}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <Badge variant="neutral">{ARTIFACT_WIDTH_LABELS[artifact.width ?? ""]}</Badge>
+        )}
+        <label className="flex items-center gap-2 sm:ml-4" title="Зрители ссылки выбирают тему, режим и ширину только для себя, в своём браузере">
+          <input
+            type="checkbox"
+            checked={!artifact.lockAppearance}
+            disabled={!canWrite}
+            onChange={(e) => changeAppearance({ lockAppearance: !e.target.checked })}
+          />
+          Зрители могут менять оформление
+        </label>
       </div>
 
       {editing ? (

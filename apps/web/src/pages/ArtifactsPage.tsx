@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, type ArtifactSummary, type OrgDetail } from "../lib/api";
-import { formatDateTime, formatExpiry } from "../lib/labels";
+import { api, type ArtifactSummary, type ArtifactThemeId, type OrgDetail } from "../lib/api";
+import { ARTIFACT_WIDTH_LABELS, formatDateTime, formatExpiry } from "../lib/labels";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Select, Textarea } from "../components/ui/Input";
 import { Field } from "../components/ui/Field";
 import { LifetimeSelect } from "../components/ui/LifetimeSelect";
+import { ThemePicker, themeName } from "../components/ThemePicker";
+import { ARTIFACT_FONTS } from "../lib/artifactThemes.generated";
 import { SearchInput } from "../components/ui/SearchInput";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -61,6 +63,7 @@ export function ArtifactsPage() {
         <CreateArtifactForm
           orgId={orgId}
           maxLifetimeMinutes={orgDetail.effectiveMaxArtifactLifetimeMinutes}
+          inheritedTheme={orgDetail.effectiveTheme}
           onCreated={() => {
             setShowCreate(false);
             load();
@@ -144,23 +147,30 @@ export function ArtifactsPage() {
 function CreateArtifactForm({
   orgId,
   maxLifetimeMinutes,
+  inheritedTheme,
   onCreated,
 }: {
   orgId: string;
   maxLifetimeMinutes: number | null;
+  /** The theme the artifact gets when none is chosen: the team's, else the service's. */
+  inheritedTheme: ArtifactThemeId;
   onCreated: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<"html" | "markdown" | "mermaid" | "svg">("html");
   const [content, setContent] = useState("<h1>Hello, world</h1>");
   const [lifetime, setLifetime] = useState<number | null>(maxLifetimeMinutes);
+  const [theme, setTheme] = useState<ArtifactThemeId | null>(null);
+  const [width, setWidth] = useState("");
+  const [font, setFont] = useState("");
+  const [allowViewerStyle, setAllowViewerStyle] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     try {
-      await api.post(`/artifacts?orgId=${orgId}`, { title, kind, content, visibility: "org", lifetime });
+      await api.post(`/artifacts?orgId=${orgId}`, { title, kind, content, visibility: "org", lifetime, theme, width: width || null, font: font || null, lockAppearance: !allowViewerStyle });
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
@@ -187,6 +197,37 @@ function CreateArtifactForm({
         <Field label="Срок жизни" hint="После истечения содержимое удаляется безвозвратно.">
           <LifetimeSelect value={lifetime} maxMinutes={maxLifetimeMinutes} onChange={setLifetime} />
         </Field>
+        <div className="flex flex-col gap-1.5">
+          <p className="text-[0.9375rem] font-medium text-fg">Тема оформления</p>
+          <ThemePicker value={theme} onChange={setTheme} inheritLabel={`Сейчас: ${themeName(inheritedTheme)}`} />
+          <p className="text-sm text-muted">Применяется к Markdown, Mermaid, SVG и страницам из конструктора. В своём HTML — только к тому, что использует переменные темы.</p>
+        </div>
+        <Field label="Шрифт" hint="По умолчанию берётся шрифт выбранной темы.">
+          <Select value={font} onChange={(e) => setFont(e.target.value)}>
+            <option value="">Из темы</option>
+            {ARTIFACT_FONTS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Ширина содержимого" hint="Для широких и резиновых страниц длина строки текста ограничена, таблицы и графики занимают всю ширину.">
+          <Select value={width} onChange={(e) => setWidth(e.target.value)}>
+            {Object.entries(ARTIFACT_WIDTH_LABELS).map(([value, text]) => (
+              <option key={value} value={value}>
+                {text}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <label className="flex items-start gap-2 text-[0.9375rem] text-fg">
+          <input type="checkbox" className="mt-1" checked={allowViewerStyle} onChange={(e) => setAllowViewerStyle(e.target.checked)} />
+          <span>
+            Зрители ссылки могут менять оформление
+            <span className="block text-sm text-muted">Тему, режим (светлый/тёмный) и ширину — только для себя, в своём браузере. Снимите галочку, если нужен единый вид.</span>
+          </span>
+        </label>
         {error && <p className="text-sm text-danger">{error}</p>}
         <Button type="submit" className="self-start">
           Создать

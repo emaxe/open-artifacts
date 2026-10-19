@@ -5,6 +5,8 @@
 // ArtifactSummary, ...) is declared the same way, for the same reason.
 export type ShareMode = "public" | "password" | "team";
 export type DefaultShareMode = "public" | "team";
+import type { ArtifactFontId, ArtifactThemeId } from "./artifactThemes.generated";
+export type { ArtifactFontId, ArtifactThemeId };
 export type RegistrationMode = "open" | "invite_only" | "closed";
 
 const BASE = "/api/v1";
@@ -124,6 +126,12 @@ export interface OrgDetail {
   effectiveDefaultShareMode: DefaultShareMode;
   /** Whether a `public` link can actually be created right now (team AND instance both allow it). */
   effectiveAllowPublicShares: boolean;
+  /** This team's own artifact theme. `null` = inherits the service theme. */
+  theme: ArtifactThemeId | null;
+  /** The service-wide artifact theme. */
+  globalTheme: ArtifactThemeId;
+  /** The theme artifacts of this team get unless they pick their own. */
+  effectiveTheme: ArtifactThemeId;
   createdAt: string;
   memberCount: number;
   artifactCount: number;
@@ -233,6 +241,16 @@ export interface ArtifactSummary {
   updatedAt: string;
   /** `null` = never expires. */
   expiresAt: string | null;
+  /** The artifact's own theme. `null` = inherits the team's, then the service's. */
+  theme?: ArtifactThemeId | null;
+  /** Content width. `null` = the kind's default. */
+  width?: ArtifactWidth | null;
+  /** Body font. `null` = the theme's own. */
+  font?: ArtifactFontId | null;
+  /** `true` = viewers of a share link can't change the theme, width or colour scheme. */
+  lockAppearance?: boolean;
   /** Present on list responses only: whether the caller may edit/delete this artifact. */
   canWrite?: boolean;
 }
+
+export type ArtifactWidth = "narrow" | "normal" | "wide" | "full";

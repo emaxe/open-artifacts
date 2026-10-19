@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, type DefaultShareMode } from "../../lib/api";
+import { api, ApiError, type ArtifactThemeId, type DefaultShareMode } from "../../lib/api";
 import { REGISTRATION_MODE_LABELS, DEFAULT_SHARE_MODE_LABELS, formatLifetime } from "../../lib/labels";
 import { Card, CardHeader } from "../../components/ui/Card";
 import { Field } from "../../components/ui/Field";
@@ -10,6 +10,7 @@ import { XIcon, PlusIcon } from "../../components/ui/icons";
 import { useToast } from "../../components/ui/Toast";
 import { LifetimeSelect } from "../../components/ui/LifetimeSelect";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { ThemePicker } from "../../components/ThemePicker";
 
 interface InstanceSettings {
   registrationMode: "open" | "invite_only" | "closed";
@@ -28,6 +29,8 @@ interface InstanceSettings {
   orgQuotaBytes: number;
   /** Bytes; 0 = unlimited (the default). A team may set its own stricter override. */
   artifactQuotaBytes: number;
+  /** Service-wide artifact theme; always set. A team and an artifact may override it. */
+  artifactTheme: ArtifactThemeId;
 }
 
 function bytesToMb(bytes: number): number {
@@ -196,6 +199,14 @@ export function AdminSettingsPage() {
             </div>
           </div>
         </Field>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Тема артефактов"
+          description="Тема по умолчанию для всего сервиса. Команда может выбрать свою, а при создании артефакта — ещё одну; если не выбрано, берётся тема уровнем выше."
+        />
+        <ThemePicker value={settings.artifactTheme} onChange={(v) => v && save({ artifactTheme: v })} disabled={saving} />
       </Card>
 
       <Card>

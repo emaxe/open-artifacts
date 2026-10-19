@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, ApiError, type DefaultShareMode, type OrgDetail, type OrgInvite, type OrgMember } from "../../lib/api";
+import { api, ApiError, type ArtifactThemeId, type DefaultShareMode, type OrgDetail, type OrgInvite, type OrgMember } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { ORG_ROLE_LABELS, INVITE_STATUS_LABELS, DEFAULT_SHARE_MODE_LABELS, formatDateTime, formatLifetime, formatQuota, label } from "../../lib/labels";
 import { Card, CardHeader } from "../../components/ui/Card";
@@ -14,6 +14,7 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Dialog } from "../../components/ui/Dialog";
 import { CopyButton } from "../../components/ui/CopyButton";
 import { Spinner } from "../../components/ui/Spinner";
+import { ThemePicker, themeName } from "../../components/ThemePicker";
 import { useToast } from "../../components/ui/Toast";
 
 const ROLE_OPTIONS = ["owner", "admin", "member", "viewer"];
@@ -113,6 +114,17 @@ export function TeamSettingsPage() {
       await load();
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Не удалось изменить настройки ссылок", "error");
+    }
+  }
+
+  async function handleSaveTheme(theme: ArtifactThemeId | null) {
+    if (!orgId) return;
+    try {
+      await api.patch(`/orgs/${orgId}`, { theme });
+      toast.show("Тема артефактов сохранена", "success");
+      await load();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Не удалось изменить тему", "error");
     }
   }
 
@@ -359,6 +371,19 @@ export function TeamSettingsPage() {
             </div>
           </div>
         </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Тема артефактов"
+          description={`Артефакты команды оформляются этой темой, если у артефакта нет своей. Тема сервиса — «${themeName(detail.globalTheme)}».`}
+        />
+        <ThemePicker
+          value={detail.theme}
+          onChange={handleSaveTheme}
+          disabled={!canManageTeam}
+          inheritLabel={`Сейчас: ${themeName(detail.globalTheme)}`}
+        />
       </Card>
 
       <Card>

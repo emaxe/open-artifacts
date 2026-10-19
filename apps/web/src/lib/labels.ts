@@ -134,3 +134,12 @@ export function formatLifetime(minutes: number | null): string {
 export function formatExpiry(expiresAt: string | null): string {
   return expiresAt === null ? "никогда" : formatDateTime(expiresAt);
 }
+
+/** Per-artifact content width; `""` = the kind's own default. */
+export const ARTIFACT_WIDTH_LABELS: Record<string, string> = {
+  "": "По умолчанию",
+  narrow: "Узкая (720 px)",
+  normal: "Обычная (920 px)",
+  wide: "Широкая (1200 px)",
+  full: "Резиновая (на всю ширину)",
+};
