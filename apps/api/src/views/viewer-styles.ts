@@ -202,6 +202,35 @@ body.oa-viewer { display: flex; flex-direction: column; }
 }
 .oa-versions-more { padding: 6px 8px; font-size: 13px; color: var(--oa-muted); }
 
+/* ---- appearance control (viewer's own theme / mode / width) ---- */
+.oa-style-menu { min-width: 260px; max-height: min(70vh, 520px); }
+.oa-style-group + .oa-style-group { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--oa-border); }
+.oa-style-opt {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--oa-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.oa-style-opt:hover { background: var(--oa-panel-muted); }
+.oa-style-opt[aria-checked="true"] { background: var(--oa-accent-soft); font-weight: 600; }
+.oa-style-opt .oa-mode-check { visibility: hidden; }
+.oa-style-opt[aria-checked="true"] .oa-mode-check { visibility: visible; }
+.oa-style-foot { display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 4px; margin-top: 4px; border-top: 1px solid var(--oa-border); font-size: 12px; color: var(--oa-muted); }
+.oa-style-foot .oa-btn { justify-content: center; }
+/* A fixed-width column makes no sense on a phone, so the control is not offered there. */
+@media (max-width: 640px) { .oa-style-width { display: none; } }
+
 /* ---- visibility control ---- */
 .oa-mode-menu { min-width: 300px; }
 .oa-mode-list { display: flex; flex-direction: column; gap: 2px; }

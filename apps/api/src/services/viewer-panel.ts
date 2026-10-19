@@ -20,6 +20,8 @@ export interface BuildViewerModelInput {
    *  control's disabled/enabled options), so the caller resolves and passes it in rather than this
    *  function querying it unconditionally for every anon/member render. */
   policy?: EffectiveSharePolicy;
+  /** What the viewer may restyle, or `null` for nothing (locked by the author / content doesn't respond). */
+  restyle: { theme: boolean; width: boolean } | null;
 }
 
 function urls(token: string, versionNo: number) {
@@ -38,7 +40,7 @@ function urls(token: string, versionNo: number) {
  * `ViewerShellModel` union's typing) that nothing extra ends up in memory to leak by mistake.
  */
 export async function buildViewerModel(db: Database, input: BuildViewerModelInput): Promise<ViewerShellModel> {
-  const { token, share, artifact, resolved, ctx, policy } = input;
+  const { token, share, artifact, resolved, ctx, policy, restyle } = input;
   const version = resolved.version;
   const { canonicalHref, embedSrc, downloadHref } = urls(token, version.versionNo);
 
@@ -50,6 +52,7 @@ export async function buildViewerModel(db: Database, input: BuildViewerModelInpu
     embedSrc,
     downloadHref,
     canonicalHref,
+    restyle,
   };
 
   if (ctx.audience === "anon") {

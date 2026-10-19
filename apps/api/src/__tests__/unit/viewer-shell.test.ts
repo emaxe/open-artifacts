@@ -22,6 +22,7 @@ interface BaseOverrides {
   embedSrc: string;
   downloadHref: string;
   canonicalHref: string;
+  restyle: { theme: boolean; width: boolean } | null;
 }
 
 function baseFields(overrides: Partial<BaseOverrides> = {}): BaseOverrides {
@@ -33,6 +34,7 @@ function baseFields(overrides: Partial<BaseOverrides> = {}): BaseOverrides {
     embedSrc: "/embed/tok123?v=2",
     downloadHref: "/s/tok123/download?v=2",
     canonicalHref: "/s/tok123",
+    restyle: null,
     ...overrides,
   };
 }
@@ -289,6 +291,52 @@ describe("renderViewerShell — manager audience", () => {
       expect(html).toContain("method:'PATCH'");
       expect(html).not.toContain("location.reload");
     });
+  });
+});
+
+describe("renderViewerShell — viewer appearance picker", () => {
+  const restyle = { theme: true, width: true };
+
+  it("is absent when the viewer may not restyle (locked, or content doesn't respond)", () => {
+    const html = renderViewerShell(anonVm(), NONCE);
+    expect(html).not.toContain('class="oa-pop oa-style"');
+    expect(html).not.toContain('data-key="theme"');
+    expect(html).toContain('src="/embed/tok123?v=2"'); // plain iframe, no deferred src
+    expect(html).not.toContain("data-src=");
+  });
+
+  it("defers the iframe src to the script, with a noscript fallback, so the embed loads once", () => {
+    const html = renderViewerShell(anonVm({ restyle }), NONCE);
+    expect(html).toContain('data-src="/embed/tok123?v=2"');
+    const firstFrame = html.slice(html.indexOf('<iframe class="oa-frame"'), html.indexOf("<noscript>"));
+    expect(firstFrame).not.toMatch(/ src=/);
+    expect(html).toMatch(/<noscript><iframe class="oa-frame"[^>]* src="\/embed\/tok123\?v=2"/);
+  });
+
+  it("offers every theme, the colour modes and the widths, for every audience", () => {
+    for (const vm of [anonVm({ restyle }), memberVm({ restyle }), managerVm({ restyle })]) {
+      const html = renderViewerShell(vm, NONCE);
+      for (const id of ["sand", "graphite", "ocean", "editorial", "terminal"]) expect(html).toContain(`data-key="theme" data-val="${id}"`);
+      for (const v of ["light", "dark"]) expect(html).toContain(`data-key="scheme" data-val="${v}"`);
+      for (const v of ["narrow", "normal", "wide", "full"]) expect(html).toContain(`data-key="width" data-val="${v}"`);
+      expect(html).toContain("data-reset");
+    }
+  });
+
+  it("omits the width group when the content has no width to change", () => {
+    const html = renderViewerShell(anonVm({ restyle: { theme: true, width: false } }), NONCE);
+    expect(html).toContain('data-key="theme"');
+    expect(html).not.toContain('data-key="width"');
+  });
+
+  it("is localized", () => {
+    const ru = renderViewerShell(anonVm({ restyle }), NONCE, "ru");
+    expect(ru).toContain("Оформление");
+    expect(ru).toContain("Резиновая");
+  });
+
+  it("the boot script applies a viewer-forced colour scheme to the shell before first paint", () => {
+    expect(renderViewerShell(anonVm(), NONCE)).toContain("oa.viewer.style");
   });
 });
 

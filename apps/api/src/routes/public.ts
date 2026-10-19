@@ -1,12 +1,20 @@
 import { Hono, type Context } from "hono";
 import { setCookie, getCookie } from "hono/cookie";
 import { nanoid } from "nanoid";
-import { buildEmbedCsp, buildViewerShellCsp } from "@open-artifacts/shared";
+import {
+  buildEmbedCsp,
+  buildViewerShellCsp,
+  isArtifactScheme,
+  isArtifactThemeId,
+  isArtifactWidth,
+} from "@open-artifacts/shared";
 import type { AppBindings } from "../types.js";
 import { getShareByToken, incrementShareViewCount, checkShareAccess } from "../services/shares.js";
 import { verifySecret } from "../services/crypto.js";
 import { getArtifactWithLiveness } from "../services/artifacts.js";
 import { renderArtifactHtml } from "../services/render.js";
+import { resolveArtifactAppearance } from "../services/artifact-appearance.js";
+import { isRestylable, type RenderAppearance } from "../services/render.js";
 import { recordArtifactView } from "../services/analytics.js";
 import { hashIp } from "../services/audit.js";
 import { getInstanceSettings, defaultInstanceSettings } from "../services/settings.js";
@@ -112,7 +120,9 @@ publicRoutes.get("/s/:token", async (c) => {
   // policy (whether `public` is currently choosable) — an extra DB read the anon/member majority
   // of this route's traffic never pays for.
   const policy = ctx.canManage ? await resolveSharePolicyForRequest(db, c.get("env"), artifact.orgId) : undefined;
-  const vm = await buildViewerModel(db, { token, share, artifact, resolved, ctx, policy });
+  // The picker is offered only when the author hasn't locked the look and the content responds to it.
+  const restyle = artifact.lockAppearance ? null : isRestylable(artifact.kind, resolved.version.content);
+  const vm = await buildViewerModel(db, { token, share, artifact, resolved, ctx, policy, restyle });
   return c.html(renderViewerShell(vm, nonce, lang));
 });
 
@@ -182,19 +192,33 @@ publicRoutes.get("/embed/:token", async (c) => {
   // audience-facing view count they're the one reading — see the "Changed" note in CHANGELOG —
   // so their visits land in `managerViewCount` instead of `viewCount`, and never in the
   // `artifact_views` analytics table (which is meant to describe the actual audience only).
-  if (!ctx.canManage) {
-    const ip = c.req.header("x-forwarded-for");
-    recordArtifactView(db, {
-      artifactId: artifact.id,
-      shareId: share.id,
-      ipHash: ip ? hashIp(ip, env.IP_HASH_SALT) : undefined,
-      uaHash: c.req.header("user-agent") ? hashIp(c.req.header("user-agent")!, env.IP_HASH_SALT) : undefined,
-      referer: c.req.header("referer"),
-    }).catch((err) => console.error("failed to record view:", err));
+  // `r=1` marks a re-render the viewer asked for with the style picker (same visit, new look); it
+  // must not count as another view in either counter.
+  if (c.req.query("r") !== "1") {
+    if (!ctx.canManage) {
+      const ip = c.req.header("x-forwarded-for");
+      recordArtifactView(db, {
+        artifactId: artifact.id,
+        shareId: share.id,
+        ipHash: ip ? hashIp(ip, env.IP_HASH_SALT) : undefined,
+        uaHash: c.req.header("user-agent") ? hashIp(c.req.header("user-agent")!, env.IP_HASH_SALT) : undefined,
+        referer: c.req.header("referer"),
+      }).catch((err) => console.error("failed to record view:", err));
+    }
+    incrementShareViewCount(db, share.id, { manager: ctx.canManage }).catch((err) => console.error("failed to bump view count:", err));
   }
-  incrementShareViewCount(db, share.id, { manager: ctx.canManage }).catch((err) => console.error("failed to bump view count:", err));
 
-  return c.html(renderArtifactHtml(artifact.kind, resolved.version.content));
+  const stored = await resolveArtifactAppearance(db, artifact, settings);
+  const appearance: RenderAppearance = { ...stored, scheme: null };
+  // A viewer's own choice (kept in their browser, sent by the shell) sits on top of the author's,
+  // unless the author locked the look. Values are matched against fixed lists, never echoed.
+  if (!artifact.lockAppearance) {
+    const q = c.req.query();
+    if (isArtifactThemeId(q.theme)) appearance.theme = q.theme;
+    if (isArtifactWidth(q.width)) appearance.width = q.width;
+    if (isArtifactScheme(q.scheme)) appearance.scheme = q.scheme;
+  }
+  return c.html(renderArtifactHtml(artifact.kind, resolved.version.content, appearance));
 });
 
 /**

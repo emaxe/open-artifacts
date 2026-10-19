@@ -59,6 +59,21 @@ export interface ViewerStrings {
     visibilityChangedTo: string;
     couldNotChange: string;
     passwordTooShort: string;
+    styleChanged: string;
+  };
+  /** The "Appearance" popover: a viewer's own theme / colour mode / width, kept in their browser. */
+  style: {
+    title: string;
+    asAuthor: string;
+    theme: string;
+    scheme: string;
+    schemeSystem: string;
+    schemeLight: string;
+    schemeDark: string;
+    width: string;
+    widths: Record<"narrow" | "normal" | "wide" | "full", string>;
+    reset: string;
+    note: string;
   };
   notFound: string;
   noLongerAvailable: string;
@@ -120,6 +135,20 @@ const en: ViewerStrings = {
     visibilityChangedTo: "Visibility changed to ",
     couldNotChange: "Could not change visibility.",
     passwordTooShort: "Password must be at least 4 characters.",
+    styleChanged: "Appearance changed",
+  },
+  style: {
+    title: "Appearance",
+    asAuthor: "As the author set",
+    theme: "Theme",
+    scheme: "Colour mode",
+    schemeSystem: "System",
+    schemeLight: "Light",
+    schemeDark: "Dark",
+    width: "Width",
+    widths: { narrow: "Narrow", normal: "Normal", wide: "Wide", full: "Fluid" },
+    reset: "Reset to the author's look",
+    note: "Saved in this browser only.",
   },
   notFound: "This link does not exist.",
   noLongerAvailable: "This link is no longer available.",
@@ -186,6 +215,20 @@ const ru: ViewerStrings = {
     visibilityChangedTo: "Видимость изменена: ",
     couldNotChange: "Не удалось изменить видимость.",
     passwordTooShort: "Пароль должен быть не короче 4 символов.",
+    styleChanged: "Оформление изменено",
+  },
+  style: {
+    title: "Оформление",
+    asAuthor: "Как задал автор",
+    theme: "Тема",
+    scheme: "Режим",
+    schemeSystem: "Как в системе",
+    schemeLight: "Светлый",
+    schemeDark: "Тёмный",
+    width: "Ширина",
+    widths: { narrow: "Узкая", normal: "Обычная", wide: "Широкая", full: "Резиновая" },
+    reset: "Сбросить к виду автора",
+    note: "Сохраняется только в этом браузере.",
   },
   notFound: "Такой ссылки не существует.",
   noLongerAvailable: "Эта ссылка больше не доступна.",

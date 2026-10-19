@@ -1,4 +1,4 @@
-import type { ArtifactKind, ShareMode } from "@open-artifacts/shared";
+import { ARTIFACT_WIDTHS, listArtifactThemes, type ArtifactKind, type ShareMode } from "@open-artifacts/shared";
 import { escapeHtml, truncate } from "../services/html.js";
 import { VIEWER_CSS } from "./viewer-styles.js";
 import { VIEWER_STRINGS, type ViewerLang, type ViewerStrings } from "./viewer-i18n.js";
@@ -40,6 +40,8 @@ interface BaseFields {
   downloadHref: string;
   /** The share URL with no `?v=` — what "Copy link" always copies, regardless of what's on screen. */
   canonicalHref: string;
+  /** What the viewer may restyle from the panel; `null` hides the control entirely. */
+  restyle: { theme: boolean; width: boolean } | null;
 }
 
 interface MemberFields {
@@ -106,6 +108,7 @@ const ICON_PATHS = {
   chevron: '<path d="m4 6 4 4 4-4"/>',
   dots: '<circle cx="3.5" cy="8" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="12.5" cy="8" r="1"/>',
   check: '<path d="m3.5 8.5 3 3 6-7"/>',
+  palette: '<circle cx="8" cy="8" r="6.5"/><circle cx="5.2" cy="7" r="1"/><circle cx="8" cy="4.6" r="1"/><circle cx="10.8" cy="7" r="1"/>',
 } as const;
 
 type IconName = keyof typeof ICON_PATHS;
@@ -153,7 +156,7 @@ function formatDateTime(d: Date, locale: string): string {
  * = 'open'). That is a fresh key rather than a re-read of the old `oa.viewer.panelCollapsed`, whose
  * meaning was the opposite (expanded by default) — reusing it would flip everyone's saved choice.
  */
-const HEAD_BOOT_SCRIPT = `(function(){try{var t=localStorage.getItem('oa_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}var open=false;try{open=localStorage.getItem('oa.viewer.details')==='open';}catch(e){}if(!open){document.documentElement.setAttribute('data-oa-panel','collapsed');}})();`;
+const HEAD_BOOT_SCRIPT = `(function(){try{var t=localStorage.getItem('oa_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}try{var s=JSON.parse(localStorage.getItem('oa.viewer.style')||'{}');if(s&&(s.scheme==='light'||s.scheme==='dark')){document.documentElement.setAttribute('data-theme',s.scheme);}}catch(e){}var open=false;try{open=localStorage.getItem('oa.viewer.details')==='open';}catch(e){}if(!open){document.documentElement.setAttribute('data-oa-panel','collapsed');}})();`;
 
 /**
  * Runs at the end of `<body>` on the viewer shell only. Contains zero server-supplied data (the only
@@ -219,6 +222,60 @@ function panelScript(m: ViewerStrings["script"]): string {
   window.addEventListener('blur',function(){
     if(document.activeElement&&document.activeElement.tagName==='IFRAME')closeAll();
   });
+
+  // Viewer's own look (theme / colour mode / width), kept in this browser only and sent to the embed
+  // as query parameters. Sets the iframe src exactly once on load; later changes reload it with r=1
+  // so the re-render is not counted as another view.
+  (function(){
+    var frame=document.querySelector('.oa-frame[data-src]');
+    if(!frame)return;
+    var KEY='oa.viewer.style';
+    var keys=['theme','scheme','width'];
+    var base=frame.getAttribute('data-src');
+    var st={theme:'',scheme:'',width:''};
+    try{
+      var raw=JSON.parse(localStorage.getItem(KEY)||'{}');
+      keys.forEach(function(k){if(raw&&typeof raw[k]==='string')st[k]=raw[k];});
+    }catch(e){}
+    function url(rerender){
+      var u=base;
+      keys.forEach(function(k){if(st[k])u+='&'+k+'='+encodeURIComponent(st[k]);});
+      return rerender?u+'&r=1':u;
+    }
+    function shellScheme(){
+      var forced=st.scheme==='light'||st.scheme==='dark';
+      var t=null;
+      if(forced){t=st.scheme;}else{try{var p=localStorage.getItem('oa_theme');if(p==='light'||p==='dark')t=p;}catch(e){}}
+      if(t){root.setAttribute('data-theme',t);}else{root.removeAttribute('data-theme');}
+    }
+    var menu=document.querySelector('.oa-style');
+    function sync(){
+      if(!menu)return;
+      Array.prototype.forEach.call(menu.querySelectorAll('.oa-style-opt'),function(b){
+        b.setAttribute('aria-checked',String(st[b.getAttribute('data-key')]===b.getAttribute('data-val')));
+      });
+    }
+    function changed(){
+      try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}
+      sync();
+      shellScheme();
+      frame.src=url(true);
+      announce(${JSON.stringify(m.styleChanged)});
+    }
+    frame.src=url(false);
+    if(!menu)return;
+    sync();
+    menu.addEventListener('click',function(e){
+      var t=e.target&&e.target.closest?e.target.closest('button'):null;
+      if(!t||!menu.contains(t))return;
+      if(t.hasAttribute('data-reset')){keys.forEach(function(k){st[k]='';});changed();return;}
+      if(!t.classList.contains('oa-style-opt'))return;
+      var k=t.getAttribute('data-key');
+      if(keys.indexOf(k)<0)return;
+      st[k]=t.getAttribute('data-val')||'';
+      changed();
+    });
+  })();
 
   function legacyCopy(text){
     var ta=document.createElement('textarea');
@@ -401,6 +458,57 @@ function documentShell(opts: { title: string; nonce: string; lang: ViewerLang; b
   return `<!doctype html><html lang="${VIEWER_STRINGS[opts.lang].htmlLang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${opts.title}</title><style nonce="${opts.nonce}">${VIEWER_CSS}</style><script nonce="${opts.nonce}">${HEAD_BOOT_SCRIPT}</script>${opts.headExtra ?? ""}</head><body${opts.bodyClass ? ` class="${opts.bodyClass}"` : ""}>${opts.body}</body></html>`;
 }
 
+const FRAME_SANDBOX = "allow-scripts allow-forms allow-popups allow-modals allow-downloads";
+
+/**
+ * With the style picker on, the iframe is deliberately emitted WITHOUT `src`: the panel script sets
+ * it once, already carrying the viewer's saved choice. Loading the plain URL first and swapping it
+ * would hit `/embed/:token` twice per visit (two renders, and two counted views).
+ */
+function renderFrame(vm: ViewerShellModel, str: ViewerStrings): string {
+  const plain = `<iframe class="oa-frame" title="${str.frameTitle}" src="${escapeHtml(vm.embedSrc)}" sandbox="${FRAME_SANDBOX}"></iframe>`;
+  if (!vm.restyle) return plain;
+  return `<iframe class="oa-frame" title="${str.frameTitle}" data-src="${escapeHtml(vm.embedSrc)}" sandbox="${FRAME_SANDBOX}"></iframe><noscript>${plain}</noscript>`;
+}
+
+/**
+ * The viewer's own look for this page: theme, colour mode, width. Only static labels and fixed
+ * enum values (theme ids, widths) are rendered here; the choice lives in the viewer's localStorage
+ * and is sent to `/embed/:token` as query parameters that the server matches against those same
+ * fixed lists. Nothing here changes the artifact for anyone else.
+ */
+function renderStyleControl(restyle: NonNullable<ViewerShellModel["restyle"]>, str: ViewerStrings): string {
+  const s = str.style;
+  const opt = (key: string, val: string, text: string) =>
+    `<button type="button" class="oa-style-opt" role="menuitemradio" data-key="${key}" data-val="${val}" aria-checked="false"><span>${escapeHtml(text)}</span>${icon("check", "oa-mode-check")}</button>`;
+  const group = (key: string, label: string, opts: string, extraClass = "") =>
+    `<div class="oa-style-group${extraClass ? ` ${extraClass}` : ""}" role="group" aria-label="${escapeHtml(label)}"><p class="oa-pop-title">${escapeHtml(label)}</p>${opts}</div>`;
+
+  const themes = group(
+    "theme",
+    s.theme,
+    opt("theme", "", s.asAuthor) + listArtifactThemes().map((t) => opt("theme", t.id, t.name)).join(""),
+  );
+  const schemes = group(
+    "scheme",
+    s.scheme,
+    opt("scheme", "", s.schemeSystem) + opt("scheme", "light", s.schemeLight) + opt("scheme", "dark", s.schemeDark),
+  );
+  const widths = restyle.width
+    ? group(
+        "width",
+        s.width,
+        opt("width", "", s.asAuthor) + ARTIFACT_WIDTHS.map((w) => opt("width", w, s.widths[w])).join(""),
+        "oa-style-width",
+      )
+    : "";
+
+  return `<details class="oa-pop oa-style">
+<summary class="oa-btn oa-chip" title="${escapeHtml(s.title)}">${icon("palette")}<span>${escapeHtml(s.title)}</span>${icon("chevron", "oa-chevron")}</summary>
+<div class="oa-pop-menu oa-style-menu">${themes}${schemes}${widths}<div class="oa-style-foot"><button type="button" class="oa-btn" data-reset>${escapeHtml(s.reset)}</button><span>${escapeHtml(s.note)}</span></div></div>
+</details>`;
+}
+
 function renderVersionPicker(vm: ManagerModel, str: ViewerStrings): string {
   const items = vm.versions
     .map((v) => {
@@ -494,6 +602,7 @@ export function renderViewerShell(vm: ViewerShellModel, nonce: string, lang: Vie
   if (vm.audience === "manager") {
     actions.push(renderShareModeControl(vm, str), renderVersionPicker(vm, str));
   }
+  if (vm.restyle) actions.push(renderStyleControl(vm.restyle, str));
   actions.push(`<a id="oa-copy" class="oa-btn" href="${escapeHtml(vm.canonicalHref)}">${str.copyLink}</a>`);
   actions.push(renderSecondaryActions(secondary, str));
 
@@ -527,7 +636,7 @@ export function renderViewerShell(vm: ViewerShellModel, nonce: string, lang: Vie
 ${details}
 <span id="oa-live" class="oa-sr-only" role="status" aria-live="polite"></span>
 </header>
-<iframe class="oa-frame" title="${str.frameTitle}" src="${escapeHtml(vm.embedSrc)}" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"></iframe>
+${renderFrame(vm, str)}
 <script nonce="${nonce}">${panelScript(str.script)}</script>`;
 
   return documentShell({ title: escapedTitle, nonce, lang, bodyClass: "oa-viewer", body });
