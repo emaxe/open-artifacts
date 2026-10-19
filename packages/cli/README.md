@@ -123,6 +123,10 @@ oa push <file> [options]
   --password <pass>     Protect the share link with a password (implies --share)
   --message <msg>       Version commit message
   --lifetime <duration> Delete the artifact after this long: 30m, 12h, 7d, or 0 for never (omit to use the team's default)
+  --theme <id>          Colour theme: sand | graphite | ocean | editorial | terminal, or 'inherit' (omit to use the team's/service's theme)
+  --font <id>           Body font: system | inter | onest | plex-sans | source-serif | jetbrains-mono, or 'theme' for the theme's own
+  --width <width>       Content width: narrow | normal | wide | full, or 'default'
+  --lock-appearance     Don't let viewers of a share link change the theme, colour mode or width (--unlock-appearance to allow it again)
   --org <team>          Team id or slug to publish into (overrides the project/machine default)
   --json                Output result as JSON
 ```

@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-19
+
 ### Added
 
 - **Artifact colour themes.** Five themes (`sand`, `graphite`, `ocean`, `editorial`, `terminal`), each with light and dark variants and full support for every constructor block, markdown, mermaid, svg and charts. The theme is resolved on every view as artifact → team → service, so changing a team or service theme re-colours everything that inherits it with no republish. The service theme is always set (default `sand`); a team (`PATCH /orgs/:id`) or an artifact (`theme` on create/update, `oa push --theme`, MCP, the web form) may override it, and `null` means "inherit". Hand-written HTML gets the theme tokens injected before its own styles, so it only changes where the page uses the token names.

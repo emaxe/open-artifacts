@@ -123,6 +123,10 @@ oa push <file> [options]
   --password <pass>     Защитить ссылку паролем (включает --share)
   --message <msg>       Сообщение версии
   --lifetime <duration> Удалить артефакт через указанное время: 30m, 12h, 7d или 0 для бессрочного (по умолчанию — лимит команды)
+  --theme <id>          Цветовая тема: sand | graphite | ocean | editorial | terminal или 'inherit' (по умолчанию — тема команды/сервиса)
+  --font <id>           Основной шрифт: system | inter | onest | plex-sans | source-serif | jetbrains-mono или 'theme' (шрифт самой темы)
+  --width <width>       Ширина содержимого: narrow | normal | wide | full или 'default'
+  --lock-appearance     Запретить зрителям ссылки менять тему, режим и ширину (--unlock-appearance — разрешить снова)
   --org <team>          Команда для публикации (переопределяет значение по умолчанию проекта/машины)
   --json                Вывод результата в формате JSON
 ```

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.15.0] - 2026-10-19
+
+### Added
+- `oa push --theme <id>`: colour theme for the artifact (`sand`, `graphite`, `ocean`, `editorial`, `terminal`); `--theme inherit` goes back to the team's/service's theme.
+- `oa push --font <id>`: body font (`system`, `inter`, `onest`, `plex-sans`, `source-serif`, `jetbrains-mono`); `--font theme` goes back to the theme's own.
+- `oa push --width <width>`: content width (`narrow`, `normal`, `wide`, `full`); `--width default` resets it.
+- `oa push --lock-appearance` / `--unlock-appearance`: stop or allow viewers of a share link to change the theme, colour mode and width for themselves.
+- All four work on create and on update (`--id`) and are validated before the request is sent.
+
 ## [0.14.0] - 2026-10-17
 
 ### Changed

@@ -9,6 +9,15 @@
 
 ---
 
+## [0.15.0] - 2026-10-19
+
+### Добавлено
+- `oa push --theme <id>`: цветовая тема артефакта (`sand`, `graphite`, `ocean`, `editorial`, `terminal`); `--theme inherit` возвращает тему команды/сервиса.
+- `oa push --font <id>`: основной шрифт (`system`, `inter`, `onest`, `plex-sans`, `source-serif`, `jetbrains-mono`); `--font theme` возвращает шрифт темы.
+- `oa push --width <width>`: ширина содержимого (`narrow`, `normal`, `wide`, `full`); `--width default` сбрасывает её.
+- `oa push --lock-appearance` / `--unlock-appearance`: запретить или разрешить зрителям ссылки менять тему, режим и ширину для себя.
+- Все четыре флага работают при создании и при обновлении (`--id`) и проверяются до отправки запроса.
+
 ## [0.14.0] - 2026-10-17
 
 ### Изменено

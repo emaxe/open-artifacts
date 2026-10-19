@@ -10,7 +10,7 @@
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-%3E%3D20-brightgreen?logo=node.js" alt="Node.js"></a>
   <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white" alt="Docker"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Theme-light_%2F_dark-4f6238" alt="Light and dark themes"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Themes-5_%C3%97_light_%2F_dark-4f6238" alt="5 themes, each with light and dark variants"></a>
   <a href="#"><img src="https://img.shields.io/badge/UI-RU_%7C_EN-3d6a8a" alt="Russian and English UI"></a>
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-Server-purple" alt="MCP Server"></a>
   <a href="#-constructor-mode-declarative-artifact-builder"><img src="https://img.shields.io/badge/Constructor_Mode-41_Blocks-blueviolet?logo=yaml" alt="Constructor Mode: 41 Blocks"></a>
@@ -28,7 +28,7 @@ Runs as a lightweight, single-stack Docker Compose deployment.
 ---
 
 ### Topics & Tags
-`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `mcp-server` • `model-context-protocol` • `self-hosted` • `docker` • `hono` • `react` • `typescript` • `cli` • `developer-tools` • `open-artifacts` • `s3` • `constructor` • `yaml` • `mermaid` • `report-generator`
+`ai-agents` • `artifacts` • `claude-artifacts` • `claude` • `mcp` • `mcp-server` • `model-context-protocol` • `self-hosted` • `docker` • `typescript` • `cli` • `developer-tools` • `open-artifacts` • `s3` • `constructor` • `yaml` • `mermaid` • `report-generator` • `themes` • `dark-mode`
 
 ---
 
@@ -40,6 +40,8 @@ Runs as a lightweight, single-stack Docker Compose deployment.
 - ⚡ **Built-in MCP Server**: Ready-to-use Model Context Protocol endpoint at `/mcp` (Streamable HTTP) for immediate integration with Cursor, Claude Desktop, and Claude Code.
 - 🤖 **Standard AI Agent Skill**: First-class support for `skills.sh` (`npx skills add emaxe/open-artifacts`) with automatic CLI detection and device-flow authorization.
 - 🎨 **Built-in Design Systems**: Four ready-made design templates (dashboards, documents, promo/decks, diagrams) ship with the skill so an agent picks the right one before publishing, keeping artifacts visually consistent. One shared sand-and-moss design language (light and dark) and the self-hosted Onest typeface run through the landing page, the account area, the viewer and the constructor; charts and Mermaid diagrams pick up the page palette, and a chart with a single series is multicolour by default. The logo ships in light and dark tone sets that follow the theme.
+- 🎨 **Themes, fonts and width for every artifact**: five colour themes (Sand & Moss, Graphite, Ocean, Editorial, Terminal), each with light and dark variants and full support for every constructor block, Markdown, Mermaid, SVG and charts. The theme resolves artifact → team → service, so changing it in the admin or team settings recolours everything that inherits it. Per artifact you can also pick a body font and a content width (narrow to fluid).
+- 🪄 **Viewers can restyle a shared page for themselves**: an "Appearance" menu on the share-link page lets a visitor pick a theme, light/dark mode and width; it is kept only in their browser. Authors can lock the look when it must stay as designed.
 - 🔑 **Flexible Authentication**: Interactive OAuth Device Flow (`oa login`) and non-interactive organization API tokens (`OA_TOKEN`).
 - 🖥️ **Bilingual Sign-In Screen**: `/` greets a signed-out visitor with a two-panel sign-in/sign-up screen (English/Russian, toggle in the header) — no marketing copy to scroll past on your own instance. Signed-in visitors are redirected straight to their own workspace. The product's marketing site lives separately at **[emaxe.github.io/open-artifacts](https://emaxe.github.io/open-artifacts/)** (source: `apps/landing/`), published to GitHub Pages and carrying no auth of its own.
 - 👥 **Multi-Tenancy & Teams**: Organizations, user management, and fine-grained roles (`superadmin`, `admin`, `member`) with an intuitive Team Switcher.
@@ -118,7 +120,7 @@ cd packages/cli && pnpm dev -- login --server http://localhost:3000
 
 ```bash
 pnpm -r run test                                             # Run all unit tests
-cd apps/api && pnpm run test:integration                     # Integration tests (requires dev DB)
+cd apps/api && pnpm run test:integration                     # Integration tests (requires a dev DB built with `pnpm db:migrate`, not `drizzle-kit push`: the file-GC trigger lives in the SQL migrations)
 cd apps/api && pnpm exec playwright install chromium          # Install Playwright browser once
 cd apps/api && pnpm run test:e2e                              # End-to-end security sandbox tests
 ```
@@ -180,6 +182,8 @@ oa whoami
 | Set the default team for this project | `oa use <team-slug>` |
 | Publish artifact and generate a link in the team's default mode | `oa push report.html --title "Q3 Summary" --share` |
 | Update an existing artifact (create new version) | `oa push report.html --id <artifact-id> --message "Updated metrics"` |
+| Publish with a theme, font and width (omit to inherit the team's/service's theme) | `oa push report.md --theme ocean --font inter --width wide` |
+| Keep the look exactly as authored (viewers can't restyle it) | `oa push report.md --lock-appearance` |
 | Create a team-only link (only logged-in team members can open it) | `oa share <artifact-id> --team` |
 | Create expiring link with password protection | `oa share <artifact-id> --password "secret123" --expires 7d` |
 | Create a fully public link (may be disabled by team/instance policy) | `oa share <artifact-id> --public` |
@@ -404,15 +408,50 @@ Already have a finished Markdown document (research note, RFC, post-mortem, or a
 
 ---
 
-### Independent CSS Themes
+### Layouts and colour themes
 
-Themes decouple aesthetics from content. Switching a theme takes one line in YAML:
+Two independent one-line choices in the YAML spec: **how it is laid out** and **how it looks**.
 
-- **`default`**: Clean neutral theme suitable for general documents and mixed deliverables.
-- **`data`**: Optimized for dashboards, dense metrics, sortable tables, and hover-highlighting.
-- **`document`**: Optimized for long-form reading (720px readable width, 1.8 line-height, elegant typography).
-- **`promo`**: High-impact landing pages and announcements (gradient hero, elevated cards).
+**`layout:`** is a spacing and density preset:
+
+- **`default`**: Clean neutral layout for general documents and mixed deliverables.
+- **`data`**: Dashboards, dense metrics, sortable tables, hover-highlighting.
+- **`document`**: Long-form reading (720px readable width, 1.8 line-height).
+- **`promo`**: Landing pages and announcements (large hero, elevated cards).
 - **`diagram`**: Centered, responsive layout for architecture and flow diagrams.
+
+**`theme:`** is a colour theme. Every theme restyles all blocks, charts, diagrams and code, and ships light and dark variants that follow the viewer's system setting:
+
+| Theme | Character |
+|---|---|
+| `sand` | Sand & Moss, flat warm surfaces (the default) |
+| `graphite` | Neutral greys with a steel-blue accent, soft corners |
+| `ocean` | Cool blue-teal, generous rounding |
+| `editorial` | Warm paper, terracotta accent, serif body text |
+| `terminal` | Monospace, sharp corners, green and amber accents |
+
+Also available per artifact: `font:` (`system`, `inter`, `onest`, `plex-sans`, `source-serif`, `jetbrains-mono`) and `width:` (`narrow`, `normal`, `wide`, `full` for a fluid page; text keeps a readable line length). The old `theme: data|document|promo|diagram` still works as an alias for `layout:`.
+
+```yaml
+layout: data
+theme: ocean
+font: inter
+width: wide
+```
+
+#### Where the theme comes from
+
+The theme is resolved on every view as **artifact → team → service**, so you rarely need to set it per artifact:
+
+- **Service** (superadmin, `/admin/settings`): always set, `sand` by default.
+- **Team** (owner/admin, team settings): overrides the service theme, or inherits it.
+- **Artifact**: chosen when creating it (`oa push --theme ocean`, the `theme` field over the API/MCP, the create form) and changeable later on the artifact page. Leave it empty to inherit.
+
+Changing a team or service theme recolours every artifact that inherits it, with no republish. Themes apply to Markdown, Mermaid, SVG and constructor pages; hand-written HTML only changes where it uses the theme's CSS variables.
+
+#### Viewers can restyle a shared page
+
+The share-link page has an **Appearance** menu: theme, colour mode (system / light / dark) and, where it makes sense, width. The choice is kept only in that viewer's browser, applies to every artifact they open and never changes what others see. To keep the look exactly as authored, publish with `--lock-appearance` (or untick *Viewers may change the appearance* on the artifact page).
 
 ---
 
