@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Artifact colour themes.** Five themes (`sand`, `graphite`, `ocean`, `editorial`, `terminal`), each with light and dark variants and full support for every constructor block, markdown, mermaid, svg and charts. The theme is resolved on every view as artifact → team → service, so changing a team or service theme re-colours everything that inherits it with no republish. The service theme is always set (default `sand`); a team (`PATCH /orgs/:id`) or an artifact (`theme` on create/update, `oa push --theme`, MCP, the web form) may override it, and `null` means "inherit". Hand-written HTML gets the theme tokens injected before its own styles, so it only changes where the page uses the token names.
+- **Artifact content width.** Per artifact `narrow | normal | wide | full` (fluid), set on create/update (`width`, `oa push --width`, MCP, web UI). Running text keeps a ~80ch measure in `wide` and `full`; tables, charts and cards use the full width.
+- **Viewers can restyle a shared page for themselves.** The share-link viewer has an "Appearance" menu: theme, colour mode (system / light / dark) and, where it makes sense, width. The choice is kept only in that viewer's browser and applies to every artifact they open; it never changes what other viewers see. Forcing a colour mode also pins the viewer's own panel and the diagrams/charts inside the page. Offered for markdown, mermaid, svg and constructor pages (not hand-written HTML).
+- **Artifact font.** A per-artifact body typeface (`system`, `inter`, `onest`, `plex-sans`, `source-serif`, `jetbrains-mono`) on top of the theme: `font` on create/update, `oa push --font`, MCP, constructor `font:`/`--font`, and a selector on the artifact page and in the create form. `null` = the theme's own font.
+- `lockAppearance` per artifact (API, MCP, `oa push --lock-appearance` / `--unlock-appearance`, web UI) hides that menu and ignores viewer choices when the look must stay as authored. Default: viewers may restyle.
+- Admin settings, team settings, the create-artifact form and the artifact page got theme and width controls.
+
+### Changed
+
+- Constructor: `theme:` now selects a colour theme. The spacing presets formerly called themes are **layouts** (`layout: data|document|promo|diagram`, files moved to `constructor/layouts/`, `--layouts-dir`); `theme: data` etc. keep working as an alias with a warning. Main content padding is now fluid.
+- Constructor pages carry `<meta name="oa-generator" content="constructor">` so the server can tell them from hand-written HTML.
+- Mermaid diagrams rendered by the server read their colours from the active theme.
+
+### Fixed
+
+- Constructor: `color: muted` resolved to a non-existent `--muted` token; it now uses `--fg-muted`.
+
 ## [0.14.0] - 2026-10-17
 
 ### Changed

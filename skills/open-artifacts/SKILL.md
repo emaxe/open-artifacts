@@ -94,14 +94,14 @@ the saved default.
 # Option A: You already have a markdown report -> pass it as source:
 cat > /tmp/report.yaml << 'EOF'
 title: "Q3 Performance Report"
-theme: document
+layout: document
 source: /tmp/my-report.md
 EOF
 
 # Option B: Assemble modular blocks (KPIs, charts, tables):
 cat > /tmp/report.yaml << 'EOF'
 title: "Q3 Analytics"
-theme: data
+layout: data
 blocks:
   - type: hero
     title: "Q3 Analytics"
@@ -234,7 +234,7 @@ are used if available; if not, the builder falls back to built-in parsing and mi
 # 1. Write the spec
 cat > /tmp/artifact.yaml << 'EOF'
 title: "My Report"
-theme: data
+layout: data
 
 blocks:
   - type: hero
@@ -273,7 +273,7 @@ of these three shortcuts instead of writing blocks manually:
 **Option A — Passthrough (fewest tokens, whole file becomes the artifact):**
 ```yaml
 title: "Q3 Analysis"
-theme: document
+layout: document
 source: /tmp/q3-report.md
 ```
 ```bash
@@ -283,7 +283,7 @@ node constructor/build.mjs /tmp/spec.yaml --share
 **Option B — `markdown-file` block (MD file + optional framing blocks above it):**
 ```yaml
 title: "Q3 Full Report"
-theme: document
+layout: document
 blocks:
   - type: hero
     title: "Q3 Analysis Report"
@@ -311,15 +311,39 @@ blocks:
 
 YAML frontmatter (`---…---`) is stripped automatically from `source` and `markdown-file`.
 
-### Theme selection
+### Layout selection
 
-| Theme | Use when |
-|-------|----------|
+`layout:` picks a spacing/density preset (CSS from `constructor/layouts/`). It has nothing to do with colour.
+`theme: data|document|promo|diagram` still works as an alias with a deprecation warning.
+
+| Layout | Use when |
+|--------|----------|
 | `default` | Generic content, one-offs, mixed layouts |
 | `data` | KPI dashboards, analytics, dense tables |
 | `document` | Long prose: reports, RFCs, post-mortems, **MD reports** |
 | `promo` | Landing pages, announcements, pitch decks |
 | `diagram` | Architecture diagrams, flow charts |
+
+### Colour themes and page width
+
+`theme:` selects a **colour theme**; every theme restyles all blocks and ships light and dark variants
+(following the viewer's `prefers-color-scheme`): `sand` (default), `graphite`, `ocean`, `editorial`, `terminal`.
+**Leave it out unless the user asked for a look**: the theme is resolved on the server per view as
+artifact → team → service, so an artifact without its own theme follows the team's and the service's choice.
+`--theme <id>` on the CLI does the same as `theme:` and is forwarded to `oa push`.
+
+Viewers of a share link can also restyle the page **for themselves** from an "Appearance" button in the viewer
+(theme, light/dark/system, width; saved only in their browser, never changes what others see). It is offered for
+markdown, mermaid, svg and constructor pages, not for hand-written HTML. If the look must stay exactly as authored (brand
+page, a fixed layout), publish with `--lock-appearance` (`lockAppearance: true` in the API/MCP); the default is unlocked.
+
+`font:` sets the body typeface (`system` | `inter` | `onest` | `plex-sans` | `source-serif` | `jetbrains-mono`); omit it to use
+the theme's own font. Code keeps its monospace font. Like theme and width it is stored on the artifact (`oa push --font`,
+the `font` API/MCP field, the artifact page).
+
+`width:` is `narrow` (720px) | `normal` (920px, default) | `wide` (1200px) | `full` (fluid). In `wide` and `full`
+running text is capped at ~80ch while tables, charts, grids and cards use the whole width. It can also be set (and changed
+later without a rebuild) with `oa push --width`, the `width` API field, or the artifact page in the web UI.
 
 ### Block catalogue
 

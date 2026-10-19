@@ -75,6 +75,22 @@ body. Once `expiresAt` passes, the content is hard-deleted; there's no recoverin
 -d '{"title":"Q3 Report","kind":"html","content":"<h1>Hi</h1>","lifetime":"7d"}'
 ```
 
+Optional `theme` (`sand` | `graphite` | `ocean` | `editorial` | `terminal`) and `width` (`narrow` | `normal` | `wide` |
+`full`). Omit or send `null` to inherit: the theme resolves artifact → team → service at view time (the team's value
+is `theme` on `PATCH /orgs/:id`, the service's `artifactTheme` on `PATCH /admin/settings`), and `width` falls back to the
+kind's default. Both can be changed later with `PATCH /artifacts/:id` and take effect immediately, without a new version.
+`GET /artifacts/:id` returns `effectiveTheme` alongside the artifact.
+
+`font` (`system` | `inter` | `onest` | `plex-sans` | `source-serif` | `jetbrains-mono`, or `null` for the theme's own) sets the body
+typeface; it is returned on `GET /artifacts/:id` and can be changed with `PATCH` like `theme` and `width`.
+
+`lockAppearance` (boolean, default `false`): when `true`, viewers of a share link cannot restyle the page. Otherwise the
+viewer's "Appearance" menu sends `?theme=&scheme=light|dark&width=` to `/embed/:token` (`&r=1` marks a re-render that is
+not counted as another view); unknown values are ignored.
+```bash
+-d '{"title":"Q3 Report","kind":"markdown","content":"# Hi","theme":"editorial","width":"wide"}'
+```
+
 ## Update an artifact (creates a new version)
 
 ```bash

@@ -235,7 +235,8 @@ node skills/open-artifacts/constructor/build.mjs report.yaml --share
 #### 2. Пример декларативной спецификации (`report.yaml`)
 ```yaml
 title: "Квартальная аналитика"
-theme: data # default | data | document | promo | diagram
+layout: data # default | data | document | promo | diagram (пресет раскладки)
+theme: ocean # цветовая тема: sand | graphite | ocean | editorial | terminal (необязательно)
 lang: ru
 
 blocks:
@@ -323,7 +324,7 @@ blocks:
    Укажите путь к файлу markdown. Сборщик отрендерит его, применит стили темы `document` и сформирует чистый автономный артефакт. Фронтматтер (`---...---`) удаляется автоматически:
    ```yaml
    title: "Аналитическая записка за Q3"
-   theme: document
+   layout: document
    source: /path/to/report.md
    ```
 
@@ -331,7 +332,7 @@ blocks:
    Объедините существующий `.md`-файл с верхнеуровневыми плитками KPI или hero-баннером:
    ```yaml
    title: "Резюме для руководства"
-   theme: document
+   layout: document
    blocks:
      - type: hero
        title: "Итоги работы за Q3"

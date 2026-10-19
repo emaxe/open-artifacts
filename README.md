@@ -235,7 +235,8 @@ node skills/open-artifacts/constructor/build.mjs report.yaml --share
 #### 2. Declarative Specification Example (`report.yaml`)
 ```yaml
 title: "Quarterly Analytics"
-theme: data # default | data | document | promo | diagram
+layout: data # default | data | document | promo | diagram (spacing preset)
+theme: ocean # colour theme: sand | graphite | ocean | editorial | terminal (optional)
 lang: en
 
 blocks:
@@ -323,7 +324,7 @@ Already have a finished Markdown document (research note, RFC, post-mortem, or a
    Point directly to the markdown file. The builder parses it, applies the document theme, and outputs a clean standalone artifact. Frontmatter (`---...---`) is stripped automatically:
    ```yaml
    title: "Q3 Research Note"
-   theme: document
+   layout: document
    source: /path/to/report.md
    ```
 
@@ -331,7 +332,7 @@ Already have a finished Markdown document (research note, RFC, post-mortem, or a
    Combine an existing `.md` file with top-level KPI metrics or a hero banner:
    ```yaml
    title: "Executive Summary"
-   theme: document
+   layout: document
    blocks:
      - type: hero
        title: "Q3 Executive Summary"

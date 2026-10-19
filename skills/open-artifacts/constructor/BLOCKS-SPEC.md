@@ -385,7 +385,7 @@ HTML-таблица. Поддерживает опциональную JS-сор
 
 ```yaml
 title: "Q3 Full Report"
-theme: document
+layout: document
 
 blocks:
   - type: hero
@@ -421,7 +421,7 @@ blocks:
 
 ```yaml
 title: "Q3 Analysis Report"
-theme: document
+layout: document
 lang: en
 source: /tmp/q3-analysis.md   # путь к MD-файлу, blocks не нужны
 ```

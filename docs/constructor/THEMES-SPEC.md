@@ -1,5 +1,11 @@
 # Themes Specification
 
+> **Note — layouts vs colour themes.** The files described below are **layout** presets: they now live in
+> `constructor/layouts/` and are selected with `layout:` (the old `theme: data|document|promo|diagram` still works as an
+> alias). `theme:` now selects a **colour theme** (`sand`, `graphite`, `ocean`, `editorial`, `terminal`): a set of values for the
+> tokens below, defined in `packages/shared/src/artifact-themes.ts` and injected by the server at view time. After editing it
+> run `pnpm --filter @open-artifacts/shared gen:palettes`. `default.css` stays in `constructor/themes/`.
+
 CSS-темы конструктора артефактов. Каждая тема — CSS-файл, который:
 1. **Не зависит от контента** — только визуальное оформление
 2. **Подключается как дополнение** к `default.css`
