@@ -16,7 +16,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "gen:tokens": "node scripts/gen-tokens.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen:palettes": "tsc -p tsconfig.json && node scripts/gen-artifact-themes.mjs"
   },
   "dependencies": {
     "zod": "^3.24.1"

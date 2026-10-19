@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { API_KEY_SCOPES } from "./scopes.js";
+import { ARTIFACT_FONT_IDS } from "./artifact-fonts.js";
+import { ARTIFACT_SCHEMES, ARTIFACT_THEME_IDS } from "./artifact-themes.js";
+import { ARTIFACT_WIDTHS } from "./artifact-width.js";
 import { DEFAULT_SHARE_MODES, SHARE_MODES } from "./share-policy.js";
 
 export const artifactKindSchema = z.enum(["html", "markdown", "mermaid", "svg"]);
@@ -7,6 +10,11 @@ export type ArtifactKind = z.infer<typeof artifactKindSchema>;
 
 export const artifactVisibilitySchema = z.enum(["private", "org"]);
 export type ArtifactVisibilitySchema = z.infer<typeof artifactVisibilitySchema>;
+
+export const artifactThemeSchema = z.enum(ARTIFACT_THEME_IDS);
+export const artifactFontSchema = z.enum(ARTIFACT_FONT_IDS);
+export const artifactSchemeSchema = z.enum(ARTIFACT_SCHEMES);
+export const artifactWidthSchema = z.enum(ARTIFACT_WIDTHS);
 
 export const orgRoleSchema = z.enum(["owner", "admin", "member", "viewer"]);
 
@@ -26,6 +34,14 @@ export const createArtifactSchema = z.object({
   content: z.string().min(1),
   visibility: artifactVisibilitySchema.default("org"),
   lifetime: lifetimeSchema,
+  // null/omitted = inherit the team's, then the service's, theme.
+  theme: artifactThemeSchema.nullish(),
+  // null/omitted = the kind's own default width.
+  width: artifactWidthSchema.nullish(),
+  // null/omitted = the theme's own font.
+  font: artifactFontSchema.nullish(),
+  // true = viewers of a share link can't restyle the page (theme/width/scheme picker is hidden).
+  lockAppearance: z.boolean().optional(),
 });
 export type CreateArtifactInput = z.infer<typeof createArtifactSchema>;
 
@@ -36,6 +52,10 @@ export const updateArtifactSchema = z.object({
   content: z.string().min(1).optional(),
   message: z.string().max(500).optional(),
   lifetime: lifetimeSchema,
+  theme: artifactThemeSchema.nullable().optional(),
+  width: artifactWidthSchema.nullable().optional(),
+  font: artifactFontSchema.nullable().optional(),
+  lockAppearance: z.boolean().optional(),
 });
 export type UpdateArtifactInput = z.infer<typeof updateArtifactSchema>;
 

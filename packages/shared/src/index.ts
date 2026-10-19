@@ -7,5 +7,8 @@ export * from "./scopes.js";
 export * from "./access.js";
 export * from "./share-policy.js";
 export * from "./share-access.js";
+export * from "./artifact-themes.js";
+export * from "./artifact-width.js";
+export * from "./artifact-fonts.js";
 export * from "./schemas.js";
 export * from "./design/tokens.js";
